@@ -39,7 +39,7 @@ if uploaded_file is not None and api_key:
                 file_upload = genai.upload_file(path=tmp_path, display_name="Documento Quipux")
                 
                 # El Cerebro (Modelo)
-                model = genai.GenerativeModel('gemini-1.5-flash-001')
+                model = genai.GenerativeModel('gemini-pro')
 
                 # El Prompt
                 prompt = """
