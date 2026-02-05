@@ -1,73 +1,50 @@
 import streamlit as st
 import google.generativeai as genai
-import tempfile
-import os
+import sys
 
-# --- CONFIGURACIÓN DE PÁGINA ---
-st.set_page_config(page_title="Asistente DINIC - Quipux", layout="wide")
+st.title("🛠️ Diagnóstico del Sistema")
 
-# --- BARRA LATERAL (CONFIGURACIÓN) ---
-with st.sidebar:
-    st.header("⚙️ Configuración Maestra")
-    api_key = st.text_input("Ingresa tu Gemini API Key", type="password")
-    st.warning("⚠️ Sistema de uso interno. No subir documentos clasificados como SECRETOS.")
+# 1. Verificación de la API Key
+api_key = st.sidebar.text_input("Pega tu API Key aquí", type="password")
 
-# --- LÓGICA PRINCIPAL ---
-st.title("📂 Analizador de Documentación Oficial (Quipux)")
-st.markdown("""
-Sube el Oficio, Memo o Circular. El sistema analizará:
-1. **Síntesis:** De qué trata.
-2. **Derivación:** A qué departamento corresponde.
-3. **Respuesta:** Borrador de oficio de contestación.
-""")
-
-# Carga de Archivo
-uploaded_file = st.file_uploader("Sube el archivo (PDF)", type=['pdf'])
-
-if uploaded_file is not None and api_key:
+if api_key:
     genai.configure(api_key=api_key)
     
-    if st.button("🚀 Analizar Documento con IA"):
-        with st.spinner("Leyendo documento y redactando respuesta..."):
-            try:
-                # Crear archivo temporal
-                with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
-                    tmp_file.write(uploaded_file.getvalue())
-                    tmp_path = tmp_file.name
+    st.write("---")
+    st.subheader("1. Versión de la Librería")
+    # Esto nos dirá si el servidor nos hizo caso o sigue con la versión vieja
+    try:
+        version = genai.__version__
+        st.info(f"Versión instalada de Google-GenerativeAI: **{version}**")
+        
+        if version < "0.5.0":
+            st.error("❌ ALERTA: La versión es demasiado antigua. El servidor no ha actualizado.")
+        else:
+            st.success("✅ La versión es correcta (Moderna).")
+            
+    except Exception as e:
+        st.error(f"No se pudo determinar la versión: {e}")
 
-                # Subir a Gemini
-                file_upload = genai.upload_file(path=tmp_path, display_name="Documento Quipux")
-                
-                # El Cerebro (Modelo)
-                model = genai.GenerativeModel('gemini-1.5-flash')
+    st.write("---")
+    st.subheader("2. Modelos Disponibles")
+    st.write("Intentando conectar con Google para ver qué modelos nos permite usar tu clave...")
+    
+    try:
+        # Esto lista lo que REALMENTE está disponible
+        modelos = genai.list_models()
+        encontrados = []
+        for m in modelos:
+            if 'generateContent' in m.supported_generation_methods:
+                encontrados.append(m.name)
+                st.code(m.name)
+        
+        if not encontrados:
+            st.warning("⚠️ No se encontraron modelos. Verifica si tu API Key es correcta.")
+        else:
+            st.success(f"✅ Se encontraron {len(encontrados)} modelos disponibles.")
+            
+    except Exception as e:
+        st.error(f"❌ Error crítico conectando con Google: {e}")
 
-                # El Prompt
-                prompt = """
-                Actúa como un Secretario Experto de la DINIC. Analiza este documento adjunto.
-                
-                TAREA 1: IDENTIFICACIÓN
-                - Resume el pedido principal en 1 frase.
-                - Identifica el remitente y el grado jerárquico.
-
-                TAREA 2: DERIVACIÓN (LOGICA)
-                - Basado en el contenido, ¿a qué departamento interno debería enviarse esto para su trámite? (Ej: Asesoría Jurídica, Administrativo, Inteligencia, RRHH). Explica por qué.
-
-                TAREA 3: RESPUESTA FORMAL
-                - Redacta el borrador del Oficio de respuesta o el comentario de reasignación en Quipux.
-                - Usa un tono formal, institucional y respetuoso ("De mi consideración...").
-                """
-
-                # Generar
-                response = model.generate_content([prompt, file_upload])
-                
-                st.success("✅ Análisis Completado")
-                st.write(response.text)
-
-                # Limpieza
-                os.remove(tmp_path)
-
-            except Exception as e:
-                st.error(f"Error: {e}")
-
-elif not api_key:
-    st.info("👈 Por favor, ingresa la API Key en la barra lateral para iniciar.")
+else:
+    st.info("👈 Pega tu API Key en la izquierda para iniciar el diagnóstico.")
