@@ -41,14 +41,18 @@ if modo == "🕵️‍♂️ Asesor Estratégico":
         if uploaded_file and st.button("⚖️ Analizar"):
             with st.spinner("Procesando..."):
                 # (Aquí va la lógica de redacción que ya tenías aprobada)
-                # La resumo para no hacer el código gigante, pero mantén la v8.0 aquí
                 try:
                     with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
                         tmp.write(uploaded_file.getvalue())
                         path = tmp.name
                     f_up = genai.upload_file(path, display_name="Doc")
                     model = genai.GenerativeModel('gemini-flash-latest')
-                    prompt = "Actúa como Asesor DINIC. Analiza, decide flujo (Cascada/Elevación) y redacta texto Quipux."
+                    prompt = """
+                    Actúa como Asesor DINIC. Analiza el documento y decide:
+                    1. Flujo (Cascada/Elevación).
+                    2. Redacta texto Quipux (Oficio o Memo).
+                    Dame la respuesta directa para copiar.
+                    """
                     res = model.generate_content([prompt, f_up])
                     st.markdown(res.text)
                     os.remove(path)
@@ -115,7 +119,7 @@ elif modo == "📊 Llenado de Matriz":
                 # 1. Cargamos tu archivo en memoria
                 wb = load_workbook(plantilla)
                 
-                # 2. Seleccionamos la hoja correcta (Ajustar nombre si cambia)
+                # 2. Seleccionamos la hoja correcta
                 # Buscamos la hoja que tenga "CONTROL" o usamos la primera activa
                 sheet_name = next((s for s in wb.sheetnames if "CONTROL" in s.upper()), wb.sheetnames[0])
                 ws = wb[sheet_name]
@@ -129,30 +133,39 @@ elif modo == "📊 Llenado de Matriz":
                 current_row = start_row
 
                 # 4. Mapeo de Columnas (Según tu CSV "CONTROL DE GESTIÓN")
-                # Col 3 (C) = FECHA INGRESO
-                # Col 4 (D) = REMITENTE
-                # Col 5 (E) = CARGO
-                # Col 6 (F) = ENTIDAD
-                # Col 7 (G) = N° DOC ENTRADA
-                # Col 9 (I) = ASUNTO
-                # Col 18 (R) = N° DOC RESPUESTA (Ajustado aprox, verificar)
-                # Col 21 (U) = DESTINO
-                # Col 22 (V) = N° DOC SALIDA
-                # Col 23 (W) = FECHA SALIDA
-
-                # Escribimos los datos
+                # Si ves que cae en la columna equivocada, cambia el número aquí:
+                
+                # Columna C (3): FECHA INGRESO
                 ws.cell(row=current_row, column=3, value=data["fecha_ingreso"])
+                
+                # Columna D (4): REMITENTE
                 ws.cell(row=current_row, column=4, value=data["remitente"])
+                
+                # Columna E (5): CARGO
                 ws.cell(row=current_row, column=5, value=data["cargo"])
+                
+                # Columna F (6): ENTIDAD
                 ws.cell(row=current_row, column=6, value=data["entidad"])
+                
+                # Columna G (7): N° DOC ENTRADA
                 ws.cell(row=current_row, column=7, value=data["doc_entrada"])
+                
+                # Columna I (9): ASUNTO
                 ws.cell(row=current_row, column=9, value=data["asunto"])
                 
-                # Zona de Salida (Ajusta los índices de columna si tu excel varía un poco)
-                ws.cell(row=current_row, column=18, value=data["doc_salida"]) # Respuesta
+                # --- ZONA DE SALIDA ---
+                
+                # Columna L (12): OBSERVACIÓN (Aprox, ajusta si es necesario)
+                ws.cell(row=current_row, column=12, value=data["observacion"]) 
+
+                # Columna R (18): N° DOC RESPUESTA
+                ws.cell(row=current_row, column=18, value=data["doc_salida"]) 
+                
+                # Columna U (21): DESTINO
                 ws.cell(row=current_row, column=21, value=data["destinatario"])
+                
+                # Columna W (23): FECHA SALIDA
                 ws.cell(row=current_row, column=23, value=data["fecha_salida"])
-                ws.cell(row=current_row, column=12, value=data["observacion"]) # Col L aprox
 
                 # 5. Guardar en memoria para descargar
                 output = io.BytesIO()
@@ -160,6 +173,7 @@ elif modo == "📊 Llenado de Matriz":
                 output.seek(0)
 
                 st.success(f"✅ Matriz Actualizada en Fila {current_row}")
+                st.write(f"Hoja detectada: {sheet_name}")
                 
                 st.download_button(
                     label="📥 Descargar Matriz Llena",
