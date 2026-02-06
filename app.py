@@ -84,7 +84,7 @@ def obtener_modelo_seguro():
 
 def llamar_ia_con_retry(model, content):
     """
-    Sistema Anti-Caídas v22:
+    Sistema Anti-Caídas:
     Si hay error 429 (Cuota) -> Espera y reintenta.
     Si hay error 404 (Modelo no existe) -> Intenta con 'gemini-1.5-pro' como último recurso.
     """
@@ -148,7 +148,7 @@ with st.sidebar:
 # ==============================================================================
 # ÁREA PRINCIPAL
 # ==============================================================================
-st.markdown('<div class="main-header"><h1>S.I.G.D. - DINIC v22.0</h1><h3>Sistema Oficial de Gestión Documental</h3></div>', unsafe_allow_html=True)
+st.markdown('<div class="main-header"><h1>S.I.G.D. - DINIC v22.1</h1><h3>Sistema Oficial de Gestión Documental</h3></div>', unsafe_allow_html=True)
 
 if sistema_activo:
     tab1, tab2 = st.tabs(["📊 GESTOR DE MATRIZ", "🕵️‍♂️ ASESOR ESTRATÉGICO"])
@@ -315,4 +315,76 @@ if sistema_activo:
             else: st.warning("⚠️ Sube documento.")
 
     if st.session_state.registros:
-        st.markdown("####
+        st.markdown("#### 📋 Cola de Trabajo")
+        for i, reg in enumerate(st.session_state.registros):
+            bg = "#e8f5e9" if reg["S"] == "FINALIZADO" else "#ffebee"
+            bc = "green" if reg["S"] == "FINALIZADO" else "red"
+            with st.container():
+                st.markdown(f"""
+                <div style="background-color: {bg}; padding: 10px; border-left: 5px solid {bc}; margin-bottom: 5px; border-radius: 5px;">
+                    <b>#{i+1}</b> | <b>{reg['G']}</b> | {reg['D']} <br>
+                    <span class="status-badge" style="background-color: {bc};">{reg['S']}</span> 
+                    Salida: {reg['P'] if reg['P'] else '---'}
+                </div>""", unsafe_allow_html=True)
+                c_edit, c_del = st.columns([1, 1])
+                if c_edit.button("✏️ EDITAR", key=f"e_{i}"): st.session_state.edit_index = i; st.rerun()
+                if c_del.button("🗑️ BORRAR", key=f"d_{i}"):
+                    st.session_state.registros.pop(i)
+                    if st.session_state.edit_index == i: st.session_state.edit_index = None
+                    st.rerun()
+
+        if st.button("📥 DESCARGAR EXCEL FINAL", type="primary"):
+            if os.path.exists("matriz_maestra.xlsx"):
+                try:
+                    wb = load_workbook("matriz_maestra.xlsx")
+                    ws = wb[next((s for s in wb.sheetnames if "CONTROL" in s.upper()), wb.sheetnames[0])]
+                    start_row = 7
+                    while ws.cell(row=start_row, column=1).value is not None: start_row += 1
+                    
+                    gf = PatternFill(start_color="92D050", end_color="92D050", fill_type="solid")
+                    rf = PatternFill(start_color="FF0000", end_color="FF0000", fill_type="solid")
+                    
+                    for i, reg in enumerate(st.session_state.registros):
+                        r = start_row + i
+                        def w(c, v): ws.cell(row=r, column=c).value = v
+                        w(1, i+1); w(3, reg["C"]); w(4, reg["D"]); w(5, reg["E"])
+                        w(6, reg["F"]); w(7, reg["G"]); w(8, reg["H"]); w(9, reg["I"])
+                        w(10, reg["J"]); w(11, reg["K"]); w(12, reg["L"]); w(13, reg["M"])
+                        w(14, reg["N"]); w(15, reg["O"]); w(16, reg["P"]); w(17, reg["Q"])
+                        cell_s = ws.cell(row=r, column=19); cell_s.value = reg["S"]
+                        if reg["S"]=="FINALIZADO": preservar_bordes(cell_s, gf)
+                        elif reg["S"]=="PENDIENTE": preservar_bordes(cell_s, rf)
+                        w(20, reg["T"]); w(21, reg["U"]); w(22, reg["V"]); w(23, reg["W"]); w(24, reg["X"])
+
+                    out = io.BytesIO()
+                    wb.save(out); out.seek(0)
+                    f_str = fecha_turno.strftime("%d-%m-%y")
+                    u_str = st.session_state.usuario_turno.upper()
+                    st.download_button("💾 Guardar Excel", data=out, file_name=f"TURNO {f_str} {u_str}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+                except Exception as e: st.error(f"Error Excel: {e}")
+
+    with tab2:
+        st.markdown("#### 🧠 Consultor de Despacho (IA)")
+        st.caption("Analiza documentos complejos y redacta borradores tácticos.")
+        up_asesor = st.file_uploader("Sube documento (PDF)", type=['pdf'], key="asesor_up")
+        
+        if up_asesor and st.button("ANALIZAR ESTRATEGIA"):
+            with st.spinner("Analizando jerarquía y redactando..."):
+                try:
+                    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as t:
+                        t.write(up_asesor.getvalue()); p_as = t.name
+                    
+                    model_asesor = obtener_modelo_seguro()
+                    f_as = genai.upload_file(p_as, display_name="Consulta")
+                    
+                    prompt_asesor = """
+                    Actúa como JEFE DE AYUDANTÍA DINIC.
+                    Analiza:
+                    1. DIAGNÓSTICO: ¿Quién pide? ¿Qué pide?
+                    2. DECISIÓN: ¿Elevamos a DIGIN o disponemos a Unidades? ¿Por qué?
+                    3. REDACCIÓN: El borrador exacto para Quipux.
+                    """
+                    res = llamar_ia_con_retry(model_asesor, [prompt_asesor, f_as])
+                    st.markdown(res.text)
+                    os.remove(p_as)
+                except Exception as e: st.error(f"Error: {e}")
