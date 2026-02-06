@@ -38,6 +38,9 @@ st.markdown("""
         color: white;
     }
     div.stButton > button { width: 100%; font-weight: bold; border-radius: 5px; }
+    @media (max-width: 640px) {
+        .main-header h1 { font-size: 20px; }
+    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -46,14 +49,13 @@ if 'registros' not in st.session_state: st.session_state.registros = []
 if 'usuario_turno' not in st.session_state: st.session_state.usuario_turno = "" 
 if 'edit_index' not in st.session_state: st.session_state.edit_index = None 
 
-# --- 3. AUTENTICACIÓN AUTOMÁTICA (SECRETS) ---
+# --- 3. AUTENTICACIÓN ---
 try:
-    # Toma la clave que YA pusiste en los Secrets
     api_key = st.secrets["GEMINI_API_KEY"]
     genai.configure(api_key=api_key)
     sistema_activo = True
 except Exception:
-    st.error("⚠️ Error: No se detecta la API KEY en los Secrets.")
+    st.error("⚠️ Error: No hay API KEY configurada en los Secrets.")
     sistema_activo = False
 
 # --- 4. FUNCIONES AUXILIARES ---
@@ -77,26 +79,24 @@ def preservar_bordes(cell, fill_obj):
         cell.border = Border(top=thin, left=thin, right=thin, bottom=thin)
 
 def obtener_modelo_seguro():
-    """Usa el nombre técnico correcto para evitar error 404."""
     return genai.GenerativeModel('gemini-1.5-flash-latest')
 
 def llamar_ia_con_retry(model, content):
-    """Sistema Anti-Caídas: Reintenta si hay saturación o error de modelo."""
     max_retries = 3
     for attempt in range(max_retries):
         try:
             return model.generate_content(content)
         except Exception as e:
             error_str = str(e)
-            if "429" in error_str: # Cuota excedida (esperar)
-                time.sleep(5) 
+            if "429" in error_str:
+                time.sleep(5)
                 continue
-            elif "404" in error_str: # Nombre de modelo incorrecto (probar otro)
+            elif "404" in error_str:
                 fallback = genai.GenerativeModel('gemini-pro')
                 return fallback.generate_content(content)
             else:
                 raise e
-    raise Exception("El sistema de IA está ocupado. Intente nuevamente en 1 minuto.")
+    raise Exception("Sistema ocupado. Intente de nuevo.")
 
 # --- 5. BARRA LATERAL ---
 with st.sidebar:
@@ -121,7 +121,7 @@ with st.sidebar:
         try:
             data = json.load(uploaded_backup)
             st.session_state.registros = data
-            st.success("¡Datos restaurados!")
+            st.success("¡Restaurado!")
             st.rerun()
         except: st.error("Archivo corrupto")
 
@@ -139,14 +139,11 @@ with st.sidebar:
 # ==============================================================================
 # ÁREA PRINCIPAL
 # ==============================================================================
-st.markdown('<div class="main-header"><h1>S.I.G.D. - DINIC v21.0</h1><h3>Sistema Oficial de Gestión Documental</h3></div>', unsafe_allow_html=True)
+st.markdown('<div class="main-header"><h1>S.I.G.D. - DINIC v21.1</h1><h3>Sistema Oficial de Gestión Documental</h3></div>', unsafe_allow_html=True)
 
 if sistema_activo:
     tab1, tab2 = st.tabs(["📊 GESTOR DE MATRIZ", "🕵️‍♂️ ASESOR ESTRATÉGICO"])
 
-    # ==========================================================================
-    # PESTAÑA 1: GESTOR
-    # ==========================================================================
     with tab1:
         is_editing = st.session_state.edit_index is not None
         idx_edit = st.session_state.edit_index
@@ -297,16 +294,17 @@ if sistema_activo:
                             if is_editing:
                                 st.session_state.registros[idx_edit] = row
                                 st.session_state.edit_index = None
-                                st.success("✅ Registro Actualizado")
+                                st.success("✅ Actualizado")
                             else:
                                 st.session_state.registros.append(row)
-                                st.success("✅ Registro Agregado")
+                                st.success("✅ Agregado")
 
                             for p in paths: os.remove(p)
                             st.rerun()
 
                         except Exception as e: st.error(f"Error: {e}")
-            else: st.warning("⚠️ Sube documento.")
+                else:
+                    st.warning("⚠️ Sube documento.") # ¡AQUÍ ESTABA EL ERROR! AHORA ESTÁ ALINEADO.
 
     if st.session_state.registros:
         st.markdown("#### 📋 Cola de Trabajo")
@@ -357,31 +355,28 @@ if sistema_activo:
                     st.download_button("💾 Guardar Excel", data=out, file_name=f"TURNO {f_str} {u_str}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
                 except Exception as e: st.error(f"Error Excel: {e}")
 
-# ==========================================================================
-# PESTAÑA 2: ASESOR ESTRATÉGICO
-# ==========================================================================
-with tab2:
-    st.markdown("#### 🧠 Consultor de Despacho (IA)")
-    st.caption("Analiza documentos complejos y redacta borradores tácticos.")
-    up_asesor = st.file_uploader("Sube documento (PDF)", type=['pdf'], key="asesor_up")
-    
-    if up_asesor and st.button("ANALIZAR ESTRATEGIA"):
-        with st.spinner("Analizando jerarquía y redactando..."):
-            try:
-                with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as t:
-                    t.write(up_asesor.getvalue()); p_as = t.name
-                
-                model_asesor = obtener_modelo_seguro()
-                f_as = genai.upload_file(p_as, display_name="Consulta")
-                
-                prompt_asesor = """
-                Actúa como JEFE DE AYUDANTÍA DINIC.
-                Analiza:
-                1. DIAGNÓSTICO: ¿Quién pide? ¿Qué pide?
-                2. DECISIÓN: ¿Elevamos a DIGIN o disponemos a Unidades? ¿Por qué?
-                3. REDACCIÓN: El borrador exacto para Quipux.
-                """
-                res = llamar_ia_con_retry(model_asesor, [prompt_asesor, f_as])
-                st.markdown(res.text)
-                os.remove(p_as)
-            except Exception as e: st.error(f"Error: {e}")
+    with tab2:
+        st.markdown("#### 🧠 Consultor de Despacho (IA)")
+        st.caption("Analiza documentos complejos y redacta borradores tácticos.")
+        up_asesor = st.file_uploader("Sube documento (PDF)", type=['pdf'], key="asesor_up")
+        
+        if up_asesor and st.button("ANALIZAR ESTRATEGIA"):
+            with st.spinner("Analizando jerarquía y redactando..."):
+                try:
+                    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as t:
+                        t.write(up_asesor.getvalue()); p_as = t.name
+                    
+                    model_asesor = obtener_modelo_seguro()
+                    f_as = genai.upload_file(p_as, display_name="Consulta")
+                    
+                    prompt_asesor = """
+                    Actúa como JEFE DE AYUDANTÍA DINIC.
+                    Analiza:
+                    1. DIAGNÓSTICO: ¿Quién pide? ¿Qué pide?
+                    2. DECISIÓN: ¿Elevamos a DIGIN o disponemos a Unidades? ¿Por qué?
+                    3. REDACCIÓN: El borrador exacto para Quipux.
+                    """
+                    res = llamar_ia_con_retry(model_asesor, [prompt_asesor, f_as])
+                    st.markdown(res.text)
+                    os.remove(p_as)
+                except Exception as e: st.error(f"Error: {e}")
