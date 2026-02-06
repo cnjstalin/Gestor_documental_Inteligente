@@ -14,7 +14,7 @@ from datetime import datetime
 
 # --- 1. CONFIGURACIÓN Y ESTILOS ---
 st.set_page_config(
-    page_title="S.I.G.D. DINIC PRO",
+    page_title="S.I.G.D. DINIC OFICIAL",
     layout="wide",
     page_icon="👮‍♂️",
     initial_sidebar_state="expanded"
@@ -46,13 +46,14 @@ if 'registros' not in st.session_state: st.session_state.registros = []
 if 'usuario_turno' not in st.session_state: st.session_state.usuario_turno = "" 
 if 'edit_index' not in st.session_state: st.session_state.edit_index = None 
 
-# --- 3. AUTENTICACIÓN ---
+# --- 3. AUTENTICACIÓN AUTOMÁTICA (SECRETS) ---
 try:
+    # Toma la clave que YA pusiste en los Secrets
     api_key = st.secrets["GEMINI_API_KEY"]
     genai.configure(api_key=api_key)
     sistema_activo = True
 except Exception:
-    st.error("⚠️ Error crítico: No se detectan credenciales.")
+    st.error("⚠️ Error: No se detecta la API KEY en los Secrets.")
     sistema_activo = False
 
 # --- 4. FUNCIONES AUXILIARES ---
@@ -75,26 +76,34 @@ def preservar_bordes(cell, fill_obj):
         thin = Side(border_style="thin", color="000000")
         cell.border = Border(top=thin, left=thin, right=thin, bottom=thin)
 
+def obtener_modelo_seguro():
+    """Usa el nombre técnico correcto para evitar error 404."""
+    return genai.GenerativeModel('gemini-1.5-flash-latest')
+
 def llamar_ia_con_retry(model, content):
-    """Intenta llamar a la IA, si da error 429 espera y reintenta."""
+    """Sistema Anti-Caídas: Reintenta si hay saturación o error de modelo."""
     max_retries = 3
     for attempt in range(max_retries):
         try:
             return model.generate_content(content)
         except Exception as e:
-            if "429" in str(e):
-                time.sleep(5) # Espera 5 segundos si está saturado
+            error_str = str(e)
+            if "429" in error_str: # Cuota excedida (esperar)
+                time.sleep(5) 
                 continue
+            elif "404" in error_str: # Nombre de modelo incorrecto (probar otro)
+                fallback = genai.GenerativeModel('gemini-pro')
+                return fallback.generate_content(content)
             else:
                 raise e
-    raise Exception("El servicio de Google está saturado. Intente en 1 minuto.")
+    raise Exception("El sistema de IA está ocupado. Intente nuevamente en 1 minuto.")
 
 # --- 5. BARRA LATERAL ---
 with st.sidebar:
     st.image("https://cdn-icons-png.flaticon.com/512/2921/2921222.png", width=80)
     st.markdown("### 👮‍♂️ CONTROL DE MANDO")
     
-    st.caption("RESPONSABLE")
+    st.caption("OFICIAL DE TURNO")
     nombre_input = st.text_input("Grado y Nombre:", value=st.session_state.usuario_turno)
     if nombre_input: st.session_state.usuario_turno = nombre_input
     
@@ -112,7 +121,7 @@ with st.sidebar:
         try:
             data = json.load(uploaded_backup)
             st.session_state.registros = data
-            st.success("¡Restaurado!")
+            st.success("¡Datos restaurados!")
             st.rerun()
         except: st.error("Archivo corrupto")
 
@@ -130,13 +139,13 @@ with st.sidebar:
 # ==============================================================================
 # ÁREA PRINCIPAL
 # ==============================================================================
-st.markdown('<div class="main-header"><h1>S.I.G.D. - DINIC v18.0</h1><h3>Sistema Integral (Gestión + Asesoría)</h3></div>', unsafe_allow_html=True)
+st.markdown('<div class="main-header"><h1>S.I.G.D. - DINIC v21.0</h1><h3>Sistema Oficial de Gestión Documental</h3></div>', unsafe_allow_html=True)
 
 if sistema_activo:
     tab1, tab2 = st.tabs(["📊 GESTOR DE MATRIZ", "🕵️‍♂️ ASESOR ESTRATÉGICO"])
 
     # ==========================================================================
-    # PESTAÑA 1: GESTOR (EDICIÓN Y MATRIZ)
+    # PESTAÑA 1: GESTOR
     # ==========================================================================
     with tab1:
         is_editing = st.session_state.edit_index is not None
@@ -183,7 +192,7 @@ if sistema_activo:
         
         if st.button(btn_text, type="primary"):
             if not os.path.exists("matriz_maestra.xlsx"):
-                st.error("❌ Falta Matriz Base.")
+                st.error("❌ Falta Matriz Base (Cargar en menú lateral).")
             else:
                 process = False
                 if tipo_proceso == "TRAMITE NORMAL":
@@ -203,8 +212,7 @@ if sistema_activo:
                                 with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as t:
                                     t.write(doc_salida.getvalue()); path_out = t.name; paths.append(t.name)
 
-                            # --- CAMBIO IMPORTANTE: MODELO ESTABLE 1.5 ---
-                            model = genai.GenerativeModel('gemini-1.5-flash') 
+                            model = obtener_modelo_seguro()
                             
                             files_ia = []
                             if path_in: files_ia.append(genai.upload_file(path_in, display_name="In"))
@@ -298,83 +306,82 @@ if sistema_activo:
                             st.rerun()
 
                         except Exception as e: st.error(f"Error: {e}")
-                else: st.warning("⚠️ Sube documento.")
+            else: st.warning("⚠️ Sube documento.")
 
-        if st.session_state.registros:
-            st.markdown("#### 📋 Cola de Trabajo")
-            for i, reg in enumerate(st.session_state.registros):
-                bg = "#e8f5e9" if reg["S"] == "FINALIZADO" else "#ffebee"
-                bc = "green" if reg["S"] == "FINALIZADO" else "red"
-                with st.container():
-                    st.markdown(f"""
-                    <div style="background-color: {bg}; padding: 10px; border-left: 5px solid {bc}; margin-bottom: 5px; border-radius: 5px;">
-                        <b>#{i+1}</b> | <b>{reg['G']}</b> | {reg['D']} <br>
-                        <span class="status-badge" style="background-color: {bc};">{reg['S']}</span> 
-                        Salida: {reg['P'] if reg['P'] else '---'}
-                    </div>""", unsafe_allow_html=True)
-                    c_edit, c_del = st.columns([1, 1])
-                    if c_edit.button("✏️ EDITAR", key=f"e_{i}"): st.session_state.edit_index = i; st.rerun()
-                    if c_del.button("🗑️ BORRAR", key=f"d_{i}"):
-                        st.session_state.registros.pop(i)
-                        if st.session_state.edit_index == i: st.session_state.edit_index = None
-                        st.rerun()
+    if st.session_state.registros:
+        st.markdown("#### 📋 Cola de Trabajo")
+        for i, reg in enumerate(st.session_state.registros):
+            bg = "#e8f5e9" if reg["S"] == "FINALIZADO" else "#ffebee"
+            bc = "green" if reg["S"] == "FINALIZADO" else "red"
+            with st.container():
+                st.markdown(f"""
+                <div style="background-color: {bg}; padding: 10px; border-left: 5px solid {bc}; margin-bottom: 5px; border-radius: 5px;">
+                    <b>#{i+1}</b> | <b>{reg['G']}</b> | {reg['D']} <br>
+                    <span class="status-badge" style="background-color: {bc};">{reg['S']}</span> 
+                    Salida: {reg['P'] if reg['P'] else '---'}
+                </div>""", unsafe_allow_html=True)
+                c_edit, c_del = st.columns([1, 1])
+                if c_edit.button("✏️ EDITAR", key=f"e_{i}"): st.session_state.edit_index = i; st.rerun()
+                if c_del.button("🗑️ BORRAR", key=f"d_{i}"):
+                    st.session_state.registros.pop(i)
+                    if st.session_state.edit_index == i: st.session_state.edit_index = None
+                    st.rerun()
 
-            if st.button("📥 DESCARGAR EXCEL FINAL", type="primary"):
-                if os.path.exists("matriz_maestra.xlsx"):
-                    try:
-                        wb = load_workbook("matriz_maestra.xlsx")
-                        ws = wb[next((s for s in wb.sheetnames if "CONTROL" in s.upper()), wb.sheetnames[0])]
-                        start_row = 7
-                        while ws.cell(row=start_row, column=1).value is not None: start_row += 1
-                        
-                        gf = PatternFill(start_color="92D050", end_color="92D050", fill_type="solid")
-                        rf = PatternFill(start_color="FF0000", end_color="FF0000", fill_type="solid")
-                        
-                        for i, reg in enumerate(st.session_state.registros):
-                            r = start_row + i
-                            def w(c, v): ws.cell(row=r, column=c).value = v
-                            w(1, i+1); w(3, reg["C"]); w(4, reg["D"]); w(5, reg["E"])
-                            w(6, reg["F"]); w(7, reg["G"]); w(8, reg["H"]); w(9, reg["I"])
-                            w(10, reg["J"]); w(11, reg["K"]); w(12, reg["L"]); w(13, reg["M"])
-                            w(14, reg["N"]); w(15, reg["O"]); w(16, reg["P"]); w(17, reg["Q"])
-                            cell_s = ws.cell(row=r, column=19); cell_s.value = reg["S"]
-                            if reg["S"]=="FINALIZADO": preservar_bordes(cell_s, gf)
-                            elif reg["S"]=="PENDIENTE": preservar_bordes(cell_s, rf)
-                            w(20, reg["T"]); w(21, reg["U"]); w(22, reg["V"]); w(23, reg["W"]); w(24, reg["X"])
-
-                        out = io.BytesIO()
-                        wb.save(out); out.seek(0)
-                        f_str = fecha_turno.strftime("%d-%m-%y")
-                        u_str = st.session_state.usuario_turno.upper()
-                        st.download_button("💾 Guardar Excel", data=out, file_name=f"TURNO {f_str} {u_str}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-                    except Exception as e: st.error(f"Error Excel: {e}")
-
-    # ==========================================================================
-    # PESTAÑA 2: ASESOR ESTRATÉGICO (RESTAURADO)
-    # ==========================================================================
-    with tab2:
-        st.markdown("#### 🧠 Consultor de Despacho (IA)")
-        st.caption("Analiza documentos complejos y redacta borradores tácticos.")
-        up_asesor = st.file_uploader("Sube documento (PDF)", type=['pdf'], key="asesor_up")
-        
-        if up_asesor and st.button("ANALIZAR ESTRATEGIA"):
-            with st.spinner("Analizando jerarquía y redactando..."):
+        if st.button("📥 DESCARGAR EXCEL FINAL", type="primary"):
+            if os.path.exists("matriz_maestra.xlsx"):
                 try:
-                    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as t:
-                        t.write(up_asesor.getvalue()); p_as = t.name
+                    wb = load_workbook("matriz_maestra.xlsx")
+                    ws = wb[next((s for s in wb.sheetnames if "CONTROL" in s.upper()), wb.sheetnames[0])]
+                    start_row = 7
+                    while ws.cell(row=start_row, column=1).value is not None: start_row += 1
                     
-                    # Usamos también el modelo 1.5 aquí para evitar el error 429
-                    model_asesor = genai.GenerativeModel('gemini-1.5-flash')
-                    f_as = genai.upload_file(p_as, display_name="Consulta")
+                    gf = PatternFill(start_color="92D050", end_color="92D050", fill_type="solid")
+                    rf = PatternFill(start_color="FF0000", end_color="FF0000", fill_type="solid")
                     
-                    prompt_asesor = """
-                    Actúa como JEFE DE AYUDANTÍA DINIC.
-                    Analiza:
-                    1. DIAGNÓSTICO: ¿Quién pide? ¿Qué pide?
-                    2. DECISIÓN: ¿Elevamos a DIGIN o disponemos a Unidades? ¿Por qué?
-                    3. REDACCIÓN: El borrador exacto para Quipux.
-                    """
-                    res = llamar_ia_con_retry(model_asesor, [prompt_asesor, f_as])
-                    st.markdown(res.text)
-                    os.remove(p_as)
-                except Exception as e: st.error(f"Error: {e}")
+                    for i, reg in enumerate(st.session_state.registros):
+                        r = start_row + i
+                        def w(c, v): ws.cell(row=r, column=c).value = v
+                        w(1, i+1); w(3, reg["C"]); w(4, reg["D"]); w(5, reg["E"])
+                        w(6, reg["F"]); w(7, reg["G"]); w(8, reg["H"]); w(9, reg["I"])
+                        w(10, reg["J"]); w(11, reg["K"]); w(12, reg["L"]); w(13, reg["M"])
+                        w(14, reg["N"]); w(15, reg["O"]); w(16, reg["P"]); w(17, reg["Q"])
+                        cell_s = ws.cell(row=r, column=19); cell_s.value = reg["S"]
+                        if reg["S"]=="FINALIZADO": preservar_bordes(cell_s, gf)
+                        elif reg["S"]=="PENDIENTE": preservar_bordes(cell_s, rf)
+                        w(20, reg["T"]); w(21, reg["U"]); w(22, reg["V"]); w(23, reg["W"]); w(24, reg["X"])
+
+                    out = io.BytesIO()
+                    wb.save(out); out.seek(0)
+                    f_str = fecha_turno.strftime("%d-%m-%y")
+                    u_str = st.session_state.usuario_turno.upper()
+                    st.download_button("💾 Guardar Excel", data=out, file_name=f"TURNO {f_str} {u_str}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+                except Exception as e: st.error(f"Error Excel: {e}")
+
+# ==========================================================================
+# PESTAÑA 2: ASESOR ESTRATÉGICO
+# ==========================================================================
+with tab2:
+    st.markdown("#### 🧠 Consultor de Despacho (IA)")
+    st.caption("Analiza documentos complejos y redacta borradores tácticos.")
+    up_asesor = st.file_uploader("Sube documento (PDF)", type=['pdf'], key="asesor_up")
+    
+    if up_asesor and st.button("ANALIZAR ESTRATEGIA"):
+        with st.spinner("Analizando jerarquía y redactando..."):
+            try:
+                with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as t:
+                    t.write(up_asesor.getvalue()); p_as = t.name
+                
+                model_asesor = obtener_modelo_seguro()
+                f_as = genai.upload_file(p_as, display_name="Consulta")
+                
+                prompt_asesor = """
+                Actúa como JEFE DE AYUDANTÍA DINIC.
+                Analiza:
+                1. DIAGNÓSTICO: ¿Quién pide? ¿Qué pide?
+                2. DECISIÓN: ¿Elevamos a DIGIN o disponemos a Unidades? ¿Por qué?
+                3. REDACCIÓN: El borrador exacto para Quipux.
+                """
+                res = llamar_ia_con_retry(model_asesor, [prompt_asesor, f_as])
+                st.markdown(res.text)
+                os.remove(p_as)
+            except Exception as e: st.error(f"Error: {e}")
