@@ -43,7 +43,7 @@ if uploaded_file is not None and api_key:
                 file_upload = genai.upload_file(path=tmp_path, display_name="Doc Quipux")
                 
                 # 3. EL CEREBRO (Aquí usamos el modelo que SÍ tienes)
-                model = genai.GenerativeModel('gemini-2.0-flash')
+                model = genai.GenerativeModel('gemini-flash-latest')
 
                 # 4. LAS INSTRUCCIONES (Prompt)
                 # Aquí es donde pondremos tus reglas específicas luego
