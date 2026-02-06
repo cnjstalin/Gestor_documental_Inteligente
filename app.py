@@ -7,22 +7,21 @@ import os
 st.set_page_config(page_title="Sistema Documental DINIC", layout="wide", page_icon="⚖️")
 
 # --- GESTIÓN DE CREDENCIALES (SECRETS) ---
-# El sistema busca la clave automáticamente en el servidor
 try:
+    # Busca la clave en los secretos de Streamlit
     api_key = st.secrets["GEMINI_API_KEY"]
     genai.configure(api_key=api_key)
     sistema_activo = True
 except Exception:
-    st.error("⚠️ Error de Configuración: No se encontró la API KEY en los Secretos.")
+    st.error("⚠️ Error: No se encontró la API KEY en los Secretos.")
     sistema_activo = False
 
 # --- INTERFAZ LATERAL ---
 with st.sidebar:
-    st.image("https://cdn-icons-png.flaticon.com/512/2921/2921222.png", width=80) # Icono genérico documento
     st.title("Panel de Control")
-    st.info("Estado del Sistema: 🟢 EN LÍNEA")
+    st.success("🟢 Sistema En Línea")
     
-    # Aquí definimos tus departamentos reales (Edítalos si faltan)
+    # Opciones de departamentos
     dept_options = [
         "Dirección General",
         "Asesoría Jurídica",
@@ -33,7 +32,6 @@ with st.sidebar:
         "Logística y Financiero"
     ]
     st.write("---")
-    st.caption("Sistema de Asistencia Técnica v1.2")
 
 # --- LÓGICA PRINCIPAL ---
 st.title("🏛️ Gestión Documental Inteligente - DINIC")
@@ -44,20 +42,20 @@ if sistema_activo:
 
     if uploaded_file is not None:
         if st.button("⚡ Analizar y Generar Respuesta"):
-            with st.spinner("Leyendo documento, analizando contexto y redactando..."):
+            with st.spinner("Leyendo documento y redactando..."):
                 try:
-                    # 1. Archivo Temporal
+                    # 1. Crear archivo temporal
                     with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
                         tmp_file.write(uploaded_file.getvalue())
                         tmp_path = tmp_file.name
 
-                    # 2. Carga a Gemini
+                    # 2. Subir a Google
                     file_upload = genai.upload_file(path=tmp_path, display_name="Doc_Entrante")
                     
-                    # 3. Modelo (Usamos el Flash Latest que es rápido y gratis)
-                   model = genai.GenerativeModel('gemini-flash-latest')
+                    # 3. Cargar Modelo (Nombre corregido)
+                    model = genai.GenerativeModel('gemini-flash-latest')
 
-                    # 4. Prompt Avanzado (Aquí está la magia de John Rotot)
+                    # 4. El Prompt (Instrucciones)
                     prompt = f"""
                     Actúa como Secretario Técnico de la DINIC. Analiza el PDF adjunto.
                     
@@ -86,7 +84,7 @@ if sistema_activo:
                     Incluye espacios para fecha y firma.]
                     """
 
-                    # 5. Generación
+                    # 5. Generar
                     response = model.generate_content([prompt, file_upload])
                     
                     # 6. Mostrar Resultado
@@ -100,6 +98,3 @@ if sistema_activo:
                     st.error(f"Error técnico: {e}")
     else:
         st.info("👆 Sube un archivo para comenzar.")
-
-else:
-    st.warning("El sistema requiere configuración de API Key en 'Secrets'.")
