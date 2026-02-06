@@ -78,30 +78,46 @@ def preservar_bordes(cell, fill_obj):
         thin = Side(border_style="thin", color="000000")
         cell.border = Border(top=thin, left=thin, right=thin, bottom=thin)
 
-def obtener_modelo_seguro():
-    """Usa EXCLUSIVAMENTE gemini-1.5-flash (el más estable y rápido)."""
-    return genai.GenerativeModel('gemini-1.5-flash')
+def invocar_ia_inteligente(content):
+    """
+    Estrategia 'Todoterreno':
+    Prueba una lista de modelos hasta que uno funcione.
+    Maneja errores 404 (No existe) y 429 (Saturado).
+    """
+    # Lista de prioridades: Del más nuevo al más viejo
+    modelos_candidatos = [
+        "gemini-1.5-flash",          # El ideal
+        "gemini-1.5-flash-latest",   # Alias alternativo
+        "gemini-1.5-pro",            # Versión Pro
+        "gemini-pro"                 # Versión 1.0 (Vieja confiable)
+    ]
+    
+    ultimo_error = ""
 
-def llamar_ia_con_retry(model, content):
-    """
-    Sistema Anti-Caídas v23:
-    Solo maneja saturación (429). NO cambia de modelo para evitar error 404.
-    """
-    max_retries = 4
-    for attempt in range(max_retries):
-        try:
-            return model.generate_content(content)
-        except Exception as e:
-            error_str = str(e)
-            if "429" in error_str:
-                # Si está saturado, espera progresivamente (5s, 8s, 12s...)
-                wait_time = (attempt + 1) * 4
-                time.sleep(wait_time)
-                continue
-            else:
-                # Si es otro error, lo mostramos
-                raise e
-    raise Exception("El sistema de Google está muy saturado. Espera 1 minuto.")
+    for nombre_modelo in modelos_candidatos:
+        # Intentos por saturación (429) dentro de cada modelo
+        for intento in range(3): 
+            try:
+                model = genai.GenerativeModel(nombre_modelo)
+                return model.generate_content(content)
+            
+            except Exception as e:
+                error_str = str(e)
+                ultimo_error = error_str
+                
+                if "429" in error_str:
+                    # Si es saturación, espera y reintenta con EL MISMO modelo
+                    time.sleep(5 + (intento * 2))
+                    continue
+                elif "404" in error_str or "not found" in error_str.lower():
+                    # Si no encuentra el modelo, rompe el ciclo interno y PASA AL SIGUIENTE MODELO
+                    break
+                else:
+                    # Otros errores, probar siguiente modelo
+                    break
+    
+    # Si llega aquí, fallaron todos
+    raise Exception(f"No se pudo conectar con ningún modelo de IA. Último error: {ultimo_error}")
 
 # --- 5. BARRA LATERAL ---
 with st.sidebar:
@@ -144,7 +160,7 @@ with st.sidebar:
 # ==============================================================================
 # ÁREA PRINCIPAL
 # ==============================================================================
-st.markdown('<div class="main-header"><h1>S.I.G.D. - DINIC v23.0</h1><h3>Sistema Oficial de Gestión Documental</h3></div>', unsafe_allow_html=True)
+st.markdown('<div class="main-header"><h1>S.I.G.D. - DINIC v24.0</h1><h3>Sistema Oficial de Gestión Documental</h3></div>', unsafe_allow_html=True)
 
 if sistema_activo:
     tab1, tab2 = st.tabs(["📊 GESTOR DE MATRIZ", "🕵️‍♂️ ASESOR ESTRATÉGICO"])
@@ -203,7 +219,7 @@ if sistema_activo:
                 elif doc_entrada or doc_salida: process = True
                 
                 if process:
-                    with st.spinner("🤖 Procesando..."):
+                    with st.spinner("🤖 Analizando (Buscando mejor modelo disponible)..."):
                         try:
                             paths = []
                             path_in, path_out = None, None
@@ -214,8 +230,7 @@ if sistema_activo:
                                 with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as t:
                                     t.write(doc_salida.getvalue()); path_out = t.name; paths.append(t.name)
 
-                            model = obtener_modelo_seguro()
-                            
+                            # LLAMADA A LA FUNCIÓN TODOTERRENO
                             files_ia = []
                             if path_in: files_ia.append(genai.upload_file(path_in, display_name="In"))
                             if path_out: files_ia.append(genai.upload_file(path_out, display_name="Out"))
@@ -242,7 +257,7 @@ if sistema_activo:
                                     "fecha_salida": "DD/MM/AAAA"
                                 }
                                 """
-                                res = llamar_ia_con_retry(model, [prompt, *files_ia])
+                                res = invocar_ia_inteligente([prompt, *files_ia])
                                 data = json.loads(res.text.replace("```json", "").replace("```", ""))
 
                             final_data = registro_a_editar.copy() if is_editing else {}
@@ -307,7 +322,7 @@ if sistema_activo:
                             for p in paths: os.remove(p)
                             st.rerun()
 
-                        except Exception as e: st.error(f"Error: {e}")
+                        except Exception as e: st.error(f"Error Técnico: {e}")
                 else:
                     st.warning("⚠️ Sube documento.")
 
@@ -371,7 +386,6 @@ if sistema_activo:
                     with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as t:
                         t.write(up_asesor.getvalue()); p_as = t.name
                     
-                    model_asesor = obtener_modelo_seguro()
                     f_as = genai.upload_file(p_as, display_name="Consulta")
                     
                     prompt_asesor = """
@@ -381,7 +395,8 @@ if sistema_activo:
                     2. DECISIÓN: ¿Elevamos a DIGIN o disponemos a Unidades? ¿Por qué?
                     3. REDACCIÓN: El borrador exacto para Quipux.
                     """
-                    res = llamar_ia_con_retry(model_asesor, [prompt_asesor, f_as])
+                    # USAMOS TAMBIEN LA FUNCION INTELIGENTE AQUÍ
+                    res = invocar_ia_inteligente([prompt_asesor, f_as])
                     st.markdown(res.text)
                     os.remove(p_as)
                 except Exception as e: st.error(f"Error: {e}")
