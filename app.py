@@ -95,12 +95,10 @@ def llamar_ia_con_retry(model, content):
         except Exception as e:
             error_str = str(e)
             if "429" in error_str:
-                # Si es error de cuota, esperamos progresivamente (5s, 10s, etc)
                 wait_time = (attempt + 1) * 5
                 time.sleep(wait_time)
                 continue
             elif "404" in error_str:
-                # Si flash falla por nombre, intentamos PRO (sin 'gemini-pro' antiguo)
                 fallback = genai.GenerativeModel('gemini-1.5-pro')
                 return fallback.generate_content(content)
             else:
@@ -148,7 +146,7 @@ with st.sidebar:
 # ==============================================================================
 # ÁREA PRINCIPAL
 # ==============================================================================
-st.markdown('<div class="main-header"><h1>S.I.G.D. - DINIC v22.1</h1><h3>Sistema Oficial de Gestión Documental</h3></div>', unsafe_allow_html=True)
+st.markdown('<div class="main-header"><h1>S.I.G.D. - DINIC v22.2</h1><h3>Sistema Oficial de Gestión Documental</h3></div>', unsafe_allow_html=True)
 
 if sistema_activo:
     tab1, tab2 = st.tabs(["📊 GESTOR DE MATRIZ", "🕵️‍♂️ ASESOR ESTRATÉGICO"])
@@ -312,7 +310,8 @@ if sistema_activo:
                             st.rerun()
 
                         except Exception as e: st.error(f"Error: {e}")
-            else: st.warning("⚠️ Sube documento.")
+                else:
+                    st.warning("⚠️ Sube documento.")
 
     if st.session_state.registros:
         st.markdown("#### 📋 Cola de Trabajo")
