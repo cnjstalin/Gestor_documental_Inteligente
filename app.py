@@ -79,31 +79,29 @@ def preservar_bordes(cell, fill_obj):
         cell.border = Border(top=thin, left=thin, right=thin, bottom=thin)
 
 def obtener_modelo_seguro():
-    """Usa EXCLUSIVAMENTE gemini-1.5-flash que es el estándar actual."""
+    """Usa EXCLUSIVAMENTE gemini-1.5-flash (el más estable y rápido)."""
     return genai.GenerativeModel('gemini-1.5-flash')
 
 def llamar_ia_con_retry(model, content):
     """
-    Sistema Anti-Caídas:
-    Si hay error 429 (Cuota) -> Espera y reintenta.
-    Si hay error 404 (Modelo no existe) -> Intenta con 'gemini-1.5-pro' como último recurso.
+    Sistema Anti-Caídas v23:
+    Solo maneja saturación (429). NO cambia de modelo para evitar error 404.
     """
-    max_retries = 3
+    max_retries = 4
     for attempt in range(max_retries):
         try:
             return model.generate_content(content)
         except Exception as e:
             error_str = str(e)
             if "429" in error_str:
-                wait_time = (attempt + 1) * 5
+                # Si está saturado, espera progresivamente (5s, 8s, 12s...)
+                wait_time = (attempt + 1) * 4
                 time.sleep(wait_time)
                 continue
-            elif "404" in error_str:
-                fallback = genai.GenerativeModel('gemini-1.5-pro')
-                return fallback.generate_content(content)
             else:
+                # Si es otro error, lo mostramos
                 raise e
-    raise Exception("El sistema está saturado. Por favor espera 1 minuto e intenta de nuevo.")
+    raise Exception("El sistema de Google está muy saturado. Espera 1 minuto.")
 
 # --- 5. BARRA LATERAL ---
 with st.sidebar:
@@ -146,7 +144,7 @@ with st.sidebar:
 # ==============================================================================
 # ÁREA PRINCIPAL
 # ==============================================================================
-st.markdown('<div class="main-header"><h1>S.I.G.D. - DINIC v22.2</h1><h3>Sistema Oficial de Gestión Documental</h3></div>', unsafe_allow_html=True)
+st.markdown('<div class="main-header"><h1>S.I.G.D. - DINIC v23.0</h1><h3>Sistema Oficial de Gestión Documental</h3></div>', unsafe_allow_html=True)
 
 if sistema_activo:
     tab1, tab2 = st.tabs(["📊 GESTOR DE MATRIZ", "🕵️‍♂️ ASESOR ESTRATÉGICO"])
