@@ -3,12 +3,11 @@ import google.generativeai as genai
 import tempfile
 import os
 
-# --- CONFIGURACIÓN DE PÁGINA ---
-st.set_page_config(page_title="Sistema Documental DINIC", layout="wide", page_icon="⚖️")
+# --- 1. CONFIGURACIÓN INICIAL ---
+st.set_page_config(page_title="Gestión Documental DINIC", layout="wide", page_icon="👮‍♂️")
 
-# --- GESTIÓN DE CREDENCIALES (SECRETS) ---
+# --- 2. AUTENTICACIÓN (INVISIBLE) ---
 try:
-    # Busca la clave en los secretos de Streamlit
     api_key = st.secrets["GEMINI_API_KEY"]
     genai.configure(api_key=api_key)
     sistema_activo = True
@@ -16,79 +15,85 @@ except Exception:
     st.error("⚠️ Error: No se encontró la API KEY en los Secretos.")
     sistema_activo = False
 
-# --- INTERFAZ LATERAL ---
+# --- 3. BARRA LATERAL (JERARQUÍA DINIC) ---
 with st.sidebar:
-    st.title("Panel de Control")
-    st.success("🟢 Sistema En Línea")
+    st.image("https://cdn-icons-png.flaticon.com/512/2921/2921222.png", width=70)
+    st.title("Panel de Mando DINIC")
+    st.success("🟢 Sistema Operativo")
     
-    # Opciones de departamentos
-    dept_options = [
-        "Dirección General",
-        "Asesoría Jurídica",
-        "Talento Humano",
-        "Inteligencia e Investigación",
-        "Operaciones",
-        "Archivo General",
-        "Logística y Financiero"
-    ]
-    st.write("---")
+    st.markdown("### 🏛️ Estructura Orgánica")
+    st.info("El sistema aplicará las reglas de flujo de la DIGIN automáticamente.")
 
-# --- LÓGICA PRINCIPAL ---
-st.title("🏛️ Gestión Documental Inteligente - DINIC")
-st.markdown("### Automatización de Respuesta a Oficios y Memorandos")
+# --- 4. LÓGICA DEL CEREBRO ---
+st.title("👮‍♂️ Asistente de Despacho - DINIC")
+st.markdown("### Generador de Texto para QUIPUX")
+st.caption("Sube el PDF recibido. La IA detectará si corresponde Oficio (a DIGIN) o Memorando (Interno).")
 
 if sistema_activo:
-    uploaded_file = st.file_uploader("Arrastra el documento PDF aquí", type=['pdf'])
+    uploaded_file = st.file_uploader("Sube el documento recibido (PDF)", type=['pdf'])
 
     if uploaded_file is not None:
-        if st.button("⚡ Analizar y Generar Respuesta"):
-            with st.spinner("Leyendo documento y redactando..."):
+        if st.button("⚡ Generar Texto para Quipux"):
+            with st.spinner("Analizando jerarquía, anexos y redactando respuesta..."):
                 try:
-                    # 1. Crear archivo temporal
+                    # A. Crear temporal
                     with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
                         tmp_file.write(uploaded_file.getvalue())
                         tmp_path = tmp_file.name
 
-                    # 2. Subir a Google
-                    file_upload = genai.upload_file(path=tmp_path, display_name="Doc_Entrante")
+                    # B. Subir a Google
+                    file_upload = genai.upload_file(path=tmp_path, display_name="Doc_Analisis")
                     
-                    # 3. Cargar Modelo (Nombre corregido)
+                    # C. Modelo (Usamos el Flash Latest)
                     model = genai.GenerativeModel('gemini-flash-latest')
 
-                    # 4. El Prompt (Instrucciones)
-                    prompt = f"""
-                    Actúa como Secretario Técnico de la DINIC. Analiza el PDF adjunto.
-                    
-                    TUS OBJETIVOS:
-                    1. IDENTIFICAR: Remitente, Cargo y Asunto exacto.
-                    2. CLASIFICAR: Selecciona el departamento de destino más lógico de esta lista: {dept_options}.
-                    3. ACCIÓN:
-                       - Si es informativo: Sugerir "Conocimiento y Archivo".
-                       - Si requiere acción: Redactar el OFICIO DE RESPUESTA completo.
+                    # D. EL PROMPT MAESTRO (Tus Reglas de Oro)
+                    prompt = """
+                    Actúa como el ASISTENTE PERSONAL DEL DIRECTOR DE LA DINIC (Dirección Nacional de Investigación de Delitos Contra la Corrupción).
+                    Tu único objetivo es redactar el CUERPO DEL TEXTO para pegar en QUIPUX.
 
-                    FORMATO DE SALIDA (Usa Markdown):
-                    
-                    ## 📊 Resumen Ejecutivo
-                    * **Documento:** [Tipo y Número si existe]
-                    * **Remitente:** [Nombre y Cargo]
-                    * **Asunto:** [Síntesis en 10 palabras]
-                    * **Prioridad:** [Alta/Media/Baja]
-                    
-                    ## 🎯 Derivación Sugerida
-                    **Departamento:** [Nombre del Depto]
-                    **Justificación:** [Por qué va ahí]
+                    CONTEXTO INSTITUCIONAL (REGLAS INQUEBRANTABLES):
+                    1. YO SOY: El Director de la DINIC (Nivel 1).
+                    2. MI JEFE (Superior): Dirección General de Investigación (DIGIN).
+                    3. MIS SUBALTERNOS (Internos): 
+                       - Dptos: Planificación, Jurídico, Comunicación, Análisis, Apoyo Op (Talento Humano, Logística), Financiero.
+                       - Unidades Adscritas: UDAR, UNDECOF, UCAP.
 
-                    ## 📝 Borrador de Respuesta (Copiar y Pegar)
-                    [Redacta aquí el oficio formal de respuesta.
-                    Usa un tono institucional, sobrio y directo.
-                    Incluye espacios para fecha y firma.]
+                    REGLAS DE FLUJO Y TIPO DE DOCUMENTO:
+                    - CASO A (Hacia Arriba/Afuera): Si el trámite va a la DIGIN o a una unidad externa a la DINIC -> Se redacta un OFICIO dirigido a la DIGIN (para que ellos canalicen).
+                    - CASO B (Hacia Abajo/Interno): Si el trámite es para mis Dptos o Unidades -> Se redacta un MEMORANDO.
+                    - CASO C (Reasignación): Si llega de un Dpto y debe ir a otro Dpto -> Se hace un comentario de Reasignación o Memorando.
+
+                    INSTRUCCIONES DE ANÁLISIS:
+                    1. Lee el documento adjunto.
+                    2. Identifica quién lo envía y qué pide.
+                    3. Si faltan datos en el principal, búscalos en el contexto de los anexos.
+                    4. Define a quién debemos responder o derivar (Jurídica, Talento Humano, DIGIN, etc.).
+
+                    FORMATO DE SALIDA (Sigue esto estrictamente):
+
+                    ---
+                    **ANÁLISIS RÁPIDO:**
+                    * **Tipo de Documento Recomendado:** [OFICIO o MEMORANDO]
+                    * **Destinatario Sugerido:** [Nombre del Dpto o DIGIN]
+                    * **Razón:** [Breve explicación de la regla aplicada]
+                    ---
+
+                    **CUERPO DEL DOCUMENTO (COPIAR Y PEGAR EN QUIPUX):**
+                    [Escribe aquí SOLO el texto del cuerpo. 
+                    - Usa lenguaje formal policial/institucional ("De mi consideración...", "Por disposición...").
+                    - Sé claro, directo y coherente.
+                    - Menciona el documento recibido como referencia.
+                    - Si es derivación: "Para su conocimiento y fines pertinentes..."]
+                    
+                    ---
                     """
 
-                    # 5. Generar
+                    # E. Generar
                     response = model.generate_content([prompt, file_upload])
                     
-                    # 6. Mostrar Resultado
-                    st.success("✅ Documento Procesado")
+                    # F. Resultado
+                    st.success("✅ Texto Generado")
                     st.markdown(response.text)
 
                     # Limpieza
@@ -97,4 +102,4 @@ if sistema_activo:
                 except Exception as e:
                     st.error(f"Error técnico: {e}")
     else:
-        st.info("👆 Sube un archivo para comenzar.")
+        st.info("👆 Esperando archivo...")
