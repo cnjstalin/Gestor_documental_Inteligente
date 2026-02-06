@@ -55,7 +55,7 @@ if sistema_activo:
                     file_upload = genai.upload_file(path=tmp_path, display_name="Doc_Entrante")
                     
                     # 3. Modelo (Usamos el Flash Latest que es rápido y gratis)
-                    model = genai.GenerativeModel('gemini-1.5-flash-latest')
+                   model = genai.GenerativeModel('gemini-flash-latest')
 
                     # 4. Prompt Avanzado (Aquí está la magia de John Rotot)
                     prompt = f"""
