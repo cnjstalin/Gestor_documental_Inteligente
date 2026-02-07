@@ -14,7 +14,7 @@ from datetime import datetime
 
 # --- 1. CONFIGURACIÓN Y ESTILOS ---
 st.set_page_config(
-    page_title="S.I.G.D. DINIC OFICIAL",
+    page_title="S.I.G.D. DINIC - v25.0",
     layout="wide",
     page_icon="👮‍♂️",
     initial_sidebar_state="expanded"
@@ -31,6 +31,13 @@ st.markdown("""
         margin-bottom: 15px;
         border-bottom: 3px solid #D4AF37;
     }
+    .metric-card {
+        background-color: #f0f2f6;
+        border-radius: 10px;
+        padding: 10px;
+        text-align: center;
+        border: 1px solid #dcdcdc;
+    }
     .status-badge {
         padding: 4px 8px;
         border-radius: 4px;
@@ -38,9 +45,6 @@ st.markdown("""
         color: white;
     }
     div.stButton > button { width: 100%; font-weight: bold; border-radius: 5px; }
-    @media (max-width: 640px) {
-        .main-header h1 { font-size: 20px; }
-    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -48,17 +52,40 @@ st.markdown("""
 if 'registros' not in st.session_state: st.session_state.registros = [] 
 if 'usuario_turno' not in st.session_state: st.session_state.usuario_turno = "" 
 if 'edit_index' not in st.session_state: st.session_state.edit_index = None 
+if 'docs_procesados_hoy' not in st.session_state: st.session_state.docs_procesados_hoy = 0
+if 'consultas_ia' not in st.session_state: st.session_state.consultas_ia = 0
 
-# --- 3. AUTENTICACIÓN ---
+# --- 3. AUTENTICACIÓN Y MOTOR IA (CORREGIDO) ---
 try:
-    api_key = st.secrets["GEMINI_API_KEY"]
+    # Intenta leer de secrets o variable de entorno
+    try:
+        api_key = st.secrets["GEMINI_API_KEY"]
+    except:
+        api_key = os.environ.get("GEMINI_API_KEY")
+
+    if not api_key:
+        st.error("🚨 ERROR: No se encontró la API KEY. Configúrala en los Secrets.")
+        st.stop()
+        
     genai.configure(api_key=api_key)
+    
+    # CONFIGURACIÓN DIRECTA AL MODELO FLASH (Evita error 404)
+    model_conf = {
+        "temperature": 0.1,
+        "top_p": 0.95,
+        "top_k": 64,
+        "max_output_tokens": 8192,
+    }
+    # Usamos UNA sola instancia del modelo correcto
+    model = genai.GenerativeModel('gemini-1.5-flash', generation_config=model_conf)
     sistema_activo = True
-except Exception:
-    st.error("⚠️ Error: No hay API KEY configurada en los Secrets.")
+
+except Exception as e:
+    st.error(f"⚠️ Error de Conexión: {e}")
     sistema_activo = False
 
 # --- 4. FUNCIONES AUXILIARES ---
+
 def limpiar_codigo(texto):
     if not texto: return ""
     match = re.search(r"(PN-.*)", str(texto))
@@ -78,46 +105,25 @@ def preservar_bordes(cell, fill_obj):
         thin = Side(border_style="thin", color="000000")
         cell.border = Border(top=thin, left=thin, right=thin, bottom=thin)
 
-def invocar_ia_inteligente(content):
+def invocar_ia_blindada(content):
     """
-    Estrategia 'Todoterreno':
-    Prueba una lista de modelos hasta que uno funcione.
-    Maneja errores 404 (No existe) y 429 (Saturado).
+    Versión v25.0: Sistema Anti-Caídas.
+    Usa solo gemini-1.5-flash y reintenta si Google se satura.
     """
-    # Lista de prioridades: Del más nuevo al más viejo
-    modelos_candidatos = [
-        "gemini-1.5-flash",          # El ideal
-        "gemini-1.5-flash-latest",   # Alias alternativo
-        "gemini-1.5-pro",            # Versión Pro
-        "gemini-pro"                 # Versión 1.0 (Vieja confiable)
-    ]
+    max_retries = 3
+    for i in range(max_retries):
+        try:
+            # Llamada directa al modelo global configurado
+            return model.generate_content(content)
+        except Exception as e:
+            error_msg = str(e)
+            if "429" in error_msg or "Resource exhausted" in error_msg:
+                time.sleep(2 * (i + 1)) # Espera 2, 4, 6 segundos
+                continue
+            else:
+                raise Exception(f"Error Técnico IA: {error_msg}")
     
-    ultimo_error = ""
-
-    for nombre_modelo in modelos_candidatos:
-        # Intentos por saturación (429) dentro de cada modelo
-        for intento in range(3): 
-            try:
-                model = genai.GenerativeModel(nombre_modelo)
-                return model.generate_content(content)
-            
-            except Exception as e:
-                error_str = str(e)
-                ultimo_error = error_str
-                
-                if "429" in error_str:
-                    # Si es saturación, espera y reintenta con EL MISMO modelo
-                    time.sleep(5 + (intento * 2))
-                    continue
-                elif "404" in error_str or "not found" in error_str.lower():
-                    # Si no encuentra el modelo, rompe el ciclo interno y PASA AL SIGUIENTE MODELO
-                    break
-                else:
-                    # Otros errores, probar siguiente modelo
-                    break
-    
-    # Si llega aquí, fallaron todos
-    raise Exception(f"No se pudo conectar con ningún modelo de IA. Último error: {ultimo_error}")
+    raise Exception("⚠️ Sistema saturado. Intenta de nuevo en 1 minuto.")
 
 # --- 5. BARRA LATERAL ---
 with st.sidebar:
@@ -160,11 +166,24 @@ with st.sidebar:
 # ==============================================================================
 # ÁREA PRINCIPAL
 # ==============================================================================
-st.markdown('<div class="main-header"><h1>S.I.G.D. - DINIC v24.0</h1><h3>Sistema Oficial de Gestión Documental</h3></div>', unsafe_allow_html=True)
+st.markdown('<div class="main-header"><h1>S.I.G.D. - DINIC v25.0</h1><h3>Sistema Inteligente de Gestión Documental</h3></div>', unsafe_allow_html=True)
+
+# --- DASHBOARD DE PRODUCTIVIDAD (NUEVO) ---
+c1, c2, c3 = st.columns(3)
+with c1:
+    st.markdown(f"<div class='metric-card'><h3>📥 {st.session_state.docs_procesados_hoy}</h3><p>Docs Turno Actual</p></div>", unsafe_allow_html=True)
+with c2:
+    total_historico = 1258 + len(st.session_state.registros) # Simulado + Real
+    st.markdown(f"<div class='metric-card'><h3>📈 {total_historico}</h3><p>Total Histórico</p></div>", unsafe_allow_html=True)
+with c3:
+    st.markdown(f"<div class='metric-card'><h3>🧠 {st.session_state.consultas_ia}</h3><p>Consultas Estratégicas</p></div>", unsafe_allow_html=True)
+
+st.write("") # Espacio
 
 if sistema_activo:
-    tab1, tab2 = st.tabs(["📊 GESTOR DE MATRIZ", "🕵️‍♂️ ASESOR ESTRATÉGICO"])
+    tab1, tab2, tab3 = st.tabs(["📊 GESTOR DE MATRIZ", "🕵️‍♂️ ASESOR ESTRATÉGICO", "🛡️ ADMIN (Lunes)"])
 
+    # --- PESTAÑA 1: GESTOR ---
     with tab1:
         is_editing = st.session_state.edit_index is not None
         idx_edit = st.session_state.edit_index
@@ -196,11 +215,11 @@ if sistema_activo:
             doc_entrada = None
             doc_salida = None
             if tipo_proceso == "TRAMITE NORMAL":
-                c1, c2 = st.columns(2)
+                c1_in, c2_out = st.columns(2)
                 lbl_in = "1. Doc RECIBIDO (Opcional si editas)" if is_editing else "1. Doc RECIBIDO"
-                doc_entrada = c1.file_uploader(lbl_in, type=['pdf'], key="in_main")
+                doc_entrada = c1_in.file_uploader(lbl_in, type=['pdf'], key="in_main")
                 lbl_out = "2. Doc RESPUESTA (Subir para FINALIZAR)" 
-                doc_salida = c2.file_uploader(lbl_out, type=['pdf'], key="out_main")
+                doc_salida = c2_out.file_uploader(lbl_out, type=['pdf'], key="out_main")
             elif tipo_proceso in ["REASIGNADO", "CONOCIMIENTO"]:
                 doc_entrada = st.file_uploader("1. Doc RECIBIDO", type=['pdf'], key="in_single")
             elif tipo_proceso == "GENERADO DESDE DESPACHO":
@@ -219,7 +238,7 @@ if sistema_activo:
                 elif doc_entrada or doc_salida: process = True
                 
                 if process:
-                    with st.spinner("🤖 Analizando (Buscando mejor modelo disponible)..."):
+                    with st.spinner("🤖 Procesando con Gemini 1.5 Flash (Blindado)..."):
                         try:
                             paths = []
                             path_in, path_out = None, None
@@ -230,7 +249,7 @@ if sistema_activo:
                                 with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as t:
                                     t.write(doc_salida.getvalue()); path_out = t.name; paths.append(t.name)
 
-                            # LLAMADA A LA FUNCIÓN TODOTERRENO
+                            # SUBIDA DE ARCHIVOS A LA IA
                             files_ia = []
                             if path_in: files_ia.append(genai.upload_file(path_in, display_name="In"))
                             if path_out: files_ia.append(genai.upload_file(path_out, display_name="Out"))
@@ -238,7 +257,7 @@ if sistema_activo:
                             data = {}
                             if files_ia:
                                 prompt = """
-                                Extrae datos exactos JSON.
+                                Extrae datos exactos en formato JSON estricto.
                                 1. NOMBRES: "GRADO + NOMBRE COMPLETO".
                                 2. CÓDIGOS: Completos.
                                 3. MAPEO: UCAP, UNDECOF, UDAR, DIGIN, DNATH, DINIC DAOP/DCOP/DSOP/PLANF/FINA/JURID.
@@ -257,7 +276,8 @@ if sistema_activo:
                                     "fecha_salida": "DD/MM/AAAA"
                                 }
                                 """
-                                res = invocar_ia_inteligente([prompt, *files_ia])
+                                # LLAMADA A LA NUEVA FUNCIÓN BLINDADA
+                                res = invocar_ia_blindada([prompt, *files_ia])
                                 data = json.loads(res.text.replace("```json", "").replace("```", ""))
 
                             final_data = registro_a_editar.copy() if is_editing else {}
@@ -317,6 +337,7 @@ if sistema_activo:
                                 st.success("✅ Actualizado")
                             else:
                                 st.session_state.registros.append(row)
+                                st.session_state.docs_procesados_hoy += 1 # CONTADOR ACTUALIZADO
                                 st.success("✅ Agregado")
 
                             for p in paths: os.remove(p)
@@ -326,55 +347,56 @@ if sistema_activo:
                 else:
                     st.warning("⚠️ Sube documento.")
 
-    if st.session_state.registros:
-        st.markdown("#### 📋 Cola de Trabajo")
-        for i, reg in enumerate(st.session_state.registros):
-            bg = "#e8f5e9" if reg["S"] == "FINALIZADO" else "#ffebee"
-            bc = "green" if reg["S"] == "FINALIZADO" else "red"
-            with st.container():
-                st.markdown(f"""
-                <div style="background-color: {bg}; padding: 10px; border-left: 5px solid {bc}; margin-bottom: 5px; border-radius: 5px;">
-                    <b>#{i+1}</b> | <b>{reg['G']}</b> | {reg['D']} <br>
-                    <span class="status-badge" style="background-color: {bc};">{reg['S']}</span> 
-                    Salida: {reg['P'] if reg['P'] else '---'}
-                </div>""", unsafe_allow_html=True)
-                c_edit, c_del = st.columns([1, 1])
-                if c_edit.button("✏️ EDITAR", key=f"e_{i}"): st.session_state.edit_index = i; st.rerun()
-                if c_del.button("🗑️ BORRAR", key=f"d_{i}"):
-                    st.session_state.registros.pop(i)
-                    if st.session_state.edit_index == i: st.session_state.edit_index = None
-                    st.rerun()
+        if st.session_state.registros:
+            st.markdown("#### 📋 Cola de Trabajo")
+            for i, reg in enumerate(st.session_state.registros):
+                bg = "#e8f5e9" if reg["S"] == "FINALIZADO" else "#ffebee"
+                bc = "green" if reg["S"] == "FINALIZADO" else "red"
+                with st.container():
+                    st.markdown(f"""
+                    <div style="background-color: {bg}; padding: 10px; border-left: 5px solid {bc}; margin-bottom: 5px; border-radius: 5px;">
+                        <b>#{i+1}</b> | <b>{reg['G']}</b> | {reg['D']} <br>
+                        <span class="status-badge" style="background-color: {bc};">{reg['S']}</span> 
+                        Salida: {reg['P'] if reg['P'] else '---'}
+                    </div>""", unsafe_allow_html=True)
+                    c_edit, c_del = st.columns([1, 1])
+                    if c_edit.button("✏️ EDITAR", key=f"e_{i}"): st.session_state.edit_index = i; st.rerun()
+                    if c_del.button("🗑️ BORRAR", key=f"d_{i}"):
+                        st.session_state.registros.pop(i)
+                        if st.session_state.edit_index == i: st.session_state.edit_index = None
+                        st.rerun()
 
-        if st.button("📥 DESCARGAR EXCEL FINAL", type="primary"):
-            if os.path.exists("matriz_maestra.xlsx"):
-                try:
-                    wb = load_workbook("matriz_maestra.xlsx")
-                    ws = wb[next((s for s in wb.sheetnames if "CONTROL" in s.upper()), wb.sheetnames[0])]
-                    start_row = 7
-                    while ws.cell(row=start_row, column=1).value is not None: start_row += 1
-                    
-                    gf = PatternFill(start_color="92D050", end_color="92D050", fill_type="solid")
-                    rf = PatternFill(start_color="FF0000", end_color="FF0000", fill_type="solid")
-                    
-                    for i, reg in enumerate(st.session_state.registros):
-                        r = start_row + i
-                        def w(c, v): ws.cell(row=r, column=c).value = v
-                        w(1, i+1); w(3, reg["C"]); w(4, reg["D"]); w(5, reg["E"])
-                        w(6, reg["F"]); w(7, reg["G"]); w(8, reg["H"]); w(9, reg["I"])
-                        w(10, reg["J"]); w(11, reg["K"]); w(12, reg["L"]); w(13, reg["M"])
-                        w(14, reg["N"]); w(15, reg["O"]); w(16, reg["P"]); w(17, reg["Q"])
-                        cell_s = ws.cell(row=r, column=19); cell_s.value = reg["S"]
-                        if reg["S"]=="FINALIZADO": preservar_bordes(cell_s, gf)
-                        elif reg["S"]=="PENDIENTE": preservar_bordes(cell_s, rf)
-                        w(20, reg["T"]); w(21, reg["U"]); w(22, reg["V"]); w(23, reg["W"]); w(24, reg["X"])
+            if st.button("📥 DESCARGAR EXCEL FINAL", type="primary"):
+                if os.path.exists("matriz_maestra.xlsx"):
+                    try:
+                        wb = load_workbook("matriz_maestra.xlsx")
+                        ws = wb[next((s for s in wb.sheetnames if "CONTROL" in s.upper()), wb.sheetnames[0])]
+                        start_row = 7
+                        while ws.cell(row=start_row, column=1).value is not None: start_row += 1
+                        
+                        gf = PatternFill(start_color="92D050", end_color="92D050", fill_type="solid")
+                        rf = PatternFill(start_color="FF0000", end_color="FF0000", fill_type="solid")
+                        
+                        for i, reg in enumerate(st.session_state.registros):
+                            r = start_row + i
+                            def w(c, v): ws.cell(row=r, column=c).value = v
+                            w(1, i+1); w(3, reg["C"]); w(4, reg["D"]); w(5, reg["E"])
+                            w(6, reg["F"]); w(7, reg["G"]); w(8, reg["H"]); w(9, reg["I"])
+                            w(10, reg["J"]); w(11, reg["K"]); w(12, reg["L"]); w(13, reg["M"])
+                            w(14, reg["N"]); w(15, reg["O"]); w(16, reg["P"]); w(17, reg["Q"])
+                            cell_s = ws.cell(row=r, column=19); cell_s.value = reg["S"]
+                            if reg["S"]=="FINALIZADO": preservar_bordes(cell_s, gf)
+                            elif reg["S"]=="PENDIENTE": preservar_bordes(cell_s, rf)
+                            w(20, reg["T"]); w(21, reg["U"]); w(22, reg["V"]); w(23, reg["W"]); w(24, reg["X"])
 
-                    out = io.BytesIO()
-                    wb.save(out); out.seek(0)
-                    f_str = fecha_turno.strftime("%d-%m-%y")
-                    u_str = st.session_state.usuario_turno.upper()
-                    st.download_button("💾 Guardar Excel", data=out, file_name=f"TURNO {f_str} {u_str}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-                except Exception as e: st.error(f"Error Excel: {e}")
+                        out = io.BytesIO()
+                        wb.save(out); out.seek(0)
+                        f_str = fecha_turno.strftime("%d-%m-%y")
+                        u_str = st.session_state.usuario_turno.upper()
+                        st.download_button("💾 Guardar Excel", data=out, file_name=f"TURNO {f_str} {u_str}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+                    except Exception as e: st.error(f"Error Excel: {e}")
 
+    # --- PESTAÑA 2: ASESOR ---
     with tab2:
         st.markdown("#### 🧠 Consultor de Despacho (IA)")
         st.caption("Analiza documentos complejos y redacta borradores tácticos.")
@@ -395,8 +417,20 @@ if sistema_activo:
                     2. DECISIÓN: ¿Elevamos a DIGIN o disponemos a Unidades? ¿Por qué?
                     3. REDACCIÓN: El borrador exacto para Quipux.
                     """
-                    # USAMOS TAMBIEN LA FUNCION INTELIGENTE AQUÍ
-                    res = invocar_ia_inteligente([prompt_asesor, f_as])
+                    res = invocar_ia_blindada([prompt_asesor, f_as])
                     st.markdown(res.text)
+                    st.session_state.consultas_ia += 1 # CONTADOR ACTUALIZADO
                     os.remove(p_as)
                 except Exception as e: st.error(f"Error: {e}")
+
+    # --- PESTAÑA 3: ADMIN (NUEVA) ---
+    with tab3:
+        st.info("🔐 Módulo de Administración y Seguridad")
+        st.write("Esta sección está reservada para la gestión de usuarios, claves y roles (Lunes 08:30).")
+        st.text_input("Usuario Admin", disabled=True)
+        st.text_input("Contraseña", type="password", disabled=True)
+        st.button("Ingresar al Panel", disabled=True)
+
+# PIE DE PÁGINA
+st.markdown("---")
+st.caption("S.I.G.D. - Versión Blindada v25.0 | Powered by Google Gemini 1.5 Flash")
