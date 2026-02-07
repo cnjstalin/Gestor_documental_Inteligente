@@ -14,7 +14,7 @@ from datetime import datetime
 
 # --- 1. CONFIGURACIÓN Y ESTILOS ---
 st.set_page_config(
-    page_title="S.I.G.D. DINIC - v25.0",
+    page_title="S.I.G.D. DINIC - v25.1",
     layout="wide",
     page_icon="👮‍♂️",
     initial_sidebar_state="expanded"
@@ -55,9 +55,8 @@ if 'edit_index' not in st.session_state: st.session_state.edit_index = None
 if 'docs_procesados_hoy' not in st.session_state: st.session_state.docs_procesados_hoy = 0
 if 'consultas_ia' not in st.session_state: st.session_state.consultas_ia = 0
 
-# --- 3. AUTENTICACIÓN Y MOTOR IA (CORREGIDO) ---
+# --- 3. AUTENTICACIÓN ---
 try:
-    # Intenta leer de secrets o variable de entorno
     try:
         api_key = st.secrets["GEMINI_API_KEY"]
     except:
@@ -68,20 +67,10 @@ try:
         st.stop()
         
     genai.configure(api_key=api_key)
-    
-    # CONFIGURACIÓN DIRECTA AL MODELO FLASH (Evita error 404)
-    model_conf = {
-        "temperature": 0.1,
-        "top_p": 0.95,
-        "top_k": 64,
-        "max_output_tokens": 8192,
-    }
-    # Usamos UNA sola instancia del modelo correcto
-    model = genai.GenerativeModel('gemini-1.5-flash', generation_config=model_conf)
     sistema_activo = True
 
 except Exception as e:
-    st.error(f"⚠️ Error de Conexión: {e}")
+    st.error(f"⚠️ Error de Conexión General: {e}")
     sistema_activo = False
 
 # --- 4. FUNCIONES AUXILIARES ---
@@ -105,25 +94,51 @@ def preservar_bordes(cell, fill_obj):
         thin = Side(border_style="thin", color="000000")
         cell.border = Border(top=thin, left=thin, right=thin, bottom=thin)
 
-def invocar_ia_blindada(content):
+def invocar_ia_todoterreno(content):
     """
-    Versión v25.0: Sistema Anti-Caídas.
-    Usa solo gemini-1.5-flash y reintenta si Google se satura.
+    ESTRATEGIA BLINDADA v25.1:
+    Prueba una lista de modelos. Si uno falla (404/Error), salta al siguiente.
+    Así garantizamos que SIEMPRE funcione, sin importar cambios de Google.
     """
-    max_retries = 3
-    for i in range(max_retries):
-        try:
-            # Llamada directa al modelo global configurado
-            return model.generate_content(content)
-        except Exception as e:
-            error_msg = str(e)
-            if "429" in error_msg or "Resource exhausted" in error_msg:
-                time.sleep(2 * (i + 1)) # Espera 2, 4, 6 segundos
-                continue
-            else:
-                raise Exception(f"Error Técnico IA: {error_msg}")
+    # Lista de prioridades: El mejor primero, el viejo confiable al final.
+    modelos_a_probar = [
+        "gemini-1.5-flash",        # La opción rápida y nueva
+        "gemini-1.5-flash-latest", # Alias alternativo
+        "gemini-1.5-pro",          # Opción potente
+        "gemini-1.0-pro",          # Opción anterior
+        "gemini-pro"               # La vieja confiable
+    ]
     
-    raise Exception("⚠️ Sistema saturado. Intenta de nuevo en 1 minuto.")
+    ultimo_error = ""
+
+    config = {
+        "temperature": 0.1,
+        "max_output_tokens": 8192,
+    }
+
+    for nombre_modelo in modelos_a_probar:
+        try:
+            # Intenta configurar el modelo actual de la lista
+            model = genai.GenerativeModel(nombre_modelo, generation_config=config)
+            
+            # Intenta generar (con reintentos por si está saturado 429)
+            for i in range(2): 
+                try:
+                    return model.generate_content(content)
+                except Exception as e:
+                    if "429" in str(e): # Si está lleno, espera un poco y reintenta
+                        time.sleep(2)
+                        continue
+                    else:
+                        raise e # Si es otro error (como 404), lanza la excepción para cambiar de modelo
+            
+        except Exception as e:
+            # Si falla este modelo, guardamos el error y probamos el siguiente de la lista
+            ultimo_error = str(e)
+            continue # Pasa al siguiente modelo en la lista "modelos_a_probar"
+    
+    # Si llega aquí es que fallaron TODOS los modelos
+    raise Exception(f"⚠️ Error Crítico: No se pudo conectar con NINGÚN modelo de IA. Verifica tu API Key o actualiza requirements.txt. Detalle: {ultimo_error}")
 
 # --- 5. BARRA LATERAL ---
 with st.sidebar:
@@ -166,19 +181,19 @@ with st.sidebar:
 # ==============================================================================
 # ÁREA PRINCIPAL
 # ==============================================================================
-st.markdown('<div class="main-header"><h1>S.I.G.D. - DINIC v25.0</h1><h3>Sistema Inteligente de Gestión Documental</h3></div>', unsafe_allow_html=True)
+st.markdown('<div class="main-header"><h1>S.I.G.D. - DINIC v25.1</h1><h3>Sistema Inteligente de Gestión Documental</h3></div>', unsafe_allow_html=True)
 
-# --- DASHBOARD DE PRODUCTIVIDAD (NUEVO) ---
+# --- DASHBOARD ---
 c1, c2, c3 = st.columns(3)
 with c1:
     st.markdown(f"<div class='metric-card'><h3>📥 {st.session_state.docs_procesados_hoy}</h3><p>Docs Turno Actual</p></div>", unsafe_allow_html=True)
 with c2:
-    total_historico = 1258 + len(st.session_state.registros) # Simulado + Real
+    total_historico = 1258 + len(st.session_state.registros)
     st.markdown(f"<div class='metric-card'><h3>📈 {total_historico}</h3><p>Total Histórico</p></div>", unsafe_allow_html=True)
 with c3:
     st.markdown(f"<div class='metric-card'><h3>🧠 {st.session_state.consultas_ia}</h3><p>Consultas Estratégicas</p></div>", unsafe_allow_html=True)
 
-st.write("") # Espacio
+st.write("") 
 
 if sistema_activo:
     tab1, tab2, tab3 = st.tabs(["📊 GESTOR DE MATRIZ", "🕵️‍♂️ ASESOR ESTRATÉGICO", "🛡️ ADMIN (Lunes)"])
@@ -238,7 +253,7 @@ if sistema_activo:
                 elif doc_entrada or doc_salida: process = True
                 
                 if process:
-                    with st.spinner("🤖 Procesando con Gemini 1.5 Flash (Blindado)..."):
+                    with st.spinner("🤖 Procesando con IA (Buscando mejor modelo)..."):
                         try:
                             paths = []
                             path_in, path_out = None, None
@@ -276,8 +291,8 @@ if sistema_activo:
                                     "fecha_salida": "DD/MM/AAAA"
                                 }
                                 """
-                                # LLAMADA A LA NUEVA FUNCIÓN BLINDADA
-                                res = invocar_ia_blindada([prompt, *files_ia])
+                                # LLAMADA A LA FUNCIÓN TODOTERRENO
+                                res = invocar_ia_todoterreno([prompt, *files_ia])
                                 data = json.loads(res.text.replace("```json", "").replace("```", ""))
 
                             final_data = registro_a_editar.copy() if is_editing else {}
@@ -337,7 +352,7 @@ if sistema_activo:
                                 st.success("✅ Actualizado")
                             else:
                                 st.session_state.registros.append(row)
-                                st.session_state.docs_procesados_hoy += 1 # CONTADOR ACTUALIZADO
+                                st.session_state.docs_procesados_hoy += 1
                                 st.success("✅ Agregado")
 
                             for p in paths: os.remove(p)
@@ -417,9 +432,10 @@ if sistema_activo:
                     2. DECISIÓN: ¿Elevamos a DIGIN o disponemos a Unidades? ¿Por qué?
                     3. REDACCIÓN: El borrador exacto para Quipux.
                     """
-                    res = invocar_ia_blindada([prompt_asesor, f_as])
+                    # LLAMADA A LA FUNCIÓN TODOTERRENO
+                    res = invocar_ia_todoterreno([prompt_asesor, f_as])
                     st.markdown(res.text)
-                    st.session_state.consultas_ia += 1 # CONTADOR ACTUALIZADO
+                    st.session_state.consultas_ia += 1
                     os.remove(p_as)
                 except Exception as e: st.error(f"Error: {e}")
 
@@ -433,4 +449,4 @@ if sistema_activo:
 
 # PIE DE PÁGINA
 st.markdown("---")
-st.caption("S.I.G.D. - Versión Blindada v25.0 | Powered by Google Gemini 1.5 Flash")
+st.caption("S.I.G.D. - Versión Blindada v25.1 | Powered by Google Gemini")
