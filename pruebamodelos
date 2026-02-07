@@ -1,0 +1,28 @@
+import streamlit as st
+import google.generativeai as genai
+import os
+
+st.title("Diagnóstico de Conexión DINIC")
+
+# 1. Busca la clave
+api_key = st.secrets.get("GEMINI_API_KEY")
+if not api_key:
+    st.error("❌ No encontré la API KEY en Secrets.")
+    st.stop()
+
+# 2. Configura
+genai.configure(api_key=api_key)
+
+# 3. Pregunta a Google qué modelos ve
+try:
+    st.write("📡 Conectando con Google...")
+    modelos = genai.list_models()
+    encontrados = []
+    for m in modelos:
+        if 'generateContent' in m.supported_generation_methods:
+            encontrados.append(m.name)
+    
+    st.success(f"✅ ¡Conexión Exitosa! Modelos disponibles ({len(encontrados)}):")
+    st.write(encontrados)
+except Exception as e:
+    st.error(f"❌ Error Fatal: {e}")
