@@ -4,69 +4,57 @@ import os
 import json
 import time
 
-# --- CONFIGURACIÓN ---
-st.set_page_config(page_title="S.I.G.D. DINIC - Conexión", layout="wide")
+st.set_page_config(page_title="S.I.G.D. DINIC - FINAL", layout="wide")
 
-# --- 1. VALIDACIÓN DE LLAVE ---
+# --- 1. AUTENTICACIÓN ---
 try:
     api_key = st.secrets.get("GEMINI_API_KEY")
     if not api_key:
-        st.error("🔑 FALTA LA LLAVE: Ve a Settings > Secrets y pega tu GEMINI_API_KEY.")
+        st.error("🔑 ERROR: No hay llave en Secrets.")
         st.stop()
     genai.configure(api_key=api_key)
 except Exception as e:
-    st.error(f"Error de configuración: {e}")
+    st.error(f"Error de llave: {e}")
     st.stop()
 
-# --- 2. FUNCIÓN LLAVE MAESTRA (Prueba modelos hasta conectar) ---
-def conectar_ia_robusta():
-    # Lista de nombres técnicos posibles. Probará uno por uno.
-    candidatos = [
-        "gemini-1.5-flash-001",  # Nombre técnico exacto (A veces el alias falla)
-        "gemini-1.5-flash",      # Alias común
-        "gemini-1.5-flash-latest",
-        "gemini-1.5-pro",        # Versión potente
-        "gemini-pro"             # Versión antigua (reserva final)
-    ]
+# --- 2. BUSCADOR AUTOMÁTICO DE MODELOS ---
+def obtener_modelo_disponible():
+    st.info("📡 Escaneando modelos disponibles para tu Llave Nueva...")
+    try:
+        # Preguntamos a Google qué modelos permite usar tu llave
+        listado = genai.list_models()
+        modelos_vistos = []
+        
+        for m in listado:
+            modelos_vistos.append(m.name)
+            # Buscamos si tu llave tiene acceso a Flash o Pro
+            if 'flash' in m.name or 'pro' in m.name:
+                if 'generateContent' in m.supported_generation_methods:
+                    return m.name # ¡Encontrado!
+        
+        # Si no encuentra ninguno específico, devolvemos el primero que sirva
+        st.warning(f"Modelos vistos: {modelos_vistos}")
+        return "gemini-1.5-flash" # Intento forzoso
+        
+    except Exception as e:
+        st.error(f"❌ Tu llave nueva tampoco funciona. Error: {e}")
+        return None
+
+# --- 3. INICIO DEL SISTEMA ---
+st.title("👮‍♂️ S.I.G.D. - PRUEBA FINAL")
+
+if st.button("🚔 INICIAR CONEXIÓN"):
+    nombre_modelo = obtener_modelo_disponible()
     
-    log = []
-    
-    for modelo in candidatos:
+    if nombre_modelo:
         try:
-            # Intenta conectar
-            test_model = genai.GenerativeModel(modelo)
-            # Prueba de fuego: Generar un "Hola" simple
-            respuesta = test_model.generate_content("Test de conexión.")
+            model = genai.GenerativeModel(nombre_modelo)
+            response = model.generate_content("¡Reporte de estado!")
             
-            # Si llega aquí, FUNCIONÓ. Devolvemos este modelo.
-            return test_model, modelo, log
+            st.success(f"✅ ¡ÉXITO TOTAL! Conectado usando: {nombre_modelo}")
+            st.balloons()
+            st.write(f"🤖 La IA dice: {response.text}")
+            st.success("YA PUEDES PEGAR EL CÓDIGO COMPLETO DE LA MATRIZ. EL PROBLEMA ESTÁ RESUELTO.")
             
         except Exception as e:
-            # Si falla, anotamos el error y pasamos al siguiente
-            log.append(f"❌ {modelo}: {str(e)}")
-            continue
-            
-    # Si todos fallan
-    return None, None, log
-
-# --- 3. INTERFAZ ---
-st.title("👮‍♂️ S.I.G.D. - Diagnóstico y Reparación")
-
-with st.spinner("🔄 Probando llaves de acceso con Google..."):
-    modelo_activo, nombre_modelo, historial = conectar_ia_robusta()
-
-if modelo_activo:
-    st.success(f"✅ ¡CONEXIÓN ESTABLECIDA! Modelo conectado: {nombre_modelo}")
-    st.info("El sistema ya encontró el modelo correcto para tu cuenta. Procederemos a cargar la interfaz completa.")
-    
-    # AQUÍ IRÍA TU SISTEMA (Simulado para prueba)
-    if st.button("🚔 Probar Generación de Informe"):
-        res = modelo_activo.generate_content("Actúa como policía y di: 'Sistema operativo y sin novedades'.")
-        st.write(f"**Respuesta:** {res.text}")
-
-else:
-    st.error("⚠️ NO SE PUDO CONECTAR. Aquí está el reporte técnico:")
-    for linea in historial:
-        st.text(linea)
-        
-    st.warning("🔍 SOLUCIÓN: Si ves error 404 en todos, tu API KEY podría no tener permisos habilitados. Crea una nueva en aistudio.google.com")
+            st.error(f"Falló al conectar con {nombre_modelo}: {e}")
