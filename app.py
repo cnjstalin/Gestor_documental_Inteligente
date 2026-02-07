@@ -5,6 +5,7 @@ import os
 import json
 import re
 import time
+import io  # <--- ¡ESTA ERA LA LIBRERÍA QUE FALTABA!
 import pandas as pd
 from copy import copy
 from openpyxl import load_workbook
@@ -146,6 +147,7 @@ with st.sidebar:
         try:
             data = json.load(uploaded_backup)
             st.session_state.registros = data
+            st.session_state.docs_procesados_hoy = len(data) # Actualizar contador
             st.success("¡Restaurado!")
             st.rerun()
         except: st.error("Archivo corrupto")
@@ -164,7 +166,7 @@ with st.sidebar:
 # ==============================================================================
 # ÁREA PRINCIPAL
 # ==============================================================================
-st.markdown(f'<div class="main-header"><h1>S.I.G.D. - DINIC v26.0</h1><h3>Sistema Oficial de Gestión Documental</h3></div>', unsafe_allow_html=True)
+st.markdown(f'<div class="main-header"><h1>S.I.G.D. - DINIC v26.1</h1><h3>Sistema Oficial de Gestión Documental</h3></div>', unsafe_allow_html=True)
 
 # --- DASHBOARD ---
 c1, c2, c3 = st.columns(3)
@@ -284,150 +286,4 @@ if sistema_activo:
                             unidad_f7 = extraer_unidad(get_val("codigo_completo_entrada", "G"))
                             
                             tiene_entrada = True if (path_in or (is_editing and final_data.get("G"))) else False
-                            tiene_salida = True if (path_out or (is_editing and final_data.get("P"))) else False
-                            
-                            estado_s7 = "PENDIENTE"
-                            if tipo_proceso != "TRAMITE NORMAL": estado_s7 = "FINALIZADO"
-                            elif tiene_entrada and tiene_salida: estado_s7 = "FINALIZADO"
-
-                            row = {
-                                "C": get_val("fecha_recepcion", "C"),
-                                "D": get_val("remitente_grado_nombre", "D"),
-                                "E": get_val("remitente_cargo", "E"),
-                                "F": unidad_f7,
-                                "G": cod_in,
-                                "H": get_val("fecha_recepcion", "H"),
-                                "I": get_val("asunto_entrada", "I"),
-                                "J": get_val("resumen_breve", "J"),
-                                "K": st.session_state.usuario_turno,
-                                "L": tipo_proceso if tipo_proceso != "TRAMITE NORMAL" else "",
-                                "M": get_val("cargo_destinatario_mapeado", "M"),
-                                "N": tipo_doc_salida,
-                                "O": get_val("destinatario_grado_nombre", "O"),
-                                "P": limpiar_codigo(get_val("codigo_completo_salida", "P")),
-                                "Q": get_val("fecha_salida", "Q"),
-                                "R": "",
-                                "S": estado_s7,
-                                "T": "SI" if get_val("cargo_destinatario_mapeado", "M") in ["UDAR","UNDECOF","UCAP","DIGIN","DNATH"] else "NO",
-                                "U": get_val("cargo_destinatario_mapeado", "U"),
-                                "V": limpiar_codigo(get_val("codigo_completo_salida", "V")),
-                                "W": get_val("fecha_salida", "W"),
-                                "X": get_val("fecha_salida", "X")
-                            }
-
-                            if estado_s7 == "PENDIENTE":
-                                for k in ["M", "N", "O", "P", "Q", "T", "U", "V", "W", "X"]: row[k] = ""
-                            
-                            if tipo_proceso == "GENERADO DESDE DESPACHO":
-                                row["D"]=""; row["E"]=""; row["F"]="DINIC"
-                                row["C"]=row["Q"]; row["H"]=row["Q"]
-                            elif tipo_proceso == "REASIGNADO":
-                                row["P"]=""; row["V"]=""
-                                for k in ["Q","W","X"]: row[k] = row["C"]
-                            elif tipo_proceso == "CONOCIMIENTO":
-                                for k in ["M","N","O","P","S","T","U","V"]: row[k] = ""
-                                for k in ["Q","W","X"]: row[k] = row["C"]
-
-                            if is_editing:
-                                st.session_state.registros[idx_edit] = row
-                                st.session_state.edit_index = None
-                                st.success("✅ Actualizado")
-                            else:
-                                st.session_state.registros.append(row)
-                                st.session_state.docs_procesados_hoy += 1
-                                st.success("✅ Agregado")
-
-                            for p in paths: os.remove(p)
-                            st.rerun()
-
-                        except Exception as e: st.error(f"Error Técnico: {e}")
-                else:
-                    st.warning("⚠️ Sube documento.")
-
-        if st.session_state.registros:
-            st.markdown("#### 📋 Cola de Trabajo")
-            for i, reg in enumerate(st.session_state.registros):
-                bg = "#e8f5e9" if reg["S"] == "FINALIZADO" else "#ffebee"
-                bc = "green" if reg["S"] == "FINALIZADO" else "red"
-                with st.container():
-                    st.markdown(f"""
-                    <div style="background-color: {bg}; padding: 10px; border-left: 5px solid {bc}; margin-bottom: 5px; border-radius: 5px;">
-                        <b>#{i+1}</b> | <b>{reg['G']}</b> | {reg['D']} <br>
-                        <span class="status-badge" style="background-color: {bc};">{reg['S']}</span> 
-                        Salida: {reg['P'] if reg['P'] else '---'}
-                    </div>""", unsafe_allow_html=True)
-                    c_edit, c_del = st.columns([1, 1])
-                    if c_edit.button("✏️ EDITAR", key=f"e_{i}"): st.session_state.edit_index = i; st.rerun()
-                    if c_del.button("🗑️ BORRAR", key=f"d_{i}"):
-                        st.session_state.registros.pop(i)
-                        if st.session_state.edit_index == i: st.session_state.edit_index = None
-                        st.rerun()
-
-            if st.button("📥 DESCARGAR EXCEL FINAL", type="primary"):
-                if os.path.exists("matriz_maestra.xlsx"):
-                    try:
-                        wb = load_workbook("matriz_maestra.xlsx")
-                        ws = wb[next((s for s in wb.sheetnames if "CONTROL" in s.upper()), wb.sheetnames[0])]
-                        start_row = 7
-                        while ws.cell(row=start_row, column=1).value is not None: start_row += 1
-                        
-                        gf = PatternFill(start_color="92D050", end_color="92D050", fill_type="solid")
-                        rf = PatternFill(start_color="FF0000", end_color="FF0000", fill_type="solid")
-                        
-                        for i, reg in enumerate(st.session_state.registros):
-                            r = start_row + i
-                            def w(c, v): ws.cell(row=r, column=c).value = v
-                            w(1, i+1); w(3, reg["C"]); w(4, reg["D"]); w(5, reg["E"])
-                            w(6, reg["F"]); w(7, reg["G"]); w(8, reg["H"]); w(9, reg["I"])
-                            w(10, reg["J"]); w(11, reg["K"]); w(12, reg["L"]); w(13, reg["M"])
-                            w(14, reg["N"]); w(15, reg["O"]); w(16, reg["P"]); w(17, reg["Q"])
-                            cell_s = ws.cell(row=r, column=19); cell_s.value = reg["S"]
-                            if reg["S"]=="FINALIZADO": preservar_bordes(cell_s, gf)
-                            elif reg["S"]=="PENDIENTE": preservar_bordes(cell_s, rf)
-                            w(20, reg["T"]); w(21, reg["U"]); w(22, reg["V"]); w(23, reg["W"]); w(24, reg["X"])
-
-                        out = io.BytesIO()
-                        wb.save(out); out.seek(0)
-                        f_str = fecha_turno.strftime("%d-%m-%y")
-                        u_str = st.session_state.usuario_turno.upper()
-                        st.download_button("💾 Guardar Excel", data=out, file_name=f"TURNO {f_str} {u_str}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-                    except Exception as e: st.error(f"Error Excel: {e}")
-
-    # --- PESTAÑA 2: ASESOR ---
-    with tab2:
-        st.markdown("#### 🧠 Consultor de Despacho (IA)")
-        st.caption("Analiza documentos complejos y redacta borradores tácticos.")
-        up_asesor = st.file_uploader("Sube documento (PDF)", type=['pdf'], key="asesor_up")
-        
-        if up_asesor and st.button("ANALIZAR ESTRATEGIA"):
-            with st.spinner("Analizando jerarquía y redactando..."):
-                try:
-                    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as t:
-                        t.write(up_asesor.getvalue()); p_as = t.name
-                    
-                    f_as = genai.upload_file(p_as, display_name="Consulta")
-                    
-                    prompt_asesor = """
-                    Actúa como JEFE DE AYUDANTÍA DINIC.
-                    Analiza:
-                    1. DIAGNÓSTICO: ¿Quién pide? ¿Qué pide?
-                    2. DECISIÓN: ¿Elevamos a DIGIN o disponemos a Unidades? ¿Por qué?
-                    3. REDACCIÓN: El borrador exacto para Quipux.
-                    """
-                    res = invocar_ia_segura([prompt_asesor, f_as])
-                    st.markdown(res.text)
-                    st.session_state.consultas_ia += 1
-                    os.remove(p_as)
-                except Exception as e: st.error(f"Error: {e}")
-
-    # --- PESTAÑA 3: ADMIN (Lunes) ---
-    with tab3:
-        st.info("🔐 Módulo de Administración y Seguridad")
-        st.write("Esta sección está reservada para la gestión de usuarios, claves y roles (Lunes 08:30).")
-        st.text_input("Usuario Admin", disabled=True)
-        st.text_input("Contraseña", type="password", disabled=True)
-        st.button("Ingresar al Panel", disabled=True)
-
-# PIE DE PÁGINA
-st.markdown("---")
-st.caption("S.I.G.D. - v26.0 | Powered by Google Gemini")
+                            tiene_
