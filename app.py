@@ -8,7 +8,6 @@ import time
 import io
 import random
 import base64
-import socket
 import pandas as pd
 from copy import copy
 from openpyxl import load_workbook
@@ -16,10 +15,9 @@ from openpyxl.styles import PatternFill, Border, Side, Alignment
 from datetime import datetime
 
 # --- 1. CONFIGURACIÓN Y ESTILOS ---
-VER_SISTEMA = "v27.3"
+VER_SISTEMA = "v27.4"
 ADMIN_USER = "1723623011"
 ADMIN_PASS_MASTER = "9994915010022"
-ADMIN_NAME_DISPLAY = "CBOS. JOHN CARRILLO" # Nombre forzado para Columna K del Admin
 
 st.set_page_config(
     page_title="SIGD DINIC",
@@ -28,9 +26,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- 2. BASES DE DATOS ---
-
-# A. Usuarios (Hardcoded + Local)
+# --- 2. BASE DE DATOS DE USUARIOS (INCRUSTADA) ---
 USUARIOS_BASE = {
     "0702870460": {"grado": "SGOS", "nombre": "VILLALTA OCHOA XAVIER BISMARK", "activo": True},
     "1715081731": {"grado": "SGOS", "nombre": "MINDA MINDA FRANCISCO GABRIEL", "activo": True},
@@ -54,7 +50,6 @@ DB_FILE = "usuarios_db.json"
 CONFIG_FILE = "config_sistema.json"
 CONTRATOS_FILE = "contratos_legal.json"
 
-# Funciones de Carga/Guardado
 def cargar_json(filepath, default):
     if os.path.exists(filepath):
         try:
@@ -67,31 +62,34 @@ def guardar_json(filepath, data):
     with open(filepath, 'w') as f:
         json.dump(data, f)
 
-# Inicialización
+# Inicializar sistema
 config_sistema = cargar_json(CONFIG_FILE, {"pass_universal": "DINIC2026"})
 db_usuarios = cargar_json(DB_FILE, USUARIOS_BASE)
-if not db_usuarios: db_usuarios = USUARIOS_BASE # Fallback seguro
+if not db_usuarios: db_usuarios = USUARIOS_BASE
 db_contratos = cargar_json(CONTRATOS_FILE, {})
 
 # --- 3. ESTILOS Y LOGO ---
-def get_logo_html():
+def get_img_as_base64(file_path):
+    with open(file_path, "rb") as f:
+        data = f.read()
+    return base64.b64encode(data).decode()
+
+def get_logo_html(width="120px"):
     img_path = "Captura.JPG"
     if os.path.exists(img_path):
-        with open(img_path, "rb") as f:
-            data = base64.b64encode(f.read()).decode()
-        return f'<img src="data:image/jpeg;base64,{data}" style="width:120px; margin-bottom:15px;">'
-    return '<img src="https://upload.wikimedia.org/wikipedia/commons/2/25/Escudo_Policia_Nacional_del_Ecuador.png" style="width:120px; margin-bottom:15px;">'
+        b64 = get_img_as_base64(img_path)
+        return f'<img src="data:image/jpeg;base64,{b64}" style="width:{width}; margin-bottom:15px;">'
+    return f'<img src="https://upload.wikimedia.org/wikipedia/commons/2/25/Escudo_Policia_Nacional_del_Ecuador.png" style="width:{width}; margin-bottom:15px;">'
 
-st.markdown(f"""
+st.markdown("""
     <style>
-    .main-header {{ background-color: #0E2F44; padding: 20px; border-radius: 10px; color: white; text-align: center; margin-bottom: 20px; border-bottom: 4px solid #D4AF37; }}
-    .main-header h1 {{ margin: 0; font-size: 2.5rem; font-weight: 800; }}
-    .main-header h3 {{ margin: 5px 0 0 0; font-size: 1.2rem; font-style: italic; color: #e0e0e0; }}
-    .metric-card {{ background-color: #f8f9fa; border-radius: 10px; padding: 15px; text-align: center; border: 1px solid #dee2e6; }}
-    .login-container {{ max-width: 400px; margin: auto; padding: 40px; background-color: #ffffff; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); text-align: center; border-top: 5px solid #0E2F44; }}
-    .legal-warning {{ background-color: #fff3cd; border-left: 6px solid #ffc107; padding: 15px; color: #856404; font-weight: bold; margin-bottom: 15px; }}
-    .policy-box {{ background-color: #f8f9fa; padding: 10px; border-radius: 5px; border: 1px solid #ddd; margin-bottom: 5px; font-size: 0.9rem; }}
-    div.stButton > button {{ width: 100%; font-weight: bold; border-radius: 5px; }}
+    .main-header { background-color: #0E2F44; padding: 20px; border-radius: 10px; color: white; text-align: center; margin-bottom: 20px; border-bottom: 4px solid #D4AF37; }
+    .main-header h1 { margin: 0; font-size: 2.5rem; font-weight: 800; }
+    .main-header h3 { margin: 5px 0 0 0; font-size: 1.2rem; font-style: italic; color: #e0e0e0; }
+    .metric-card { background-color: #f8f9fa; border-radius: 10px; padding: 15px; text-align: center; border: 1px solid #dee2e6; }
+    .login-container { max-width: 400px; margin: auto; padding: 40px; background-color: #ffffff; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); text-align: center; border-top: 5px solid #0E2F44; }
+    .legal-warning { background-color: #fff3cd; border-left: 6px solid #ffc107; padding: 15px; color: #856404; font-weight: bold; margin-bottom: 15px; }
+    div.stButton > button { width: 100%; font-weight: bold; border-radius: 5px; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -99,7 +97,7 @@ st.markdown(f"""
 if 'logged_in' not in st.session_state: st.session_state.logged_in = False
 if 'user_role' not in st.session_state: st.session_state.user_role = "" 
 if 'usuario_turno' not in st.session_state: st.session_state.usuario_turno = "" 
-if 'user_id' not in st.session_state: st.session_state.user_id = "" # Cédula del usuario actual
+if 'user_id' not in st.session_state: st.session_state.user_id = ""
 
 if 'registros' not in st.session_state: st.session_state.registros = [] 
 if 'edit_index' not in st.session_state: st.session_state.edit_index = None 
@@ -107,7 +105,6 @@ if 'docs_procesados_hoy' not in st.session_state: st.session_state.docs_procesad
 if 'consultas_ia' not in st.session_state: st.session_state.consultas_ia = 0
 if 'modelo_nombre' not in st.session_state: st.session_state.modelo_nombre = None
 
-# Listas
 if 'lista_unidades' not in st.session_state: 
     st.session_state.lista_unidades = [
         "DINIC", "SOPORTE OPERATIVO", "APOYO OPERATIVO", "PLANIFICACION", 
@@ -172,34 +169,44 @@ def preservar_bordes(cell, fill_obj):
 
 def generar_html_contrato(datos_usuario, img_b64):
     fecha_hora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    # Simular IP ya que en Streamlit Cloud no es directa, o usar host local
-    ip_simulada = socket.gethostbyname(socket.gethostname())
+    logo_b64 = ""
+    # Intentar cargar logo del escudo para el contrato
+    if os.path.exists("Captura.JPG"):
+        logo_b64 = get_img_as_base64("Captura.JPG")
     
+    # HTML del logo
+    logo_html_tag = f'<img src="data:image/jpeg;base64,{logo_b64}" style="width:100px; display:block; margin: 0 auto;">' if logo_b64 else ""
+
     html = f"""
-    <div style="font-family: Arial, sans-serif; padding: 40px; border: 2px solid #000;">
-        <h2 style="text-align: center;">ACTA DE COMPROMISO Y CONFIDENCIALIDAD<br>USO DEL ASESOR INTELIGENTE SIGD-DINIC</h2>
+    <div style="font-family: Arial, sans-serif; padding: 40px; border: 2px solid #000; max-width: 800px; margin: auto;">
+        <div style="text-align: center;">
+            {logo_html_tag}
+            <h2>ACTA DE COMPROMISO Y CONFIDENCIALIDAD<br>USO DEL ASESOR INTELIGENTE SIGD-DINIC</h2>
+        </div>
+        <br>
         <p><strong>Usuario:</strong> {datos_usuario['grado']} {datos_usuario['nombre']}</p>
         <p><strong>Cédula:</strong> {st.session_state.user_id}</p>
-        <p><strong>Fecha y Hora:</strong> {fecha_hora}</p>
-        <p><strong>IP Registro:</strong> {ip_simulada}</p>
+        <p><strong>Fecha y Hora de Aceptación:</strong> {fecha_hora}</p>
         <hr>
-        <h3>DECLARACIÓN DE ACEPTACIÓN</h3>
-        <p>Yo, el servidor policial arriba identificado, declaro haber leído, entendido y aceptado los Términos y Condiciones del Asesor Inteligente de SIGD:</p>
+        <h3>TÉRMINOS Y CONDICIONES DEL ASESOR INTELIGENTE SIGD</h3>
+        <p>Yo, el servidor policial arriba identificado, declaro haber leído, entendido y aceptado las siguientes políticas:</p>
         <ol>
-            <li><strong>Naturaleza de Apoyo:</strong> Herramienta de apoyo técnico, no sustituye mi criterio.</li>
-            <li><strong>Carácter Referencial:</strong> El contenido es tentativo y no oficial hasta mi firma.</li>
-            <li><strong>Responsabilidad Humana:</strong> Asumo la responsabilidad total de validar la información.</li>
-            <li><strong>Verificación Normativa:</strong> Me obligo a contrastar con la ley vigente.</li>
-            <li><strong>Prohibición de Datos Sensibles:</strong> NO ingresaré datos secretos o de fuentes.</li>
-            <li><strong>No Vinculante:</strong> Las recomendaciones no me eximen de responsabilidad.</li>
-            <li><strong>Posibilidad de Error:</strong> Reconozco que la IA puede fallar y revisaré todo.</li>
-            <li><strong>Trazabilidad:</strong> Acepto que mis accesos son auditados.</li>
-            <li><strong>Uso Ético:</strong> Solo para fines institucionales.</li>
-            <li><strong>Aceptación de Riesgo:</strong> Libero a la administración de responsabilidad por mal uso.</li>
+            <li><strong>Naturaleza de Apoyo:</strong> El Asesor Estratégico es una herramienta de Inteligencia Artificial generativa diseñada exclusivamente como apoyo técnico y de consulta. No sustituye el criterio, mando ni decisión del servidor policial.</li>
+            <li><strong>Carácter Referencial:</strong> Todo contenido, análisis, extracto o redacción generado por este sistema es estrictamente referencial y tentativo. No constituye un documento oficial ni una orden vinculante hasta que sea revisado y firmado por la autoridad competente.</li>
+            <li><strong>Responsabilidad Humana:</strong> El Oficial de Turno o usuario asume la responsabilidad total y exclusiva de verificar, corregir y validar la información antes de plasmarla en sistemas oficiales (Quipux, Partes Web, etc.).</li>
+            <li><strong>Verificación Normativa:</strong> Es obligación del usuario contrastar las sugerencias de la IA con la normativa legal vigente (COIP, COESCOP, Reglamentos) para evitar errores jurídicos o de procedimiento.</li>
+            <li><strong>Prohibición de Datos Sensibles:</strong> Queda estrictamente prohibido ingresar nombres de fuentes humanas, datos de víctimas protegidas o información clasificada como "SECRETA" que ponga en riesgo operaciones en curso.</li>
+            <li><strong>No Vinculante:</strong> Las recomendaciones tácticas (diagnósticos) emitidas por el sistema no tienen validez legal ni administrativa por sí mismas y no eximen de responsabilidad al usuario por acciones tomadas basándose en ellas.</li>
+            <li><strong>Posibilidad de Error:</strong> El usuario reconoce que la IA puede incurrir en "alucinaciones" (datos inexactos) y se compromete a realizar el control de calidad de cada párrafo generado.</li>
+            <li><strong>Trazabilidad de Uso:</strong> El sistema registra la identidad, fecha y hora del acceso para fines de auditoría y control de gestión de la DINIC.</li>
+            <li><strong>Uso Ético:</strong> La herramienta debe utilizarse estrictamente para fines institucionales. Cualquier uso para fines personales o ajenos al servicio será sancionado disciplinariamente.</li>
+            <li><strong>Aceptación de Riesgo:</strong> Al ingresar, el usuario declara entender estas limitaciones y libera a la administración del sistema de cualquier responsabilidad por el mal uso de la información generada.</li>
         </ol>
-        <div style="margin-top: 50px; text-align: right;">
-            <img src="data:image/png;base64,{img_b64}" style="width: 150px; border: 1px solid #ccc; padding: 5px;">
-            <p style="font-size: 10px;">Evidencia Biométrica Digital<br>{fecha_hora}</p>
+        <br><br>
+        <div style="border: 1px dashed #333; padding: 15px; width: fit-content; margin-left: auto;">
+            <p style="text-align: center; font-size: 12px; margin-bottom: 5px;"><strong>EVIDENCIA BIOMÉTRICA DE ACEPTACIÓN</strong></p>
+            <img src="data:image/png;base64,{img_b64}" style="width: 150px; border: 1px solid #ccc;">
+            <p style="font-size: 10px; text-align: center; margin-top: 5px;">Firma Digital: {fecha_hora}</p>
         </div>
     </div>
     """
@@ -213,8 +220,13 @@ if not st.session_state.logged_in:
     c1, c2, c3 = st.columns([1,2,1])
     with c2:
         st.markdown("<br><br>", unsafe_allow_html=True)
-        logo_html = get_logo_html()
-        st.markdown(f"""<div class="login-container">{logo_html}<h2 style='color:#0E2F44; margin-bottom: 5px;'>ACCESO SIGD DINIC</h2><p style='color: gray; margin-top: 0;'>Sistema Oficial de Gestión Documental</p></div>""", unsafe_allow_html=True)
+        st.markdown(f"""
+        <div class="login-container">
+            {get_logo_html()}
+            <h2 style='color:#0E2F44; margin-bottom: 5px;'>ACCESO SIGD DINIC</h2>
+            <p style='color: gray; margin-top: 0;'>Sistema Oficial de Gestión Documental</p>
+        </div>
+        """, unsafe_allow_html=True)
         
         with st.form("login_form"):
             usuario_input = st.text_input("Usuario (Cédula):").strip()
@@ -225,7 +237,7 @@ if not st.session_state.logged_in:
                     st.session_state.logged_in = True
                     st.session_state.user_role = "admin"
                     st.session_state.user_id = usuario_input
-                    st.session_state.usuario_turno = ADMIN_NAME_DISPLAY # NOMBRE FORZADO ADMIN
+                    st.session_state.usuario_turno = "CBOS. JOHN CARRILLO" # NOMBRE ADMIN FIJO
                     st.success("✅ Acceso Concedido: ADMINISTRADOR")
                     st.rerun()
                 # 2. USUARIOS
@@ -255,9 +267,7 @@ else:
         st.markdown("### 👮‍♂️ CONTROL DE MANDO")
         st.info(f"👤 **{st.session_state.usuario_turno}**")
         
-        # --- CAMPO FECHA RESTAURADO ---
         fecha_turno = st.date_input("Fecha Operación:", value=datetime.now())
-        # ------------------------------
 
         st.markdown("---")
         if st.button("🗑️ NUEVO TURNO (Limpiar)", type="primary"):
@@ -458,7 +468,7 @@ else:
 
                                     row = {
                                         "C": get_val("fecha_recepcion", "C"), "D": get_val("remitente_grado_nombre", "D"), "E": get_val("remitente_cargo", "E"), "F": unidad_f7, "G": cod_in, "H": get_val("fecha_recepcion", "H"), "I": get_val("asunto_entrada", "I"), "J": get_val("resumen_breve", "J"),
-                                        "K": st.session_state.usuario_turno, # USA EL NOMBRE CORRECTO (ADMIN O USUARIO)
+                                        "K": st.session_state.usuario_turno, 
                                         "L": "", "M": str_unidades_final, "N": tipo_doc_salida, "O": dest_ia, "P": cod_out, "Q": get_val("fecha_salida", "Q"), "R": "", "S": estado_s7, "T": es_interno, "U": str_unidades_final, "V": cod_out, "W": get_val("fecha_salida", "W"), "X": get_val("fecha_salida", "X"), "Y": "", "Z": ""
                                     }
 
@@ -530,71 +540,50 @@ else:
         # --- TAB 2: ASESOR (CONTRATOS) ---
         with tab2:
             st.markdown("#### 🧠 Consultor de Despacho (IA)")
-            
-            # --- LÓGICA DE ACEPTACIÓN DE CONTRATO ---
             usuario_actual = st.session_state.user_id
-            
-            # Verificar si ya aceptó
             ya_acepto = usuario_actual in db_contratos
             
             if not ya_acepto:
-                st.warning("⚠️ **ACCIÓN REQUERIDA:** Para acceder a este módulo, debe aceptar los Términos y Condiciones por única vez.")
+                st.warning("⚠️ **ACCIÓN REQUERIDA:** Debe aceptar los Términos y Condiciones.")
                 with st.expander("📜 TÉRMINOS Y CONDICIONES (DECÁLOGO)", expanded=True):
                     politicas = [
-                        "Naturaleza de Apoyo: Herramienta de apoyo técnico, no sustituye criterio humano.",
-                        "Carácter Referencial: Contenido tentativo, no oficial hasta firma.",
-                        "Responsabilidad Humana: El usuario valida la información.",
-                        "Verificación Normativa: Obligación de contrastar con ley vigente.",
-                        "Prohibición de Datos Sensibles: NO ingresar datos secretos.",
-                        "No Vinculante: Recomendaciones no eximen de responsabilidad.",
-                        "Posibilidad de Error: La IA puede fallar, revisar todo.",
-                        "Trazabilidad de Uso: Accesos auditados (IP, Fecha).",
-                        "Uso Ético: Solo fines institucionales.",
-                        "Aceptación de Riesgo: Libera a administración de responsabilidad."
+                        "Naturaleza de Apoyo: El Asesor Estratégico es una herramienta de Inteligencia Artificial generativa diseñada exclusivamente como apoyo técnico y de consulta. No sustituye el criterio, mando ni decisión del servidor policial.",
+                        "Carácter Referencial: Todo contenido, análisis, extracto o redacción generado por este sistema es estrictamente referencial y tentativo. No constituye un documento oficial ni una orden vinculante hasta que sea revisado y firmado por la autoridad competente.",
+                        "Responsabilidad Humana: El Oficial de Turno o usuario asume la responsabilidad total y exclusiva de verificar, corregir y validar la información antes de plasmarla en sistemas oficiales (Quipux, Partes Web, etc.).",
+                        "Verificación Normativa: Es obligación del usuario contrastar las sugerencias de la IA con la normativa legal vigente (COIP, COESCOP, Reglamentos) para evitar errores jurídicos o de procedimiento.",
+                        "Prohibición de Datos Sensibles: Queda estrictamente prohibido ingresar nombres de fuentes humanas, datos de víctimas protegidas o información clasificada como \"SECRETA\" que ponga en riesgo operaciones en curso.",
+                        "No Vinculante: Las recomendaciones tácticas (diagnósticos) emitidas por el sistema no tienen validez legal ni administrativa por sí mismas y no eximen de responsabilidad al usuario por acciones tomadas basándose en ellas.",
+                        "Posibilidad de Error: El usuario reconoce que la IA puede incurrir en \"alucinaciones\" (datos inexactos) y se compromete a realizar el control de calidad de cada párrafo generado.",
+                        "Trazabilidad de Uso: El sistema registra la identidad, fecha y hora del acceso para fines de auditoría y control de gestión de la DINIC.",
+                        "Uso Ético: La herramienta debe utilizarse estrictamente para fines institucionales. Cualquier uso para fines personales o ajenos al servicio será sancionado disciplinariamente.",
+                        "Aceptación de Riesgo: Al ingresar, el usuario declara entender estas limitaciones y libera a la administración del sistema de cualquier responsabilidad por el mal uso de la información generada."
                     ]
                     checks = []
                     for p in politicas:
                         checks.append(st.checkbox(p))
                     
-                    todos_aceptados = all(checks)
-                    
-                    if todos_aceptados:
-                        st.success("✅ Términos aceptados. Por favor, capture su foto para finalizar.")
+                    if all(checks):
+                        st.success("✅ Términos aceptados. Capture su foto para finalizar.")
                         foto = st.camera_input("Firma Biométrica (Foto)")
                         if foto:
-                            # Procesar Contrato
-                            bytes_foto = foto.getvalue()
-                            b64_foto = base64.b64encode(bytes_foto).decode()
-                            
-                            # Guardar en DB
+                            b64_foto = base64.b64encode(foto.getvalue()).decode()
                             db_contratos[usuario_actual] = {
                                 "fecha": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                                "ip": "REGISTRADA", # Simulada
                                 "foto": b64_foto,
                                 "usuario": st.session_state.usuario_turno
                             }
                             guardar_json(CONTRATOS_FILE, db_contratos)
                             st.balloons()
-                            st.success("¡Contrato Firmado! El módulo se desbloqueará.")
+                            st.success("¡Contrato Firmado!")
                             time.sleep(2)
                             st.rerun()
             else:
-                # --- MÓDULO DESBLOQUEADO ---
-                st.markdown("""
-                <div class="legal-warning">
-                ⚠️ AVISO LEGAL:<br>
-                Este módulo utiliza Inteligencia Artificial para generar borradores tácticos.<br>
-                El contenido es ESTRICTAMENTE REFERENCIAL y debe ser verificado por el PERSONAL DE TURNO a cargo antes DECIDIR su uso o no en documentos oficiales.
-                </div>
-                """, unsafe_allow_html=True)
-                
-                # Descargar Mi Contrato
+                st.markdown("""<div class="legal-warning">⚠️ AVISO LEGAL:<br>Este módulo utiliza Inteligencia Artificial...</div>""", unsafe_allow_html=True)
                 if usuario_actual in db_contratos:
                     datos = db_contratos[usuario_actual]
-                    # Recuperamos datos del usuario para el HTML
-                    user_info = db_usuarios.get(usuario_actual, {"grado":"", "nombre": st.session_state.usuario_turno})
-                    html_contrato = generar_html_contrato(user_info, datos["foto"])
-                    st.download_button("📜 Descargar Mi Contrato Firmado", html_contrato, file_name="Contrato_Uso.html", mime="text/html")
+                    u_info = db_usuarios.get(usuario_actual, {"grado":"", "nombre": st.session_state.usuario_turno})
+                    html_contrato = generar_html_contrato(u_info, datos["foto"])
+                    st.download_button("📜 Descargar Mi Contrato", html_contrato, file_name="Contrato_Uso.html", mime="text/html")
 
                 st.markdown("---")
                 up_asesor = st.file_uploader("Sube documento (PDF)", type=['pdf'], key="asesor_up")
@@ -625,20 +614,14 @@ else:
         # --- TAB 3: ADMIN ---
         with tab3:
             st.markdown("### 🛡️ PANEL DE ADMINISTRADOR")
-            
             if st.session_state.user_role == "admin":
                 verif_pass = st.text_input("Confirme Contraseña Maestra:", type="password")
-                
                 if verif_pass == ADMIN_PASS_MASTER:
                     st.success("ACCESO VERIFICADO")
-                    
                     t3_1, t3_2 = st.tabs(["👥 Usuarios", "📜 Contratos Firmados"])
-                    
                     with t3_1:
                         st.markdown("#### Gestión de Usuarios")
-                        df_users = pd.DataFrame.from_dict(db_usuarios, orient='index')
-                        st.dataframe(df_users, use_container_width=True)
-                        
+                        st.dataframe(pd.DataFrame.from_dict(db_usuarios, orient='index'), use_container_width=True)
                         c_add, c_del = st.columns(2)
                         with c_add:
                             st.caption("Agregar Usuario")
@@ -651,7 +634,6 @@ else:
                                     guardar_json(DB_FILE, db_usuarios)
                                     st.success("Usuario agregado.")
                                     st.rerun()
-                        
                         with c_del:
                             st.caption("Eliminar Usuario")
                             del_ced = st.selectbox("Seleccione Cédula:", options=list(db_usuarios.keys()))
@@ -661,19 +643,15 @@ else:
                                     guardar_json(DB_FILE, db_usuarios)
                                     st.success("Eliminado.")
                                     st.rerun()
-                    
                     with t3_2:
                         st.markdown("#### Repositorio de Contratos")
                         if db_contratos:
                             for ced, data in db_contratos.items():
                                 with st.expander(f"{data['usuario']} ({ced}) - {data['fecha']}"):
-                                    # Generar HTML al vuelo para descarga
                                     u_info = db_usuarios.get(ced, {"grado":"", "nombre": data['usuario']})
                                     html_c = generar_html_contrato(u_info, data["foto"])
                                     st.download_button(f"Descargar Contrato {ced}", html_c, file_name=f"Contrato_{ced}.html", mime="text/html")
-                        else:
-                            st.info("No hay contratos firmados aún.")
-
+                        else: st.info("No hay contratos firmados aún.")
                 else: st.info("Ingrese contraseña maestra.")
             else: st.error("ACCESO DENEGADO.")
 
