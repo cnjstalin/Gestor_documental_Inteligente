@@ -14,12 +14,12 @@ from openpyxl.styles import PatternFill, Border, Side, Alignment
 from datetime import datetime
 
 # --- 1. CONFIGURACIÓN Y ESTILOS ---
-VER_SISTEMA = "v26.7"
+VER_SISTEMA = "v26.8"
 
 st.set_page_config(
     page_title="SIGD DINIC",
     layout="wide",
-    page_icon="📂",
+    page_icon="🛡️",
     initial_sidebar_state="expanded"
 )
 
@@ -45,7 +45,6 @@ st.markdown("""
         border: 1px solid #dee2e6;
         box-shadow: 0 2px 4px rgba(0,0,0,0.05);
     }
-    .status-badge { padding: 4px 8px; border-radius: 4px; font-weight: bold; color: white; }
     div.stButton > button { width: 100%; font-weight: bold; border-radius: 5px; }
     </style>
 """, unsafe_allow_html=True)
@@ -58,9 +57,7 @@ if 'docs_procesados_hoy' not in st.session_state: st.session_state.docs_procesad
 if 'consultas_ia' not in st.session_state: st.session_state.consultas_ia = 0
 if 'modelo_nombre' not in st.session_state: st.session_state.modelo_nombre = None
 
-# Listas de Memoria
 if 'lista_unidades' not in st.session_state: 
-    # Incluye tanto departamentos internos como unidades externas para el selector
     st.session_state.lista_unidades = [
         "DINIC", "SOPORTE OPERATIVO", "APOYO OPERATIVO", "PLANIFICACION", 
         "JURIDICO", "COMUNICACION", "ANALISIS DE INFORMACION", "COORDINACION OPERACIONAL", 
@@ -100,7 +97,7 @@ def frases_curiosas():
     frases = [
         "¿Sabías que? El primer correo electrónico se envió en 1971.",
         "¿Sabías que? La DINIC procesa miles de datos para tu seguridad.",
-        "¿Sabías que? Los unicornios son el animal nacional de Escocia (y a veces salen en GitHub).",
+        "¿Sabías que? Los unicornios son el animal nacional de Escocia.",
         "¿Sabías que? La IA está leyendo a 1000 palabras por segundo.",
         "¿Sabías que? Un archivo bien organizado ahorra 40% de tiempo futuro.",
         "¿Sabías que? El café ayuda a procesar trámites (comprobado científicamente).",
@@ -110,42 +107,29 @@ def frases_curiosas():
 
 def limpiar_codigo(texto):
     if not texto: return ""
-    # Busca PN-...-QX...
     match = re.search(r"(PN-[A-Z0-9]+-QX(?:-\d+)?(?:-OF|-MM)?)", str(texto), re.IGNORECASE)
     if match: return match.group(1).strip().upper()
-    # Respaldo
     match2 = re.search(r"(?:Oficio|Memorando).*?(PN-.*)", str(texto), re.IGNORECASE)
     if match2: return match2.group(1).strip().upper()
     return str(texto).strip()
 
 def extraer_unidad_f7(texto_codigo):
     if not texto_codigo: return "DINIC"
-    # Busca lo que está entre PN- y -QX
     match = re.search(r"PN-([A-Z\s]+)-QX", str(texto_codigo).upper())
     if match: return match.group(1).strip()
     return "DINIC" 
 
 def determinar_sale_no_sale(destinos_str):
-    """
-    Logica para Columna T:
-    SI: Unidades Adscritas, DIGIN, Externas.
-    NO: Departamentos Internos de la Dirección.
-    """
     unidades_externas = ["UCAP", "UNDECOF", "UDAR", "DIGIN", "DNATH", "COMANDO GENERAL", "OTRAS DIRECCIONES"]
     destinos_upper = destinos_str.upper()
-    
-    # Si contiene alguna unidad externa, SALE (SI)
     for u in unidades_externas:
-        if u in destinos_upper:
-            return "SI"
-    
-    # Por defecto, si es interno (Departamentos), NO sale
+        if u in destinos_upper: return "SI"
     return "NO"
 
 def preservar_bordes(cell, fill_obj):
     original_border = copy(cell.border)
     cell.fill = fill_obj
-    cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=True) # Alineación centrada
+    cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
     if original_border: cell.border = original_border
     else:
         thin = Side(border_style="thin", color="000000")
@@ -160,9 +144,15 @@ def invocar_ia_segura(content):
             else: raise e
     raise Exception("Sistema saturado.")
 
-# --- 5. SIDEBAR ---
+# --- 5. SIDEBAR (LOGO ESCUDO) ---
 with st.sidebar:
-    st.image("https://cdn-icons-png.flaticon.com/512/2921/2921222.png", width=80)
+    # Lógica para cargar el Escudo (Captura.JPG) si existe, sino usa backup
+    logo_path = "Captura.JPG"
+    if os.path.exists(logo_path):
+        st.image(logo_path, use_container_width=True)
+    else:
+        st.image("https://cdn-icons-png.flaticon.com/512/2921/2921222.png", width=100)
+    
     st.markdown("### 👮‍♂️ CONTROL DE MANDO")
     
     # 1. PERSONA DE TURNO
@@ -246,10 +236,8 @@ if sistema_activo:
 
         col1, col2 = st.columns([1, 2])
         
-        # --- COLUMNA IZQUIERDA ---
         with col1:
             val_tipo = registro_a_editar['L'] if (is_editing and registro_a_editar['L']) else "TRAMITE NORMAL"
-            # Ajuste para consistencia con valores reales de L
             if val_tipo == "": val_tipo = "TRAMITE NORMAL" 
             
             tipo_proceso = st.selectbox("Tipo Gestión:", 
@@ -310,7 +298,6 @@ if sistema_activo:
                 elif sel_reasig != "SELECCIONAR...":
                     destinatario_reasignado_final = sel_reasig
 
-        # --- COLUMNA DERECHA ---
         with col2:
             doc_entrada = None
             doc_salida = None
@@ -348,7 +335,6 @@ if sistema_activo:
                         
                         with st.spinner(msg_carga):
                             try:
-                                # Archivos
                                 paths = []; path_in = None; path_out = None
                                 if doc_entrada:
                                     with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as t:
@@ -361,14 +347,12 @@ if sistema_activo:
                                 if path_in: files_ia.append(genai.upload_file(path_in, display_name="In"))
                                 if path_out: files_ia.append(genai.upload_file(path_out, display_name="Out"))
 
-                                # Prompt Robusto
                                 prompt = """
                                 Extrae datos en JSON estricto.
-                                1. DESTINATARIOS (OJO): Identifica TODOS los destinatarios (PARA). Extrae GRADO y NOMBRE de CADA UNO. 
-                                   Formato: "Grado Nombre, Grado Nombre". Separados por comas.
-                                2. CODIGO: Busca el código "PN-XYZ-QX-202X". Si no hay, busca "Oficio Nro.".
+                                1. DESTINATARIOS: "Grado Nombre, Grado Nombre". (Todos los 'Para').
+                                2. CODIGO: "PN-XYZ-QX-202X".
                                 3. FECHAS: DD/MM/AAAA.
-                                4. RESUMEN: Breve descripción del asunto.
+                                4. RESUMEN: Breve descripción.
                                 
                                 JSON:
                                 {
@@ -392,28 +376,24 @@ if sistema_activo:
                                 final_data = registro_a_editar.copy() if is_editing else {}
                                 def get_val(key_ia, key_row): return data.get(key_ia) if data.get(key_ia) else final_data.get(key_row, "")
 
-                                # --- EXTRACCIÓN BÁSICA ---
+                                # EXTRACCIÓN
                                 raw_code_in = get_val("codigo_completo_entrada", "G")
                                 cod_in = limpiar_codigo(raw_code_in)
                                 unidad_f7 = extraer_unidad_f7(cod_in)
-                                
                                 dest_ia = get_val("destinatarios_todos", "O")
-                                
                                 raw_code_out = get_val("codigo_completo_salida", "P")
                                 cod_out = limpiar_codigo(raw_code_out)
 
                                 # Estado S7
                                 estado_s7 = "PENDIENTE"
-                                if tipo_proceso == "CONOCIMIENTO": estado_s7 = "FINALIZADO"
-                                elif tipo_proceso == "REASIGNADO": estado_s7 = "FINALIZADO"
-                                elif tipo_proceso == "GENERADO DESDE DESPACHO": estado_s7 = "FINALIZADO"
+                                if tipo_proceso in ["CONOCIMIENTO", "REASIGNADO", "GENERADO DESDE DESPACHO"]: estado_s7 = "FINALIZADO"
                                 elif (path_in or final_data.get("G")) and (path_out or final_data.get("P")): estado_s7 = "FINALIZADO"
 
-                                # Columna T (Sale/No Sale)
+                                # Columna T
                                 es_interno = determinar_sale_no_sale(str_unidades_final)
                                 if tipo_proceso == "CONOCIMIENTO": es_interno = "NO"
 
-                                # --- CONSTRUCCIÓN DEL ROW (CASO GENERAL) ---
+                                # CONSTRUCCIÓN
                                 row = {
                                     "C": get_val("fecha_recepcion", "C"),
                                     "D": get_val("remitente_grado_nombre", "D"),
@@ -424,7 +404,7 @@ if sistema_activo:
                                     "I": get_val("asunto_entrada", "I"),
                                     "J": get_val("resumen_breve", "J"),
                                     "K": st.session_state.usuario_turno,
-                                    "L": "", # Por defecto vacío para Tramite Normal
+                                    "L": "",
                                     "M": str_unidades_final,
                                     "N": tipo_doc_salida,
                                     "O": dest_ia, 
@@ -440,65 +420,40 @@ if sistema_activo:
                                     "Y": "", "Z": ""
                                 }
 
-                                # --- LÓGICA ESPECÍFICA POR VARIABLE ---
-                                
+                                # REGLAS ESPECÍFICAS
                                 if tipo_proceso == "TRAMITE NORMAL":
-                                    row["L"] = "" # Celda L vacía
-                                    # P, Q, W, X vienen del doc de salida (ya mapeado arriba)
-                                    # O viene de IA (todos los destinatarios)
+                                    row["L"] = ""
                                 
                                 elif tipo_proceso == "REASIGNADO":
                                     row["L"] = "REASIGNADO"
-                                    # P7: Numero de doc cargado (Entrada)
-                                    row["P"] = row["G"] 
-                                    # Q, W, X: Fecha doc cargado (Entrada)
+                                    row["P"] = row["G"]; row["V"] = row["P"]
                                     row["Q"] = row["H"]; row["W"] = row["H"]; row["X"] = row["H"]
-                                    # V: Igual a P
-                                    row["V"] = row["P"]
-                                    # O: Destinatario Manual
-                                    if destinatario_reasignado_final:
-                                        row["O"] = destinatario_reasignado_final
-                                    # Guardar en memoria
+                                    if destinatario_reasignado_final: row["O"] = destinatario_reasignado_final
                                     if destinatario_reasignado_final and destinatario_reasignado_final not in st.session_state.lista_reasignados:
                                         st.session_state.lista_reasignados.append(destinatario_reasignado_final)
 
                                 elif tipo_proceso == "GENERADO DESDE DESPACHO":
                                     row["L"] = "GENERADO DESDE DESPACHO"
-                                    # C, H, Q, W, X -> Fechas doc cargado (Salida/Generado)
                                     fecha_gen = get_val("fecha_salida", "Q")
                                     row["C"]=fecha_gen; row["H"]=fecha_gen; row["Q"]=fecha_gen; row["W"]=fecha_gen; row["X"]=fecha_gen
-                                    # D, E Vacios
                                     row["D"] = ""; row["E"] = ""
-                                    # F: Unidad del doc generado
-                                    # G, P, V -> Mismo código del doc generado
-                                    # El doc generado se subió en 'doc_salida', la IA leyó 'cod_out'
-                                    if not cod_out and cod_in: cod_out = cod_in # Fallback
-                                    
+                                    if not cod_out and cod_in: cod_out = cod_in
                                     row["G"] = cod_out; row["P"] = cod_out; row["V"] = cod_out
                                     row["F"] = extraer_unidad_f7(cod_out)
 
                                 elif tipo_proceso == "CONOCIMIENTO":
                                     row["L"] = "CONOCIMIENTO"
-                                    # M, U Vacios
-                                    row["M"] = ""; row["U"] = ""
-                                    # O Vacía
-                                    row["O"] = ""
-                                    # P, V Vacías
-                                    row["P"] = ""; row["V"] = ""
-                                    # T -> NO
-                                    row["T"] = "NO"
-                                    # Fechas replicadas
+                                    row["M"] = ""; row["U"] = ""; row["O"] = ""
+                                    row["P"] = ""; row["V"] = ""; row["T"] = "NO"
                                     row["Q"] = row["C"]; row["W"] = row["C"]; row["X"] = row["C"]
 
-                                # Limpieza Final para PENDIENTES (Tramite Normal sin respuesta)
                                 if row["S"] == "PENDIENTE":
                                     for k in ["O", "P", "Q", "V", "W", "X"]: row[k] = ""
 
-                                # Memorias Unidades
                                 if input_otra_unidad and input_otra_unidad not in st.session_state.lista_unidades:
                                     st.session_state.lista_unidades.append(input_otra_unidad)
 
-                                # GUARDAR
+                                # Guardar
                                 if is_editing:
                                     st.session_state.registros[idx_edit] = row
                                     st.session_state.edit_index = None
@@ -527,12 +482,11 @@ if sistema_activo:
                 
                 reg_prev = st.session_state.registros[sel_idx]
                 df_prev = pd.DataFrame([reg_prev])
-                # Mostrar columnas clave
                 cols_order = ["C","F","G","L","M","O","P","S","T"]
                 df_show = df_prev[[c for c in cols_order if c in df_prev.columns]]
                 st.dataframe(df_show, hide_index=True, use_container_width=True)
 
-            # LISTA TARJETAS
+            # LISTA
             for i, reg in enumerate(st.session_state.registros):
                 bg = "#e8f5e9" if reg["S"] == "FINALIZADO" else "#ffebee"
                 bc = "green" if reg["S"] == "FINALIZADO" else "red"
@@ -550,13 +504,12 @@ if sistema_activo:
                         if st.session_state.edit_index == i: st.session_state.edit_index = None
                         st.rerun()
 
-            # DESCARGA
+            # DESCARGA EXCEL
             if os.path.exists("matriz_maestra.xlsx"):
                 try:
                     wb = load_workbook("matriz_maestra.xlsx")
                     ws = wb[next((s for s in wb.sheetnames if "CONTROL" in s.upper()), wb.sheetnames[0])]
                     start_row = 7
-                    # Buscar ultima fila vacia columna A
                     while ws.cell(row=start_row, column=1).value is not None: start_row += 1
                     
                     gf = PatternFill(start_color="92D050", end_color="92D050", fill_type="solid")
@@ -565,34 +518,26 @@ if sistema_activo:
                     for i, reg in enumerate(st.session_state.registros):
                         r = start_row + i
                         def w(c, v): ws.cell(row=r, column=c).value = v
-                        # Mapeo A=1 ... Z=26
-                        w(1, i+1); w(2, "") # A, B
+                        w(1, i+1); w(2, "")
                         w(3, reg["C"]); w(4, reg["D"]); w(5, reg["E"])
                         w(6, reg["F"]); w(7, reg["G"]); w(8, reg["H"]); w(9, reg["I"])
                         w(10, reg["J"]); w(11, reg["K"]); w(12, reg["L"]); w(13, reg["M"])
                         w(14, reg["N"]); w(15, reg["O"]); w(16, reg["P"]); w(17, reg["Q"])
-                        w(18, "") # R Vacia
-                        
-                        cell_s = ws.cell(row=r, column=19); cell_s.value = reg["S"] # S
+                        w(18, "")
+                        cell_s = ws.cell(row=r, column=19); cell_s.value = reg["S"]
                         if reg["S"]=="FINALIZADO": preservar_bordes(cell_s, gf)
                         elif reg["S"]=="PENDIENTE": preservar_bordes(cell_s, rf)
-                        
                         w(20, reg["T"]); w(21, reg["U"]); w(22, reg["V"]); w(23, reg["W"]); w(24, reg["X"])
-                        w(25, ""); w(26, "") # Y, Z Vacias
-
-                        # Aplicar estilos a toda la fila
+                        w(25, ""); w(26, "")
                         for col_idx in range(1, 27):
                             cell = ws.cell(row=r, column=col_idx)
-                            if col_idx != 19: # Ya tiene estilo S
-                                preservar_bordes(cell, PatternFill(fill_type=None))
+                            if col_idx != 19: preservar_bordes(cell, PatternFill(fill_type=None))
 
                     out_buffer = io.BytesIO()
                     wb.save(out_buffer)
                     out_buffer.seek(0)
-                    
                     f_str = fecha_turno.strftime("%d-%m-%y")
                     u_str = st.session_state.usuario_turno.upper()
-                    
                     st.download_button(
                         label="📥 DESCARGAR MATRIZ FINAL",
                         data=out_buffer,
@@ -612,7 +557,25 @@ if sistema_activo:
                     with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as t:
                         t.write(up_asesor.getvalue()); p_as = t.name
                     f_as = genai.upload_file(p_as, display_name="Consulta")
-                    prompt_asesor = "Actúa como JEFE DE AYUDANTÍA. Dame Diagnóstico, Decisión y Redacción."
+                    
+                    # PROMPT MODIFICADO: SOLO EXTRACTO (TEXTO CUERPO)
+                    prompt_asesor = """
+                    Actúa como JEFE DE AYUDANTÍA DINIC.
+                    Tu salida debe tener ESTRICTAMENTE esta estructura:
+
+                    1. 🧐 DIAGNÓSTICO TÉCNICO:
+                       - ¿Qué unidad pide?
+                       - ¿Cuál es el requerimiento central?
+
+                    2. ⚖️ CRITERIO / DECISIÓN:
+                       - ¿Se debe archivar, tramitar internamente o elevar? ¿Por qué?
+
+                    3. ✍️ EXTRACTO TENTATIVO (SOLO TEXTO):
+                       - Redacta EXCLUSIVAMENTE el párrafo o párrafos del cuerpo del documento de respuesta.
+                       - NO incluyas: Encabezados, fechas, nombres de destinatarios, cargos, despedidas ni firmas.
+                       - Solo el texto argumentativo o dispositivo.
+                    """
+                    
                     res = invocar_ia_segura([prompt_asesor, f_as])
                     st.markdown(res.text)
                     st.session_state.consultas_ia += 1
