@@ -8,6 +8,7 @@ import time
 import io
 import random
 import base64
+import socket
 import pandas as pd
 from copy import copy
 from openpyxl import load_workbook
@@ -15,7 +16,7 @@ from openpyxl.styles import PatternFill, Border, Side, Alignment
 from datetime import datetime, timedelta, timezone
 
 # --- 1. CONFIGURACIÓN Y ESTILOS ---
-VER_SISTEMA = "v27.5"
+VER_SISTEMA = "v27.6"
 ADMIN_USER = "1723623011"
 ADMIN_PASS_MASTER = "9994915010022"
 
@@ -26,7 +27,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- 2. BASE DE DATOS DE USUARIOS ---
+# --- 2. BASE DE DATOS DE USUARIOS (INCRUSTADA) ---
 USUARIOS_BASE = {
     "0702870460": {"grado": "SGOS", "nombre": "VILLALTA OCHOA XAVIER BISMARK", "activo": True},
     "1715081731": {"grado": "SGOS", "nombre": "MINDA MINDA FRANCISCO GABRIEL", "activo": True},
@@ -62,13 +63,16 @@ def guardar_json(filepath, data):
     with open(filepath, 'w') as f:
         json.dump(data, f)
 
-# Inicializar sistema
 config_sistema = cargar_json(CONFIG_FILE, {"pass_universal": "DINIC2026"})
 db_usuarios = cargar_json(DB_FILE, USUARIOS_BASE)
 if not db_usuarios: db_usuarios = USUARIOS_BASE
 db_contratos = cargar_json(CONTRATOS_FILE, {})
 
-# --- 3. ESTILOS Y LOGO ---
+# --- 3. FUNCIONES DE TIEMPO Y LOGO ---
+def get_hora_ecuador():
+    # UTC - 5
+    return datetime.now(timezone(timedelta(hours=-5)))
+
 def get_img_as_base64(file_path):
     with open(file_path, "rb") as f:
         data = f.read()
@@ -113,24 +117,43 @@ if 'lista_unidades' not in st.session_state:
     ]
 if 'lista_reasignados' not in st.session_state: st.session_state.lista_reasignados = []
 
-# --- 5. FUNCIONES ---
-
-# --- NUEVA FUNCIÓN HORA ECUADOR ---
-def get_hora_ecuador():
-    # UTC - 5 horas
-    return datetime.now(timezone(timedelta(hours=-5)))
-
-# --- RESTAURACIÓN DE LA IA ---
+# --- 5. CONFIGURACIÓN IA (AUTO-REPARACIÓN) ---
 try:
     api_key = st.secrets.get("GEMINI_API_KEY")
     if api_key:
         genai.configure(api_key=api_key)
-        # Guardar modelo en session_state para persistencia
-        st.session_state.genai_model = genai.GenerativeModel("gemini-1.5-flash")
+        
+        # LÓGICA DE DETECCIÓN AUTOMÁTICA DE MODELO
+        if not st.session_state.genai_model:
+            model_name = "gemini-pro" # Fallback por defecto
+            try:
+                # Intentamos listar modelos disponibles para la API KEY
+                listado = genai.list_models()
+                modelos_disponibles = [m.name for m in listado if 'generateContent' in m.supported_generation_methods]
+                
+                # Buscamos prioridades
+                flash_models = [m for m in modelos_disponibles if 'flash' in m]
+                pro_models = [m for m in modelos_disponibles if 'pro' in m and 'vision' not in m] # Vision a veces da error con texto solo
+                
+                if flash_models:
+                    model_name = flash_models[0]
+                elif pro_models:
+                    model_name = pro_models[0]
+                elif modelos_disponibles:
+                    model_name = modelos_disponibles[0]
+                    
+            except Exception as e:
+                # Si falla listar, forzamos uno conocido
+                model_name = "gemini-1.5-flash"
+
+            st.session_state.genai_model = genai.GenerativeModel(model_name)
+            # st.toast(f"IA Conectada: {model_name}") # Debug visual opcional
+            
         sistema_activo = True
     else:
         sistema_activo = False
 except Exception as e:
+    st.error(f"Error Conexión IA: {e}")
     sistema_activo = False
 
 def frases_curiosas():
@@ -159,14 +182,10 @@ def determinar_sale_no_sale(destinos_str):
     return "NO"
 
 def invocar_ia_segura(content):
-    # Usar el modelo desde el estado de la sesión
-    if not st.session_state.genai_model:
-        raise Exception("IA Desconectada. Recargue la página.")
-    
+    if not st.session_state.genai_model: raise Exception("IA no configurada")
     max_retries = 3
     for i in range(max_retries):
-        try:
-            return st.session_state.genai_model.generate_content(content)
+        try: return st.session_state.genai_model.generate_content(content)
         except Exception as e:
             if "429" in str(e): time.sleep(2); continue
             else: raise e
@@ -182,7 +201,6 @@ def preservar_bordes(cell, fill_obj):
         cell.border = Border(top=thin, left=thin, right=thin, bottom=thin)
 
 def generar_html_contrato(datos_usuario, img_b64):
-    # USAR HORA ECUADOR
     fecha_hora = get_hora_ecuador().strftime("%Y-%m-%d %H:%M:%S")
     logo_b64 = ""
     if os.path.exists("Captura.JPG"):
@@ -245,7 +263,7 @@ if not st.session_state.logged_in:
             usuario_input = st.text_input("Usuario (Cédula):").strip()
             pass_input = st.text_input("Contraseña:", type="password").strip()
             if st.form_submit_button("INGRESAR AL SISTEMA", type="primary"):
-                # 1. ADMIN
+                # ADMIN
                 if usuario_input == ADMIN_USER and pass_input == ADMIN_PASS_MASTER:
                     st.session_state.logged_in = True
                     st.session_state.user_role = "admin"
@@ -253,7 +271,7 @@ if not st.session_state.logged_in:
                     st.session_state.usuario_turno = "CBOS. JOHN CARRILLO" 
                     st.success("✅ Acceso Concedido: ADMINISTRADOR")
                     st.rerun()
-                # 2. USUARIOS
+                # USUARIOS
                 elif usuario_input in db_usuarios:
                     user_data = db_usuarios[usuario_input]
                     if pass_input == config_sistema["pass_universal"]:
@@ -280,7 +298,6 @@ else:
         st.markdown("### 👮‍♂️ CONTROL DE MANDO")
         st.info(f"👤 **{st.session_state.usuario_turno}**")
         
-        # FECHA OPERACION
         fecha_turno = st.date_input("Fecha Operación:", value=get_hora_ecuador().date())
 
         st.markdown("---")
