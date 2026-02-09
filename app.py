@@ -15,7 +15,7 @@ from openpyxl.styles import PatternFill, Border, Side, Alignment
 from datetime import datetime, timedelta, timezone
 
 # --- 1. CONFIGURACIÓN Y ESTILOS ---
-VER_SISTEMA = "v28.1"
+VER_SISTEMA = "v28.2"
 ADMIN_USER = "1723623011"
 ADMIN_PASS_MASTER = "9994915010022"
 
@@ -58,20 +58,23 @@ DB_FILE = "usuarios_db.json"
 CONFIG_FILE = "config_sistema.json"
 CONTRATOS_FILE = "contratos_legal.json"
 LOGS_FILE = "historial_acciones.json"
-LISTAS_FILE = "listas_db.json"  # <--- NUEVO ARCHIVO PARA GUARDAR LISTAS
+LISTAS_FILE = "listas_db.json"
 
-# FUNCIONES DE CARGA/GUARDADO
+# FUNCIONES DE CARGA/GUARDADO (CON PROTECCIÓN DE ERRORES)
 def cargar_json(filepath, default):
     if os.path.exists(filepath):
         try:
             with open(filepath, 'r') as f:
-                return json.load(f)
+                data = json.load(f)
+                return data if data is not None else default
         except: return default
     return default
 
 def guardar_json(filepath, data):
-    with open(filepath, 'w') as f:
-        json.dump(data, f)
+    try:
+        with open(filepath, 'w') as f:
+            json.dump(data, f)
+    except: pass
 
 def inicializar_usuarios_seguros():
     usuarios_finales = USUARIOS_BASE.copy()
@@ -79,7 +82,8 @@ def inicializar_usuarios_seguros():
         try:
             with open(DB_FILE, 'r') as f:
                 usuarios_locales = json.load(f)
-                usuarios_finales.update(usuarios_locales)
+                if isinstance(usuarios_locales, dict):
+                    usuarios_finales.update(usuarios_locales)
         except: pass
     guardar_json(DB_FILE, usuarios_finales)
     return usuarios_finales
@@ -87,19 +91,21 @@ def inicializar_usuarios_seguros():
 # --- GESTIÓN DE LISTAS PERSISTENTES ---
 def cargar_listas_desplegables():
     datos = cargar_json(LISTAS_FILE, {"unidades": UNIDADES_DEFAULT, "reasignados": []})
-    # Asegurar que las default estén
+    # Validación por si el archivo está corrupto o incompleto
+    if not isinstance(datos, dict): datos = {"unidades": UNIDADES_DEFAULT, "reasignados": []}
+    if "unidades" not in datos: datos["unidades"] = UNIDADES_DEFAULT
+    if "reasignados" not in datos: datos["reasignados"] = []
+    
+    # Asegurar defaults
     for u in UNIDADES_DEFAULT:
-        if u not in datos["unidades"]:
-            datos["unidades"].append(u)
+        if u not in datos["unidades"]: datos["unidades"].append(u)
     return datos
 
 def guardar_nueva_entrada_lista(tipo, valor):
-    """Guarda nuevo valor en listas_db.json"""
     datos = cargar_listas_desplegables()
     if valor and valor not in datos[tipo]:
         datos[tipo].append(valor)
         guardar_json(LISTAS_FILE, datos)
-        # Actualizar sesión también
         if tipo == "unidades": st.session_state.lista_unidades = datos["unidades"]
         if tipo == "reasignados": st.session_state.lista_reasignados = datos["reasignados"]
 
@@ -108,6 +114,7 @@ config_sistema = cargar_json(CONFIG_FILE, {"pass_universal": "DINIC2026", "base_
 db_usuarios = inicializar_usuarios_seguros()
 db_contratos = cargar_json(CONTRATOS_FILE, {})
 db_logs = cargar_json(LOGS_FILE, [])
+if not isinstance(db_logs, list): db_logs = [] # Corrección por si el log se corrompe
 db_listas = cargar_listas_desplegables()
 
 # Cargar listas a sesión
@@ -121,6 +128,9 @@ def get_hora_ecuador():
 def registrar_accion(usuario, accion, detalle=""):
     ahora = get_hora_ecuador().strftime("%Y-%m-%d %H:%M:%S")
     nuevo_log = {"fecha": ahora, "usuario": usuario, "accion": accion, "detalle": detalle}
+    # Asegurar que db_logs es lista
+    global db_logs
+    if not isinstance(db_logs, list): db_logs = []
     db_logs.insert(0, nuevo_log)
     guardar_json(LOGS_FILE, db_logs)
 
@@ -146,14 +156,19 @@ def get_estado_usuario(cedula):
     except: return "🔴 ERROR"
 
 def get_ultima_accion_usuario(nombre_usuario):
+    if not isinstance(db_logs, list): return "---"
     for log in db_logs:
-        if log['usuario'] == nombre_usuario:
-            return f"{log['accion']} ({log['fecha'].split(' ')[1]})"
+        if log.get('usuario') == nombre_usuario:
+            fecha = log.get('fecha', '').split(' ')
+            hora = fecha[1] if len(fecha) > 1 else ""
+            return f"{log.get('accion')} ({hora})"
     return "---"
 
 def get_img_as_base64(file_path):
-    with open(file_path, "rb") as f: data = f.read()
-    return base64.b64encode(data).decode()
+    try:
+        with open(file_path, "rb") as f: data = f.read()
+        return base64.b64encode(data).decode()
+    except: return ""
 
 def get_logo_html(width="120px"):
     img_path = "Captura.JPG"
@@ -255,18 +270,16 @@ def generar_html_contrato(datos_usuario, img_b64):
     
     logo_html_tag = f'<img src="data:image/jpeg;base64,{logo_b64}" style="width:100px; display:block; margin: 0 auto;">' if logo_b64 else ""
 
+    # Defensa contra datos faltantes
+    grado = datos_usuario.get('grado', 'N/A')
+    nombre = datos_usuario.get('nombre', 'Usuario Desconocido')
+
     html = f"""
     <div style="font-family: Arial, sans-serif; padding: 40px; border: 2px solid #000; max-width: 800px; margin: auto;">
-        <div style="text-align: center;">
-            {logo_html_tag}
-            <h2>ACTA DE COMPROMISO Y CONFIDENCIALIDAD<br>USO DEL ASESOR INTELIGENTE SIGD-DINIC</h2>
-        </div>
-        <br>
-        <p><strong>Usuario:</strong> {datos_usuario['grado']} {datos_usuario['nombre']}</p>
-        <p><strong>Cédula:</strong> {st.session_state.user_id}</p>
-        <p><strong>Fecha y Hora de Aceptación:</strong> {fecha_hora}</p>
-        <hr>
-        <h3>TÉRMINOS Y CONDICIONES DEL ASESOR INTELIGENTE SIGD</h3>
+        <div style="text-align: center;">{logo_html_tag}<h2>ACTA DE COMPROMISO Y CONFIDENCIALIDAD<br>USO DEL ASESOR INTELIGENTE SIGD-DINIC</h2></div>
+        <br><p><strong>Usuario:</strong> {grado} {nombre}</p>
+        <p><strong>Cédula:</strong> {st.session_state.user_id}</p><p><strong>Fecha:</strong> {fecha_hora}</p><hr>
+        <h3>TÉRMINOS Y CONDICIONES</h3>
         <p>Yo, el servidor policial arriba identificado, declaro haber leído, entendido y aceptado las siguientes políticas:</p>
         <ol>
             <li><strong>Naturaleza de Apoyo:</strong> El Asesor Estratégico es una herramienta de Inteligencia Artificial generativa diseñada exclusivamente como apoyo técnico y de consulta. No sustituye el criterio, mando ni decisión del servidor policial.</li>
@@ -280,11 +293,10 @@ def generar_html_contrato(datos_usuario, img_b64):
             <li><strong>Uso Ético:</strong> La herramienta debe utilizarse estrictamente para fines institucionales. Cualquier uso para fines personales o ajenos al servicio será sancionado disciplinariamente.</li>
             <li><strong>Aceptación de Riesgo:</strong> Al ingresar, el usuario declara entender estas limitaciones y libera a la administración del sistema de cualquier responsabilidad por el mal uso de la información generada.</li>
         </ol>
-        <br><br>
         <div style="border: 1px dashed #333; padding: 15px; width: fit-content; margin-left: auto;">
-            <p style="text-align: center; font-size: 12px; margin-bottom: 5px;"><strong>EVIDENCIA BIOMÉTRICA DE ACEPTACIÓN</strong></p>
+            <p style="text-align: center; font-size: 12px;"><strong>EVIDENCIA BIOMÉTRICA</strong></p>
             <img src="data:image/png;base64,{img_b64}" style="width: 150px; border: 1px solid #ccc;">
-            <p style="font-size: 10px; text-align: center; margin-top: 5px;">Firma Digital: {fecha_hora}</p>
+            <p style="font-size: 10px; text-align: center;">{fecha_hora}</p>
         </div>
     </div>
     """
@@ -311,10 +323,7 @@ if not st.session_state.logged_in:
                     st.session_state.user_id = usuario_input
                     admin_data = db_usuarios.get(ADMIN_USER, {"grado": "CBOS.", "nombre": "CARRILLO NARVAEZ JOHN STALIN"})
                     st.session_state.usuario_turno = f"{admin_data['grado']} {admin_data['nombre']}"
-                    st.success("✅ Acceso Concedido: ADMINISTRADOR")
-                    registrar_accion(st.session_state.usuario_turno, "INICIO SESIÓN ADMIN")
-                    actualizar_presencia(usuario_input)
-                    st.rerun()
+                    st.success("✅ Acceso ADMIN"); registrar_accion(st.session_state.usuario_turno, "INICIO SESIÓN ADMIN"); actualizar_presencia(usuario_input); st.rerun()
                 # USER
                 elif usuario_input in db_usuarios:
                     user_data = db_usuarios[usuario_input]
@@ -338,12 +347,8 @@ else:
         st.markdown("### 👮‍♂️ CONTROL DE MANDO")
         if st.session_state.user_role == "admin":
             st.markdown("""<div class="admin-badge">🛡️ MODO ADMINISTRADOR<br><span style="font-size: 0.8em; font-weight: normal;">CONTROL TOTAL</span></div>""", unsafe_allow_html=True)
-        
         st.info(f"👤 **{st.session_state.usuario_turno}**")
-        
-        # --- FECHA CORRECTA ECUADOR (SIEMPRE ACTUALIZADA) ---
-        fecha_actual_ec = get_hora_ecuador().date()
-        fecha_turno = st.date_input("Fecha Operación:", value=fecha_actual_ec)
+        fecha_turno = st.date_input("Fecha Operación:", value=get_hora_ecuador().date())
 
         st.markdown("---")
         if st.button("🗑️ NUEVO TURNO", type="primary"):
@@ -418,13 +423,12 @@ else:
                 st.markdown("---")
                 st.caption("🏢 DEPENDENCIA/as DE DESTINO")
                 
-                # CARGAR LISTAS PERSISTENTES
+                # LISTAS PERSISTENTES
                 opciones_unidades = sorted(st.session_state.lista_unidades)
                 default_units = []
                 if is_editing and registro_a_editar['M']:
                     prev_units = registro_a_editar['M'].split(", ")
                     default_units = [u for u in prev_units if u in opciones_unidades]
-                
                 unidades_selected = st.multiselect("Seleccione Unidad(es):", opciones_unidades, default=default_units)
                 col_ning, col_otra = st.columns(2)
                 chk_ninguna = col_ning.checkbox("NINGUNA")
@@ -441,17 +445,12 @@ else:
                 if tipo_proceso == "REASIGNADO":
                     st.markdown("---")
                     st.markdown("👤 **DESTINATARIO REASIGNADO**")
-                    # CARGAR LISTA REASIGNADOS PERSISTENTE
                     opciones_reasig = ["SELECCIONAR..."] + sorted(st.session_state.lista_reasignados) + ["✍️ NUEVO"]
                     idx_rea = 0
                     if is_editing and registro_a_editar.get("O") in st.session_state.lista_reasignados:
                         idx_rea = opciones_reasig.index(registro_a_editar["O"])
-                    
                     sel_reasig = st.selectbox("Historial:", opciones_reasig, index=idx_rea)
-                    
                     val_manual = registro_a_editar.get("O") if (is_editing and registro_a_editar.get("O") not in st.session_state.lista_reasignados) else ""
-                    
-                    # CAMPO MANUAL SIEMPRE VISIBLE SI SE ELIGE NUEVO O YA HABIA UNO MANUAL
                     input_manual_reasig = ""
                     if sel_reasig == "✍️ NUEVO":
                         input_manual_reasig = st.text_input("Escribir Grado y Nombre:", value=val_manual).upper()
@@ -526,7 +525,6 @@ else:
                                         row["L"] = "REASIGNADO"; row["P"] = row["G"]; row["V"] = row["P"]; row["Q"] = row["H"]; row["W"] = row["H"]; row["X"] = row["H"]
                                         if destinatario_reasignado_final:
                                             row["O"] = destinatario_reasignado_final
-                                            # GUARDAR EN LISTA PERSISTENTE
                                             guardar_nueva_entrada_lista("reasignados", destinatario_reasignado_final)
                                     elif tipo_proceso == "GENERADO DESDE DESPACHO":
                                         row["L"] = "GENERADO DESDE DESPACHO"; fecha_gen = get_val("fecha_salida", "Q"); row["C"]=fecha_gen; row["H"]=fecha_gen; row["Q"]=fecha_gen; row["W"]=fecha_gen; row["X"]=fecha_gen; row["D"] = ""; row["E"] = ""
@@ -538,7 +536,6 @@ else:
                                     if row["S"] == "PENDIENTE":
                                         for k in ["O", "P", "Q", "V", "W", "X"]: row[k] = ""
 
-                                    # GUARDAR UNIDAD NUEVA
                                     if input_otra_unidad:
                                         guardar_nueva_entrada_lista("unidades", input_otra_unidad)
 
@@ -656,30 +653,36 @@ else:
                             if st.button("Eliminar"): del db_usuarios[del_ced]; guardar_json(DB_FILE, db_usuarios); st.success("Eliminado."); st.rerun()
 
                     with t3_2:
-                        if db_contratos:
-                            for ced, data in db_contratos.items():
-                                with st.expander(f"{data['usuario']} - {data['fecha']}"):
-                                    c1c, c2c, c3c = st.columns([1,1,1])
-                                    html_c = generar_html_contrato(db_usuarios.get(ced, {}), data["foto"])
-                                    with c1c: st.components.v1.html(html_c, height=300, scrolling=True)
-                                    with c2c: st.download_button(f"⬇️ Descargar", html_c, file_name=f"C_{ced}.html", mime="text/html")
-                                    with c3c: 
-                                        if st.button(f"🗑️ Eliminar {ced}"): 
-                                            del db_contratos[ced]; guardar_json(CONTRATOS_FILE, db_contratos); st.rerun()
-                        else: st.info("Sin contratos.")
+                        try:
+                            if db_contratos:
+                                for ced, data in db_contratos.items():
+                                    with st.expander(f"{data.get('usuario', 'Desconocido')} - {ced}"):
+                                        c1c, c2c, c3c = st.columns([1,1,1])
+                                        u_info = db_usuarios.get(ced, {"grado":"", "nombre": data.get("usuario","")})
+                                        html_c = generar_html_contrato(u_info, data["foto"])
+                                        with c1c: st.components.v1.html(html_c, height=300, scrolling=True)
+                                        with c2c: st.download_button(f"⬇️ Descargar", html_c, file_name=f"C_{ced}.html", mime="text/html", key=f"dl_{ced}")
+                                        with c3c: 
+                                            if st.button(f"🗑️ Eliminar", key=f"del_{ced}"): 
+                                                del db_contratos[ced]; guardar_json(CONTRATOS_FILE, db_contratos); st.rerun()
+                            else: st.info("Sin contratos.")
+                        except Exception as e: st.error("Error cargando contratos.")
 
-                    with t3_3: st.markdown("#### Historial"); st.dataframe(pd.DataFrame(db_logs), use_container_width=True)
+                    with t3_3: 
+                        st.markdown("#### Historial"); 
+                        if db_logs: st.dataframe(pd.DataFrame(db_logs), use_container_width=True)
+                        else: st.info("Historial vacío.")
 
                     with t3_4:
                         st.markdown("#### Configuración")
                         c_ia, c_base = st.columns(2)
                         with c_ia: 
-                            if st.button("🔄 Reiniciar Contador IA Global"): config_sistema["consultas_ia_global"] = 0; guardar_json(CONFIG_FILE, config_sistema); st.success("Reiniciado."); st.rerun()
+                            if st.button("🔄 Reiniciar Contador IA"): config_sistema["consultas_ia_global"] = 0; guardar_json(CONFIG_FILE, config_sistema); st.success("Reiniciado."); st.rerun()
                         with c_base:
                             new_base = st.number_input("Base Histórica:", value=config_sistema.get("base_historica", 1258))
                             if st.button("Actualizar Base"): config_sistema["base_historica"] = new_base; guardar_json(CONFIG_FILE, config_sistema); st.success("Actualizado."); st.rerun()
                         
-                        new_pass = st.text_input("Nueva Contraseña Universal:", value=config_sistema["pass_universal"])
+                        new_pass = st.text_input("Nueva Contraseña:", value=config_sistema["pass_universal"])
                         if st.button("Guardar Contraseña"): config_sistema["pass_universal"] = new_pass; guardar_json(CONFIG_FILE, config_sistema); st.success("Guardado.")
 
                 else: st.info("Ingrese contraseña maestra.")
