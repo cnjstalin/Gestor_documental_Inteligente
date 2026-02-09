@@ -56,6 +56,10 @@ if 'docs_procesados_hoy' not in st.session_state: st.session_state.docs_procesad
 if 'consultas_ia' not in st.session_state: st.session_state.consultas_ia = 0
 if 'modelo_nombre' not in st.session_state: st.session_state.modelo_nombre = None
 
+# === CAMBIO: MEMORIA DE UNIDADES ===
+if 'lista_unidades' not in st.session_state: 
+    st.session_state.lista_unidades = ["DINIC", "UCAP", "UNDECOF", "UDAR", "DIGIN", "DNATH", "DAOP", "DCOP", "DSOP", "PLANF", "FINA", "JURID"]
+
 # --- 3. AUTENTICACIÓN Y CONEXIÓN INTELIGENTE ---
 try:
     api_key = st.secrets.get("GEMINI_API_KEY")
@@ -211,6 +215,31 @@ if sistema_activo:
                 index=["QUIPUX ELECTRONICO", "DOCPOL ELECTRONICO", "FISICO", "DIGITAL", "OTRO"].index(val_salida) if val_salida else 0
             )
 
+            # === CAMBIO: SECCIÓN DEPENDENCIA DE DESTINO (MANUAL) ===
+            st.markdown("---")
+            st.caption("🏢 DEPENDENCIA DESTINO (Col M/U)")
+            
+            # Selector inteligente
+            opciones_destino = ["SELECCIONAR..."] + st.session_state.lista_unidades + ["✍️ OTRA (ESCRIBIR NUEVA)"]
+            
+            # Preselección si estamos editando
+            idx_destino = 0
+            val_destino_previo = registro_a_editar['M'] if (is_editing and registro_a_editar['M']) else "SELECCIONAR..."
+            if val_destino_previo in st.session_state.lista_unidades:
+                try: idx_destino = opciones_destino.index(val_destino_previo)
+                except: idx_destino = 0
+            
+            destino_select = st.selectbox("Unidad de Destino:", opciones_destino, index=idx_destino)
+
+            unidad_destino_final = ""
+            if destino_select == "✍️ OTRA (ESCRIBIR NUEVA)":
+                nuevo_destino = st.text_input("Escriba Siglas/Nombre:", placeholder="Ej: UNIDAD-XYZ").upper()
+                if nuevo_destino:
+                    unidad_destino_final = nuevo_destino
+            elif destino_select != "SELECCIONAR...":
+                unidad_destino_final = destino_select
+            # =======================================================
+
         with col2:
             doc_entrada = None
             doc_salida = None
@@ -231,120 +260,133 @@ if sistema_activo:
             if not os.path.exists("matriz_maestra.xlsx"):
                 st.error("❌ Falta Matriz Base (Cargar en menú lateral).")
             else:
-                process = False
-                if tipo_proceso == "TRAMITE NORMAL":
-                    if is_editing: process = True
-                    elif doc_entrada or doc_salida: process = True
-                elif doc_entrada or doc_salida: process = True
-                
-                if process:
-                    with st.spinner(f"🤖 Procesando con {st.session_state.modelo_nombre}..."):
-                        try:
-                            paths = []
-                            path_in, path_out = None, None
-                            if doc_entrada:
-                                with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as t:
-                                    t.write(doc_entrada.getvalue()); path_in = t.name; paths.append(t.name)
-                            if doc_salida:
-                                with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as t:
-                                    t.write(doc_salida.getvalue()); path_out = t.name; paths.append(t.name)
-
-                            # SUBIDA DE ARCHIVOS A LA IA
-                            files_ia = []
-                            if path_in: files_ia.append(genai.upload_file(path_in, display_name="In"))
-                            if path_out: files_ia.append(genai.upload_file(path_out, display_name="Out"))
-
-                            data = {}
-                            if files_ia:
-                                prompt = """
-                                Extrae datos exactos en formato JSON estricto.
-                                1. NOMBRES: "GRADO + NOMBRE COMPLETO".
-                                2. CÓDIGOS: Completos.
-                                3. MAPEO: UCAP, UNDECOF, UDAR, DIGIN, DNATH, DINIC DAOP/DCOP/DSOP/PLANF/FINA/JURID.
-                                
-                                JSON:
-                                {
-                                    "fecha_recepcion": "DD/MM/AAAA",
-                                    "remitente_grado_nombre": "Texto",
-                                    "remitente_cargo": "Texto",
-                                    "codigo_completo_entrada": "Texto",
-                                    "asunto_entrada": "Texto",
-                                    "resumen_breve": "Texto",
-                                    "cargo_destinatario_mapeado": "Texto",
-                                    "destinatario_grado_nombre": "Texto",
-                                    "codigo_completo_salida": "Texto",
-                                    "fecha_salida": "DD/MM/AAAA"
-                                }
-                                """
-                                res = invocar_ia_segura([prompt, *files_ia])
-                                data = json.loads(res.text.replace("```json", "").replace("```", ""))
-
-                            final_data = registro_a_editar.copy() if is_editing else {}
-                            def get_val(key_ia, key_row): return data.get(key_ia) if data.get(key_ia) else final_data.get(key_row, "")
-
-                            cod_in = limpiar_codigo(get_val("codigo_completo_entrada", "G"))
-                            unidad_f7 = extraer_unidad(get_val("codigo_completo_entrada", "G"))
-                            
-                            tiene_entrada = True if (path_in or (is_editing and final_data.get("G"))) else False
-                            tiene_salida = True if (path_out or (is_editing and final_data.get("P"))) else False
-                            
-                            estado_s7 = "PENDIENTE"
-                            if tipo_proceso != "TRAMITE NORMAL": estado_s7 = "FINALIZADO"
-                            elif tiene_entrada and tiene_salida: estado_s7 = "FINALIZADO"
-
-                            row = {
-                                "C": get_val("fecha_recepcion", "C"),
-                                "D": get_val("remitente_grado_nombre", "D"),
-                                "E": get_val("remitente_cargo", "E"),
-                                "F": unidad_f7,
-                                "G": cod_in,
-                                "H": get_val("fecha_recepcion", "H"),
-                                "I": get_val("asunto_entrada", "I"),
-                                "J": get_val("resumen_breve", "J"),
-                                "K": st.session_state.usuario_turno,
-                                "L": tipo_proceso if tipo_proceso != "TRAMITE NORMAL" else "",
-                                "M": get_val("cargo_destinatario_mapeado", "M"),
-                                "N": tipo_doc_salida,
-                                "O": get_val("destinatario_grado_nombre", "O"),
-                                "P": limpiar_codigo(get_val("codigo_completo_salida", "P")),
-                                "Q": get_val("fecha_salida", "Q"),
-                                "R": "",
-                                "S": estado_s7,
-                                "T": "SI" if get_val("cargo_destinatario_mapeado", "M") in ["UDAR","UNDECOF","UCAP","DIGIN","DNATH"] else "NO",
-                                "U": get_val("cargo_destinatario_mapeado", "U"),
-                                "V": limpiar_codigo(get_val("codigo_completo_salida", "V")),
-                                "W": get_val("fecha_salida", "W"),
-                                "X": get_val("fecha_salida", "X")
-                            }
-
-                            if estado_s7 == "PENDIENTE":
-                                for k in ["M", "N", "O", "P", "Q", "T", "U", "V", "W", "X"]: row[k] = ""
-                            
-                            if tipo_proceso == "GENERADO DESDE DESPACHO":
-                                row["D"]=""; row["E"]=""; row["F"]="DINIC"
-                                row["C"]=row["Q"]; row["H"]=row["Q"]
-                            elif tipo_proceso == "REASIGNADO":
-                                row["P"]=""; row["V"]=""
-                                for k in ["Q","W","X"]: row[k] = row["C"]
-                            elif tipo_proceso == "CONOCIMIENTO":
-                                for k in ["M","N","O","P","S","T","U","V"]: row[k] = ""
-                                for k in ["Q","W","X"]: row[k] = row["C"]
-
-                            if is_editing:
-                                st.session_state.registros[idx_edit] = row
-                                st.session_state.edit_index = None
-                                st.success("✅ Actualizado")
-                            else:
-                                st.session_state.registros.append(row)
-                                st.session_state.docs_procesados_hoy += 1
-                                st.success("✅ Agregado")
-
-                            for p in paths: os.remove(p)
-                            st.rerun()
-
-                        except Exception as e: st.error(f"Error Técnico: {e}")
+                # === VALIDACIÓN: UNIDAD OBLIGATORIA ===
+                if not unidad_destino_final:
+                    st.warning("⚠️ IMPORTANTE: Seleccione o escriba la DEPENDENCIA DE DESTINO.")
                 else:
-                    st.warning("⚠️ Sube documento.")
+                    process = False
+                    if tipo_proceso == "TRAMITE NORMAL":
+                        if is_editing: process = True
+                        elif doc_entrada or doc_salida: process = True
+                    elif doc_entrada or doc_salida: process = True
+                    
+                    if process:
+                        with st.spinner(f"🤖 Procesando con {st.session_state.modelo_nombre}..."):
+                            try:
+                                paths = []
+                                path_in, path_out = None, None
+                                if doc_entrada:
+                                    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as t:
+                                        t.write(doc_entrada.getvalue()); path_in = t.name; paths.append(t.name)
+                                if doc_salida:
+                                    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as t:
+                                        t.write(doc_salida.getvalue()); path_out = t.name; paths.append(t.name)
+
+                                # SUBIDA DE ARCHIVOS A LA IA
+                                files_ia = []
+                                if path_in: files_ia.append(genai.upload_file(path_in, display_name="In"))
+                                if path_out: files_ia.append(genai.upload_file(path_out, display_name="Out"))
+
+                                data = {}
+                                if files_ia:
+                                    prompt = """
+                                    Extrae datos exactos en formato JSON estricto.
+                                    1. NOMBRES: "GRADO + NOMBRE COMPLETO".
+                                    2. CÓDIGOS: Completos.
+                                    3. MAPEO: UCAP, UNDECOF, UDAR, DIGIN, DNATH, DINIC DAOP/DCOP/DSOP/PLANF/FINA/JURID.
+                                    
+                                    JSON:
+                                    {
+                                        "fecha_recepcion": "DD/MM/AAAA",
+                                        "remitente_grado_nombre": "Texto",
+                                        "remitente_cargo": "Texto",
+                                        "codigo_completo_entrada": "Texto",
+                                        "asunto_entrada": "Texto",
+                                        "resumen_breve": "Texto",
+                                        "destinatario_grado_nombre": "Texto",
+                                        "codigo_completo_salida": "Texto",
+                                        "fecha_salida": "DD/MM/AAAA"
+                                    }
+                                    """
+                                    res = invocar_ia_segura([prompt, *files_ia])
+                                    data = json.loads(res.text.replace("```json", "").replace("```", ""))
+
+                                final_data = registro_a_editar.copy() if is_editing else {}
+                                def get_val(key_ia, key_row): return data.get(key_ia) if data.get(key_ia) else final_data.get(key_row, "")
+
+                                cod_in = limpiar_codigo(get_val("codigo_completo_entrada", "G"))
+                                unidad_f7 = extraer_unidad(get_val("codigo_completo_entrada", "G"))
+                                
+                                tiene_entrada = True if (path_in or (is_editing and final_data.get("G"))) else False
+                                tiene_salida = True if (path_out or (is_editing and final_data.get("P"))) else False
+                                
+                                estado_s7 = "PENDIENTE"
+                                if tipo_proceso != "TRAMITE NORMAL": estado_s7 = "FINALIZADO"
+                                elif tiene_entrada and tiene_salida: estado_s7 = "FINALIZADO"
+
+                                # === CAMBIO: LÓGICA DE GUARDADO MANUAL ===
+                                # 1. Actualizar memoria si es unidad nueva
+                                if unidad_destino_final not in st.session_state.lista_unidades:
+                                    st.session_state.lista_unidades.append(unidad_destino_final)
+                                
+                                # 2. Calcular Columna T (Interno/Externo)
+                                unidades_internas = ["UDAR","UNDECOF","UCAP","DIGIN","DNATH","DINIC"]
+                                es_interno = "SI" if any(u in unidad_destino_final for u in unidades_internas) else "NO"
+                                # ========================================
+
+                                row = {
+                                    "C": get_val("fecha_recepcion", "C"),
+                                    "D": get_val("remitente_grado_nombre", "D"),
+                                    "E": get_val("remitente_cargo", "E"),
+                                    "F": unidad_f7,
+                                    "G": cod_in,
+                                    "H": get_val("fecha_recepcion", "H"),
+                                    "I": get_val("asunto_entrada", "I"),
+                                    "J": get_val("resumen_breve", "J"),
+                                    "K": st.session_state.usuario_turno,
+                                    "L": tipo_proceso if tipo_proceso != "TRAMITE NORMAL" else "",
+                                    "M": unidad_destino_final, # MANUAL
+                                    "N": tipo_doc_salida,
+                                    "O": get_val("destinatario_grado_nombre", "O"),
+                                    "P": limpiar_codigo(get_val("codigo_completo_salida", "P")),
+                                    "Q": get_val("fecha_salida", "Q"),
+                                    "R": "",
+                                    "S": estado_s7,
+                                    "T": es_interno,           # CALCULADO
+                                    "U": unidad_destino_final, # MANUAL REPETIDO
+                                    "V": limpiar_codigo(get_val("codigo_completo_salida", "V")),
+                                    "W": get_val("fecha_salida", "W"),
+                                    "X": get_val("fecha_salida", "X")
+                                }
+
+                                if estado_s7 == "PENDIENTE":
+                                    for k in ["N", "O", "P", "Q", "V", "W", "X"]: row[k] = ""
+                                
+                                if tipo_proceso == "GENERADO DESDE DESPACHO":
+                                    row["D"]=""; row["E"]=""; row["F"]="DINIC"
+                                    row["C"]=row["Q"]; row["H"]=row["Q"]
+                                elif tipo_proceso == "REASIGNADO":
+                                    row["P"]=""; row["V"]=""
+                                    for k in ["Q","W","X"]: row[k] = row["C"]
+                                elif tipo_proceso == "CONOCIMIENTO":
+                                    for k in ["N","O","P","S","V"]: row[k] = ""
+                                    for k in ["Q","W","X"]: row[k] = row["C"]
+
+                                if is_editing:
+                                    st.session_state.registros[idx_edit] = row
+                                    st.session_state.edit_index = None
+                                    st.success("✅ Actualizado")
+                                else:
+                                    st.session_state.registros.append(row)
+                                    st.session_state.docs_procesados_hoy += 1
+                                    st.success("✅ Agregado")
+
+                                for p in paths: os.remove(p)
+                                st.rerun()
+
+                            except Exception as e: st.error(f"Error Técnico: {e}")
+                    else:
+                        st.warning("⚠️ Sube documento.")
 
         if st.session_state.registros:
             st.markdown("#### 📋 Cola de Trabajo")
@@ -356,7 +398,7 @@ if sistema_activo:
                     <div style="background-color: {bg}; padding: 10px; border-left: 5px solid {bc}; margin-bottom: 5px; border-radius: 5px;">
                         <b>#{i+1}</b> | <b>{reg['G']}</b> | {reg['D']} <br>
                         <span class="status-badge" style="background-color: {bc};">{reg['S']}</span> 
-                        Salida: {reg['P'] if reg['P'] else '---'}
+                        Salida: {reg['P'] if reg['P'] else '---'} | Destino: {reg['M']}
                     </div>""", unsafe_allow_html=True)
                     c_edit, c_del = st.columns([1, 1])
                     if c_edit.button("✏️ EDITAR", key=f"e_{i}"): st.session_state.edit_index = i; st.rerun()
