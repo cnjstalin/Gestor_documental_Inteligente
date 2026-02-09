@@ -12,10 +12,10 @@ import pandas as pd
 from copy import copy
 from openpyxl import load_workbook
 from openpyxl.styles import PatternFill, Border, Side, Alignment
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 
 # --- 1. CONFIGURACIÓN Y ESTILOS ---
-VER_SISTEMA = "v27.4"
+VER_SISTEMA = "v27.5"
 ADMIN_USER = "1723623011"
 ADMIN_PASS_MASTER = "9994915010022"
 
@@ -26,7 +26,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- 2. BASE DE DATOS DE USUARIOS (INCRUSTADA) ---
+# --- 2. BASE DE DATOS DE USUARIOS ---
 USUARIOS_BASE = {
     "0702870460": {"grado": "SGOS", "nombre": "VILLALTA OCHOA XAVIER BISMARK", "activo": True},
     "1715081731": {"grado": "SGOS", "nombre": "MINDA MINDA FRANCISCO GABRIEL", "activo": True},
@@ -103,7 +103,7 @@ if 'registros' not in st.session_state: st.session_state.registros = []
 if 'edit_index' not in st.session_state: st.session_state.edit_index = None 
 if 'docs_procesados_hoy' not in st.session_state: st.session_state.docs_procesados_hoy = 0
 if 'consultas_ia' not in st.session_state: st.session_state.consultas_ia = 0
-if 'modelo_nombre' not in st.session_state: st.session_state.modelo_nombre = None
+if 'genai_model' not in st.session_state: st.session_state.genai_model = None
 
 if 'lista_unidades' not in st.session_state: 
     st.session_state.lista_unidades = [
@@ -114,14 +114,24 @@ if 'lista_unidades' not in st.session_state:
 if 'lista_reasignados' not in st.session_state: st.session_state.lista_reasignados = []
 
 # --- 5. FUNCIONES ---
+
+# --- NUEVA FUNCIÓN HORA ECUADOR ---
+def get_hora_ecuador():
+    # UTC - 5 horas
+    return datetime.now(timezone(timedelta(hours=-5)))
+
+# --- RESTAURACIÓN DE LA IA ---
 try:
     api_key = st.secrets.get("GEMINI_API_KEY")
     if api_key:
         genai.configure(api_key=api_key)
-        if not st.session_state.modelo_nombre: st.session_state.modelo_nombre = "gemini-1.5-flash"
-        model = genai.GenerativeModel(st.session_state.modelo_nombre)
-    sistema_activo = True
-except: sistema_activo = True
+        # Guardar modelo en session_state para persistencia
+        st.session_state.genai_model = genai.GenerativeModel("gemini-1.5-flash")
+        sistema_activo = True
+    else:
+        sistema_activo = False
+except Exception as e:
+    sistema_activo = False
 
 def frases_curiosas():
     frases = ["¿Sabías que? El primer virus se llamó Creeper.", "¿Sabías que? La seguridad es responsabilidad de todos.", "¿Sabías que? Tu contraseña es tu llave digital.", "¿Sabías que? La IA procesa, tú decides.", "¿Sabías que? Un escritorio limpio mejora la productividad."]
@@ -149,10 +159,14 @@ def determinar_sale_no_sale(destinos_str):
     return "NO"
 
 def invocar_ia_segura(content):
-    if 'model' not in globals(): raise Exception("IA no configurada")
+    # Usar el modelo desde el estado de la sesión
+    if not st.session_state.genai_model:
+        raise Exception("IA Desconectada. Recargue la página.")
+    
     max_retries = 3
     for i in range(max_retries):
-        try: return model.generate_content(content)
+        try:
+            return st.session_state.genai_model.generate_content(content)
         except Exception as e:
             if "429" in str(e): time.sleep(2); continue
             else: raise e
@@ -168,13 +182,12 @@ def preservar_bordes(cell, fill_obj):
         cell.border = Border(top=thin, left=thin, right=thin, bottom=thin)
 
 def generar_html_contrato(datos_usuario, img_b64):
-    fecha_hora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    # USAR HORA ECUADOR
+    fecha_hora = get_hora_ecuador().strftime("%Y-%m-%d %H:%M:%S")
     logo_b64 = ""
-    # Intentar cargar logo del escudo para el contrato
     if os.path.exists("Captura.JPG"):
         logo_b64 = get_img_as_base64("Captura.JPG")
     
-    # HTML del logo
     logo_html_tag = f'<img src="data:image/jpeg;base64,{logo_b64}" style="width:100px; display:block; margin: 0 auto;">' if logo_b64 else ""
 
     html = f"""
@@ -237,7 +250,7 @@ if not st.session_state.logged_in:
                     st.session_state.logged_in = True
                     st.session_state.user_role = "admin"
                     st.session_state.user_id = usuario_input
-                    st.session_state.usuario_turno = "CBOS. JOHN CARRILLO" # NOMBRE ADMIN FIJO
+                    st.session_state.usuario_turno = "CBOS. JOHN CARRILLO" 
                     st.success("✅ Acceso Concedido: ADMINISTRADOR")
                     st.rerun()
                 # 2. USUARIOS
@@ -267,7 +280,8 @@ else:
         st.markdown("### 👮‍♂️ CONTROL DE MANDO")
         st.info(f"👤 **{st.session_state.usuario_turno}**")
         
-        fecha_turno = st.date_input("Fecha Operación:", value=datetime.now())
+        # FECHA OPERACION
+        fecha_turno = st.date_input("Fecha Operación:", value=get_hora_ecuador().date())
 
         st.markdown("---")
         if st.button("🗑️ NUEVO TURNO (Limpiar)", type="primary"):
@@ -568,7 +582,7 @@ else:
                         if foto:
                             b64_foto = base64.b64encode(foto.getvalue()).decode()
                             db_contratos[usuario_actual] = {
-                                "fecha": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                                "fecha": get_hora_ecuador().strftime("%Y-%m-%d %H:%M:%S"),
                                 "foto": b64_foto,
                                 "usuario": st.session_state.usuario_turno
                             }
