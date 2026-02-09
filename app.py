@@ -15,7 +15,7 @@ from openpyxl.styles import PatternFill, Border, Side, Alignment
 from datetime import datetime
 
 # --- 1. CONFIGURACIÓN Y ESTILOS ---
-VER_SISTEMA = "v27.1"
+VER_SISTEMA = "v27.2"
 ADMIN_USER = "1723623011"
 ADMIN_PASS_MASTER = "9994915010022"
 
@@ -26,20 +26,74 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# FUNCIÓN PARA IMAGEN EN LOGIN (BASE64)
-def get_img_as_base64(file_path):
-    with open(file_path, "rb") as f:
-        data = f.read()
-    return base64.b64encode(data).decode()
+# --- 2. BASE DE DATOS DE USUARIOS (INCRUSTADA/SEGURA) ---
+# Esta lista se usará siempre si falla la lectura del archivo.
+USUARIOS_BASE = {
+    "0702870460": {"grado": "SGOS", "nombre": "VILLALTA OCHOA XAVIER BISMARK", "activo": True},
+    "1715081731": {"grado": "SGOS", "nombre": "MINDA MINDA FRANCISCO GABRIEL", "activo": True},
+    "1720103090": {"grado": "SGOS", "nombre": "ZAPATA NAVAS CHRISTIAN VINICIO", "activo": True},
+    "1721117057": {"grado": "CBOP", "nombre": "YANQUI RAMOS MONICA ALEXANDRA", "activo": True},
+    "1716555154": {"grado": "CBOP", "nombre": "RUANO ARMAS JAIRO RODRIGO", "activo": True},
+    "1721350351": {"grado": "CBOP", "nombre": "LOZADA MORENO EDISON WLADIMIR", "activo": True},
+    "1718278060": {"grado": "CBOP", "nombre": "CAIZA AMORES DAVID STALIN", "activo": True},
+    "1721308086": {"grado": "CBOP", "nombre": "SISALIMA CASTILLO MARÍA JOSE", "activo": True},
+    "1721865986": {"grado": "CBOP", "nombre": "VILLACRES CARRILLO SERGIO ALEJANDRO", "activo": True},
+    "1722901152": {"grado": "CBOP", "nombre": "ORTIZ GARZON VANESSA LIZBETH", "activo": True},
+    "1725283194": {"grado": "CBOP", "nombre": "RODRIGUEZ ESCOBAR DIEGO ALBERTO", "activo": True},
+    "1804621520": {"grado": "CBOP", "nombre": "CHUGCHO CHUGCHO CHRISTIAN ESTUARDO", "activo": True},
+    "1723730923": {"grado": "CBOP", "nombre": "ALMEIDA CHUGA LUIS ANDRES", "activo": True},
+    "1723248942": {"grado": "CBOS", "nombre": "ALMACHI NACIMBA DARIO RAUL", "activo": True},
+    "0401770771": {"grado": "CBOS", "nombre": "MORAN CHILAN EDISON JAVIER", "activo": True},
+    "1723623011": {"grado": "CBOS", "nombre": "CARRILLO NARVAEZ JOHN STALIN", "activo": True}
+}
 
-# Intentar cargar el escudo para el login
-img_path = "Captura.JPG"
-img_base64 = ""
-if os.path.exists(img_path):
-    img_base64 = f"data:image/jpeg;base64,{get_img_as_base64(img_path)}"
-else:
-    # Fallback si no está la imagen
-    img_base64 = "https://cdn-icons-png.flaticon.com/512/9370/9370308.png"
+DB_FILE = "usuarios_db.json"
+CONFIG_FILE = "config_sistema.json"
+
+def cargar_config():
+    if not os.path.exists(CONFIG_FILE):
+        return {"pass_universal": "DINIC2026"}
+    with open(CONFIG_FILE, 'r') as f:
+        return json.load(f)
+
+def guardar_config(cfg):
+    with open(CONFIG_FILE, 'w') as f:
+        json.dump(cfg, f)
+
+def inicializar_db_usuarios():
+    # Estrategia: Si existe archivo local válido, úsalo. Si no, usa la lista BASE incrustada.
+    if os.path.exists(DB_FILE):
+        try:
+            with open(DB_FILE, 'r') as f:
+                datos = json.load(f)
+                if datos: return datos # Retornar solo si no está vacío
+        except:
+            pass # Si falla, continuamos al fallback
+    
+    # Si llegamos aquí, no hay DB o está corrupta. Creamos una nueva con USUARIOS_BASE
+    with open(DB_FILE, 'w') as f:
+        json.dump(USUARIOS_BASE, f)
+    return USUARIOS_BASE
+
+def guardar_db_usuarios(users):
+    with open(DB_FILE, 'w') as f:
+        json.dump(users, f)
+
+# CARGA INICIAL
+config_sistema = cargar_config()
+db_usuarios = inicializar_db_usuarios()
+
+# --- 3. ESTILOS Y LOGO ---
+# Función para cargar imagen local o fallback online
+def get_logo_html():
+    img_path = "Captura.JPG"
+    if os.path.exists(img_path):
+        with open(img_path, "rb") as f:
+            data = base64.b64encode(f.read()).decode()
+        return f'<img src="data:image/jpeg;base64,{data}" style="width:120px; margin-bottom:15px;">'
+    else:
+        # Escudo Policia Genérico si no encuentra el archivo local
+        return '<img src="https://upload.wikimedia.org/wikipedia/commons/2/25/Escudo_Policia_Nacional_del_Ecuador.png" style="width:120px; margin-bottom:15px;">'
 
 st.markdown(f"""
     <style>
@@ -73,15 +127,11 @@ st.markdown(f"""
         text-align: center;
         border-top: 5px solid #0E2F44;
     }}
-    .login-logo {{
-        width: 120px;
-        margin-bottom: 20px;
-    }}
     div.stButton > button {{ width: 100%; font-weight: bold; border-radius: 5px; }}
     </style>
 """, unsafe_allow_html=True)
 
-# --- 2. GESTIÓN DE ESTADO ---
+# --- 4. GESTIÓN DE SESIÓN ---
 if 'logged_in' not in st.session_state: st.session_state.logged_in = False
 if 'user_role' not in st.session_state: st.session_state.user_role = "" 
 if 'usuario_turno' not in st.session_state: st.session_state.usuario_turno = "" 
@@ -100,63 +150,10 @@ if 'lista_unidades' not in st.session_state:
     ]
 if 'lista_reasignados' not in st.session_state: st.session_state.lista_reasignados = []
 
-# --- 2.1 BASE DE DATOS DE USUARIOS (QUEMADA/HARDCODED) ---
-DB_FILE = "usuarios_db.json"
-CONFIG_FILE = "config_sistema.json"
-
-def cargar_config():
-    if not os.path.exists(CONFIG_FILE):
-        return {"pass_universal": "DINIC2026"}
-    with open(CONFIG_FILE, 'r') as f:
-        return json.load(f)
-
-def guardar_config(cfg):
-    with open(CONFIG_FILE, 'w') as f:
-        json.dump(cfg, f)
-
-def inicializar_db_usuarios():
-    # 1. Intentar cargar archivo local si existe (persistencia)
-    if os.path.exists(DB_FILE):
-        with open(DB_FILE, 'r') as f:
-            return json.load(f)
-    
-    # 2. SI NO EXISTE ARCHIVO, USAR LISTA FIJA (DEL CSV ORIGINAL)
-    # Esto garantiza que funcione en cualquier navegador nuevo
-    users = {
-        "0702870460": {"grado": "SGOS", "nombre": "VILLALTA OCHOA XAVIER BISMARK", "activo": True},
-        "1715081731": {"grado": "SGOS", "nombre": "MINDA MINDA FRANCISCO GABRIEL", "activo": True},
-        "1720103090": {"grado": "SGOS", "nombre": "ZAPATA NAVAS CHRISTIAN VINICIO", "activo": True},
-        "1721117057": {"grado": "CBOP", "nombre": "YANQUI RAMOS MONICA ALEXANDRA", "activo": True},
-        "1716555154": {"grado": "CBOP", "nombre": "RUANO ARMAS JAIRO RODRIGO", "activo": True},
-        "1721350351": {"grado": "CBOP", "nombre": "LOZADA MORENO EDISON WLADIMIR", "activo": True},
-        "1718278060": {"grado": "CBOP", "nombre": "CAIZA AMORES DAVID STALIN", "activo": True},
-        "1721308086": {"grado": "CBOP", "nombre": "SISALIMA CASTILLO MARÍA JOSE", "activo": True},
-        "1721865986": {"grado": "CBOP", "nombre": "VILLACRES CARRILLO SERGIO ALEJANDRO", "activo": True},
-        "1722901152": {"grado": "CBOP", "nombre": "ORTIZ GARZON VANESSA LIZBETH", "activo": True},
-        "1725283194": {"grado": "CBOP", "nombre": "RODRIGUEZ ESCOBAR DIEGO ALBERTO", "activo": True},
-        "1804621520": {"grado": "CBOP", "nombre": "CHUGCHO CHUGCHO CHRISTIAN ESTUARDO", "activo": True},
-        "1723730923": {"grado": "CBOP", "nombre": "ALMEIDA CHUGA LUIS ANDRES", "activo": True},
-        "1723248942": {"grado": "CBOS", "nombre": "ALMACHI NACIMBA DARIO RAUL", "activo": True},
-        "0401770771": {"grado": "CBOS", "nombre": "MORAN CHILAN EDISON JAVIER", "activo": True},
-        "1723623011": {"grado": "CBOS", "nombre": "CARRILLO NARVAEZ JOHN STALIN", "activo": True} 
-    }
-    
-    # Guardar esta lista base en el archivo JSON
-    with open(DB_FILE, 'w') as f:
-        json.dump(users, f)
-    return users
-
-def guardar_db_usuarios(users):
-    with open(DB_FILE, 'w') as f:
-        json.dump(users, f)
-
-config_sistema = cargar_config()
-db_usuarios = inicializar_db_usuarios()
-
-# --- 3. CONEXIÓN INTELIGENTE ---
+# --- 5. FUNCIONES ---
 try:
     api_key = st.secrets.get("GEMINI_API_KEY")
-    if not api_key: st.warning("⚠️ Sin API Key (Offline).")
+    if not api_key: pass # Modo offline
     else:
         genai.configure(api_key=api_key)
         if not st.session_state.modelo_nombre: st.session_state.modelo_nombre = "gemini-1.5-flash"
@@ -164,14 +161,13 @@ try:
     sistema_activo = True
 except: sistema_activo = True
 
-# --- 4. FUNCIONES AUXILIARES ---
 def frases_curiosas():
     frases = [
-        "¿Sabías que? El primer virus informático se creó en 1971 y se llamaba Creeper.",
+        "¿Sabías que? El primer correo electrónico se envió en 1971.",
         "¿Sabías que? La seguridad de la información es responsabilidad de todos.",
         "¿Sabías que? Tu contraseña es la llave de tu identidad digital.",
         "¿Sabías que? La IA procesa datos, pero tú tomas las decisiones.",
-        "¿Sabías que? Un escritorio limpio mejora la productividad.",
+        "¿Sabías que? Un archivo bien organizado ahorra 40% de tiempo futuro.",
         "¿Sabías que? El phishing es la técnica más común de robo de datos."
     ]
     return random.choice(frases)
@@ -217,30 +213,33 @@ def preservar_bordes(cell, fill_obj):
         cell.border = Border(top=thin, left=thin, right=thin, bottom=thin)
 
 # ==============================================================================
-#  LÓGICA DE LOGIN
+#  LÓGICA DE LOGIN (PANTALLA DE INICIO)
 # ==============================================================================
 
 if not st.session_state.logged_in:
     c1, c2, c3 = st.columns([1,2,1])
     with c2:
         st.markdown("<br><br>", unsafe_allow_html=True)
-        # Aquí inyectamos la imagen Base64 del escudo
+        
+        # Logo dinámico
+        logo_html = get_logo_html()
+        
         st.markdown(f"""
         <div class="login-container">
-            <img src="{img_base64}" class="login-logo">
-            <h2 style='color:#0E2F44;'>ACCESO SIGD DINIC</h2>
-            <p>Sistema Oficial de Gestión Documental</p>
+            {logo_html}
+            <h2 style='color:#0E2F44; margin-bottom: 5px;'>ACCESO SIGD DINIC</h2>
+            <p style='color: gray; margin-top: 0;'>Sistema Oficial de Gestión Documental</p>
         </div>
         """, unsafe_allow_html=True)
         
         with st.form("login_form"):
-            usuario_input = st.text_input("Usuario (Cédula):", placeholder="Ingrese su número de cédula")
-            pass_input = st.text_input("Contraseña:", type="password", placeholder="••••••••")
+            usuario_input = st.text_input("Usuario (Cédula):", placeholder="Ingrese su número de cédula").strip()
+            pass_input = st.text_input("Contraseña:", type="password", placeholder="••••••••").strip()
             
             submit_login = st.form_submit_button("INGRESAR AL SISTEMA", type="primary")
             
             if submit_login:
-                # 1. CASO ADMINISTRADOR
+                # 1. ADMIN
                 if usuario_input == ADMIN_USER and pass_input == ADMIN_PASS_MASTER:
                     st.session_state.logged_in = True
                     st.session_state.user_role = "admin"
@@ -248,7 +247,7 @@ if not st.session_state.logged_in:
                     st.success("✅ Acceso Concedido: ADMINISTRADOR")
                     st.rerun()
                 
-                # 2. CASO USUARIO NORMAL
+                # 2. USUARIOS (Verificación en DB)
                 elif usuario_input in db_usuarios:
                     user_data = db_usuarios[usuario_input]
                     if pass_input == config_sistema["pass_universal"]:
@@ -259,33 +258,29 @@ if not st.session_state.logged_in:
                             st.success(f"✅ Bienvenido: {st.session_state.usuario_turno}")
                             st.rerun()
                         else:
-                            st.error("🚫 Usuario inactivo. Contacte al Administrador.")
+                            st.error("🚫 Usuario inactivo.")
                     else:
                         st.error("🚫 Contraseña incorrecta.")
                 
                 else:
-                    st.error("🚫 Usuario no encontrado en la base de datos.")
+                    st.error("🚫 Usuario no autorizado. Verifique su cédula.")
 
 else:
     # ==============================================================================
-    #  SISTEMA PRINCIPAL (LOGUEADO)
+    #  SISTEMA PRINCIPAL (DENTRO)
     # ==============================================================================
+    
     with st.sidebar:
-        # Mostrar el mismo escudo en el sidebar
+        # LOGO LATERAL
         if os.path.exists("Captura.JPG"):
             st.image("Captura.JPG", use_container_width=True)
         else:
-            st.image("https://cdn-icons-png.flaticon.com/512/2921/2921222.png", width=100)
+            st.image("https://upload.wikimedia.org/wikipedia/commons/2/25/Escudo_Policia_Nacional_del_Ecuador.png", width=100)
         
         st.markdown("### 👮‍♂️ CONTROL DE MANDO")
-        
-        # 1. PERSONA DE TURNO
         st.info(f"👤 **{st.session_state.usuario_turno}**")
-        st.caption(f"Rol: {st.session_state.user_role.upper()}")
-        fecha_turno = st.date_input("Fecha Operación:", value=datetime.now())
-
-        st.markdown("---")
         
+        st.markdown("---")
         # 2. ACCIONES
         if st.button("🗑️ NUEVO TURNO (Limpiar)", type="primary"):
             st.session_state.registros = []
@@ -294,7 +289,6 @@ else:
             st.rerun()
 
         st.markdown("---")
-        
         # 3. RESPALDO
         if st.session_state.registros:
             json_str = json.dumps(st.session_state.registros, default=str)
@@ -312,7 +306,6 @@ else:
             except: st.error("Archivo corrupto.")
 
         st.markdown("---")
-        
         # 4. BASE DE DATOS
         if os.path.exists("matriz_maestra.xlsx"):
             st.success("✅ Matriz Cargada")
@@ -326,11 +319,9 @@ else:
         st.markdown("---")
         if st.button("🔒 CERRAR SESIÓN"):
             st.session_state.logged_in = False
-            st.session_state.user_role = ""
-            st.session_state.usuario_turno = ""
             st.rerun()
 
-    # --- ÁREA PRINCIPAL ---
+    # --- HEADER ---
     st.markdown(f'''
     <div class="main-header">
         <h1>SIGD DINIC</h1>
