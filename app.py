@@ -14,11 +14,10 @@ from openpyxl.styles import PatternFill, Border, Side
 from datetime import datetime
 
 # --- 1. CONFIGURACIÓN Y ESTILOS ---
-NOMBRE_SISTEMA = "SIGD-DINIC Sistema Oficial de Gestión Documental"
-VER_SISTEMA = "v26.5"
+VER_SISTEMA = "v26.6"
 
 st.set_page_config(
-    page_title=NOMBRE_SISTEMA,
+    page_title="SIGD DINIC",
     layout="wide",
     page_icon="📂",
     initial_sidebar_state="expanded"
@@ -28,19 +27,34 @@ st.markdown("""
     <style>
     .main-header {
         background-color: #0E2F44;
-        padding: 15px;
-        border-radius: 8px;
+        padding: 20px;
+        border-radius: 10px;
         color: white;
         text-align: center;
-        margin-bottom: 15px;
-        border-bottom: 3px solid #D4AF37;
+        margin-bottom: 20px;
+        border-bottom: 4px solid #D4AF37;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    .main-header h1 {
+        margin: 0;
+        font-size: 2.5rem;
+        font-weight: 800;
+        letter-spacing: 1px;
+    }
+    .main-header h3 {
+        margin: 5px 0 0 0;
+        font-size: 1.2rem;
+        font-weight: 400;
+        color: #e0e0e0;
+        font-style: italic;
     }
     .metric-card {
-        background-color: #f0f2f6;
+        background-color: #f8f9fa;
         border-radius: 10px;
-        padding: 10px;
+        padding: 15px;
         text-align: center;
-        border: 1px solid #dcdcdc;
+        border: 1px solid #dee2e6;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
     }
     .status-badge {
         padding: 4px 8px;
@@ -49,10 +63,6 @@ st.markdown("""
         color: white;
     }
     div.stButton > button { width: 100%; font-weight: bold; border-radius: 5px; }
-    /* Ajuste visual para el Sidebar */
-    section[data-testid="stSidebar"] {
-        background-color: #f8f9fa;
-    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -111,23 +121,16 @@ def frases_curiosas():
 
 def limpiar_codigo(texto):
     if not texto: return ""
-    # Prioridad 1: Buscar patrón exacto PN-XXXX-QX
     match = re.search(r"(PN-[A-Z0-9]+-QX(?:-\d+)?)", str(texto), re.IGNORECASE)
     if match: return match.group(1).strip().upper()
-    
-    # Prioridad 2: Buscar palabra Oficio Nro
     match2 = re.search(r"(?:Oficio|Memorando).*?(PN-.*)", str(texto), re.IGNORECASE)
     if match2: return match2.group(1).strip().upper()
-
     return str(texto).strip()
 
 def extraer_unidad_f7(texto_codigo):
-    # Extrae lo que está entre PN- y -QX
     if not texto_codigo: return "DINIC"
     match = re.search(r"PN-([A-Z]+)-QX", str(texto_codigo).upper())
-    if match:
-        return match.group(1)
-    # Si no encuentra patrón estándar, intenta buscar siglas comunes
+    if match: return match.group(1)
     unidades = ["UCAP", "UNDECOF", "UDAR", "DIGIN", "DNATH", "DAOP"]
     for u in unidades:
         if u in str(texto_codigo).upper(): return u
@@ -173,8 +176,33 @@ with st.sidebar:
 
     st.markdown("---")
     
-    # SECCIÓN 3: MATRIZ
-    st.markdown("#### 3. Base de Datos")
+    # SECCIÓN 3: RESPALDO (RESTAURADO)
+    st.markdown("#### 3. Respaldo y Restauración")
+    
+    # Descargar
+    if st.session_state.registros:
+        json_str = json.dumps(st.session_state.registros, default=str)
+        st.download_button("⬇️ Descargar Backup (JSON)", json_str, file_name="backup_dinic.json", mime="application/json")
+    else:
+        st.caption("No hay datos para respaldar aún.")
+        
+    # Restaurar
+    uploaded_backup = st.file_uploader("⬆️ Restaurar Backup (JSON)", type=['json'])
+    if uploaded_backup:
+        try:
+            data = json.load(uploaded_backup)
+            st.session_state.registros = data
+            st.session_state.docs_procesados_hoy = len(data)
+            st.success("¡Backup Restaurado!")
+            time.sleep(1)
+            st.rerun()
+        except Exception as e:
+            st.error("Archivo corrupto.")
+
+    st.markdown("---")
+    
+    # SECCIÓN 4: MATRIZ
+    st.markdown("#### 4. Base de Datos (Excel)")
     if os.path.exists("matriz_maestra.xlsx"):
         st.success("✅ Matriz Cargada")
         if st.button("🔄 Cambiar Archivo Base"): os.remove("matriz_maestra.xlsx"); st.rerun()
@@ -185,7 +213,12 @@ with st.sidebar:
             st.rerun()
 
 # --- ÁREA PRINCIPAL ---
-st.markdown(f'<div class="main-header"><h1>{NOMBRE_SISTEMA}</h1></div>', unsafe_allow_html=True)
+st.markdown(f'''
+<div class="main-header">
+    <h1>SIGD DINIC</h1>
+    <h3>Sistema de Gestión Documental</h3>
+</div>
+''', unsafe_allow_html=True)
 
 # DASHBOARD
 c1, c2, c3 = st.columns(3)
@@ -277,7 +310,7 @@ if sistema_activo:
 
                 sel_reasig = st.selectbox("Historial Destinatarios:", opciones_reasig, index=idx_rea)
                 
-                # Input Manual siempre visible si se elige nuevo o si se quiere sobrescribir
+                # Input Manual
                 val_manual = ""
                 if is_editing and registro_a_editar.get("O") and registro_a_editar.get("O") not in st.session_state.lista_reasignados:
                     val_manual = registro_a_editar.get("O")
@@ -341,11 +374,11 @@ if sistema_activo:
                                 if path_in: files_ia.append(genai.upload_file(path_in, display_name="In"))
                                 if path_out: files_ia.append(genai.upload_file(path_out, display_name="Out"))
 
-                                # --- PROMPT AJUSTADO ---
+                                # --- PROMPT ---
                                 prompt = """
                                 Extrae datos en JSON estricto.
                                 1. DESTINATARIOS (MUY IMPORTANTE): Identifica a TODOS los destinatarios (Para). Extrae GRADO y NOMBRE de CADA UNO. 
-                                   Formato obligatorio: "Grado Nombre Apellido, Grado Nombre Apellido, Grado Nombre Apellido". 
+                                   Formato obligatorio: "Grado Nombre Apellido, Grado Nombre Apellido". 
                                    NO pongas solo uno si hay varios. Sepáralos por comas.
                                 2. CODIGO: Busca el código principal tipo "PN-XYZ-QX-202X". Si no hay, busca "Oficio Nro.".
                                 3. FECHAS: DD/MM/AAAA.
@@ -373,31 +406,27 @@ if sistema_activo:
                                 def get_val(key_ia, key_row): return data.get(key_ia) if data.get(key_ia) else final_data.get(key_row, "")
 
                                 # --- LÓGICA DE CAMPOS ---
-                                # Código Entrada y Unidad F7
                                 raw_code_in = get_val("codigo_completo_entrada", "G")
                                 cod_in = limpiar_codigo(raw_code_in)
                                 unidad_f7 = extraer_unidad_f7(cod_in)
                                 
-                                # Destinatarios (Col O)
                                 dest_ia = get_val("destinatarios_todos", "O")
                                 
-                                # Código Salida
                                 raw_code_out = get_val("codigo_completo_salida", "P")
                                 cod_out = limpiar_codigo(raw_code_out)
 
-                                # Estado S7
                                 estado_s7 = "PENDIENTE"
                                 if tipo_proceso == "CONOCIMIENTO": estado_s7 = "FINALIZADO"
                                 elif tipo_proceso != "TRAMITE NORMAL": estado_s7 = "FINALIZADO"
                                 elif (path_in or final_data.get("G")) and (path_out or final_data.get("P")): estado_s7 = "FINALIZADO"
 
-                                # Actualizar Memorias (Unidades y Reasignados)
+                                # Memorias
                                 if input_otra_unidad and input_otra_unidad not in st.session_state.lista_unidades:
                                     st.session_state.lista_unidades.append(input_otra_unidad)
                                 if destinatario_reasignado_final and destinatario_reasignado_final not in st.session_state.lista_reasignados:
                                     st.session_state.lista_reasignados.append(destinatario_reasignado_final)
 
-                                # Columna T (Sale/No Sale)
+                                # Columna T
                                 unidades_internas = ["UDAR","UNDECOF","UCAP","DIGIN","DNATH","DINIC"]
                                 es_interno = "NO"
                                 if tipo_proceso == "CONOCIMIENTO":
@@ -406,7 +435,7 @@ if sistema_activo:
                                     any_internal = any(u in str_unidades_final for u in unidades_internas)
                                     es_interno = "SI" if any_internal else "NO"
 
-                                # CONSTRUCCION ROW BASE
+                                # CONSTRUCCION ROW
                                 row = {
                                     "C": get_val("fecha_recepcion", "C"),
                                     "D": get_val("remitente_grado_nombre", "D"),
@@ -432,14 +461,11 @@ if sistema_activo:
                                     "X": get_val("fecha_salida", "X")
                                 }
 
-                                # REGLAS ESPECÍFICAS
+                                # REGLAS
                                 if tipo_proceso == "GENERADO DESDE DESPACHO":
-                                    # Forzar que el código sea el mismo en G, P y V
-                                    # Intentamos tomar el mejor código detectado (salida o entrada)
                                     best_code = cod_out if len(cod_out) > 5 else cod_in
                                     best_unit = extraer_unidad_f7(best_code)
-                                    
-                                    row["D"]=""; row["E"]=""; row["F"]= best_unit # Antes DINIC, ahora intenta extraer
+                                    row["D"]=""; row["E"]=""; row["F"]= best_unit
                                     row["G"]=best_code; row["P"]=best_code; row["V"]=best_code
                                     row["C"]=row["Q"]; row["H"]=row["Q"]
                                 
@@ -448,7 +474,6 @@ if sistema_activo:
                                     for k in ["Q","W","X"]: row[k] = row["C"]
                                     if destinatario_reasignado_final:
                                         row["O"] = destinatario_reasignado_final
-                                    # Asegurar F7
                                     row["F"] = extraer_unidad_f7(row["G"])
 
                                 elif tipo_proceso == "CONOCIMIENTO":
@@ -456,7 +481,6 @@ if sistema_activo:
                                     for k in ["N","O","P","V"]: row[k] = ""
                                     for k in ["Q","W","X"]: row[k] = row["C"]
 
-                                # Limpieza final PENDIENTE
                                 if row["S"] == "PENDIENTE":
                                     for k in ["N", "O", "P", "Q", "V", "W", "X"]: row[k] = ""
 
@@ -476,27 +500,26 @@ if sistema_activo:
                             except Exception as e: st.error(f"Error Técnico: {e}")
                     else: st.warning("⚠️ Sube documento.")
 
-        # --- VISUALIZACIÓN LISTA Y PREVIEW ---
+        # --- VISUALIZACIÓN ---
         if st.session_state.registros:
             st.markdown("---")
             st.markdown("#### 📋 Cola de Trabajo")
             
-            # 1. MINI MATRIZ DE PREVISUALIZACIÓN (FILA ÚNICA)
+            # MINI MATRIZ
             if len(st.session_state.registros) > 0:
-                st.caption("👁️ Previsualización de Registro Seleccionado:")
+                st.caption("👁️ Previsualización:")
                 indices = [f"#{i+1} | {r['G']}" for i, r in enumerate(st.session_state.registros)]
                 sel_idx = st.selectbox("Seleccionar Registro:", range(len(st.session_state.registros)), format_func=lambda x: indices[x], index=len(st.session_state.registros)-1, label_visibility="collapsed")
                 
                 reg_prev = st.session_state.registros[sel_idx]
                 df_prev = pd.DataFrame([reg_prev])
-                # Columnas clave para mostrar
                 cols_order = ["C","F","G","M","O","P","S","T"]
                 df_show = df_prev[[c for c in cols_order if c in df_prev.columns]]
                 st.dataframe(df_show, hide_index=True, use_container_width=True)
 
             st.write("")
 
-            # 2. LISTA DE TARJETAS
+            # LISTA
             for i, reg in enumerate(st.session_state.registros):
                 bg = "#e8f5e9" if reg["S"] == "FINALIZADO" else "#ffebee"
                 bc = "green" if reg["S"] == "FINALIZADO" else "red"
@@ -514,10 +537,9 @@ if sistema_activo:
                         if st.session_state.edit_index == i: st.session_state.edit_index = None
                         st.rerun()
 
-            # --- DESCARGA DIRECTA (SIN DOBLE CLIC) ---
+            # DESCARGA
             if os.path.exists("matriz_maestra.xlsx"):
                 try:
-                    # Generamos el archivo en memoria ANTES de pintar el botón
                     wb = load_workbook("matriz_maestra.xlsx")
                     ws = wb[next((s for s in wb.sheetnames if "CONTROL" in s.upper()), wb.sheetnames[0])]
                     start_row = 7
