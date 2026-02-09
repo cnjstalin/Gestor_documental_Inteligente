@@ -15,7 +15,7 @@ from openpyxl.styles import PatternFill, Border, Side, Alignment
 from datetime import datetime, timedelta, timezone
 
 # --- 1. CONFIGURACIÓN Y ESTILOS ---
-VER_SISTEMA = "v27.8"
+VER_SISTEMA = "v28.0"
 ADMIN_USER = "1723623011"
 ADMIN_PASS_MASTER = "9994915010022"
 
@@ -26,7 +26,8 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- 2. BASE DE DATOS DE USUARIOS (INCRUSTADA) ---
+# --- 2. BASE DE DATOS MAESTRA (SIEMPRE DISPONIBLE) ---
+# Esta lista garantiza el acceso aunque se borren los archivos locales
 USUARIOS_BASE = {
     "0702870460": {"grado": "SGOS", "nombre": "VILLALTA OCHOA XAVIER BISMARK", "activo": True},
     "1715081731": {"grado": "SGOS", "nombre": "MINDA MINDA FRANCISCO GABRIEL", "activo": True},
@@ -46,13 +47,13 @@ USUARIOS_BASE = {
     "1723623011": {"grado": "CBOS", "nombre": "CARRILLO NARVAEZ JOHN STALIN", "activo": True}
 }
 
-# ARCHIVOS DE PERSISTENCIA
+# ARCHIVOS
 DB_FILE = "usuarios_db.json"
 CONFIG_FILE = "config_sistema.json"
 CONTRATOS_FILE = "contratos_legal.json"
 LOGS_FILE = "historial_acciones.json"
 
-# FUNCIONES DE CARGA/GUARDADO
+# FUNCIONES DE PERSISTENCIA ROBUSTA
 def cargar_json(filepath, default):
     if os.path.exists(filepath):
         try:
@@ -65,11 +66,26 @@ def guardar_json(filepath, data):
     with open(filepath, 'w') as f:
         json.dump(data, f)
 
-# Inicializar sistema
-# Config ahora guarda el TOTAL HISTORICO BASE
-config_sistema = cargar_json(CONFIG_FILE, {"pass_universal": "DINIC2026", "base_historica": 1258})
-db_usuarios = cargar_json(DB_FILE, USUARIOS_BASE)
-if not db_usuarios: db_usuarios = USUARIOS_BASE
+def inicializar_usuarios_seguros():
+    """Garantiza que la nómina base siempre exista, fusionando con lo local."""
+    usuarios_finales = USUARIOS_BASE.copy() # Empezamos con la base segura
+    
+    # Si existe archivo local (ej: usuarios nuevos creados), los fusionamos
+    if os.path.exists(DB_FILE):
+        try:
+            with open(DB_FILE, 'r') as f:
+                usuarios_locales = json.load(f)
+                # Actualizamos la base con lo local (respetando nuevos usuarios)
+                usuarios_finales.update(usuarios_locales)
+        except: pass
+    
+    # Guardamos la versión fusionada para asegurar persistencia
+    guardar_json(DB_FILE, usuarios_finales)
+    return usuarios_finales
+
+# CARGA DE DATOS
+config_sistema = cargar_json(CONFIG_FILE, {"pass_universal": "DINIC2026", "base_historica": 1258, "consultas_ia_global": 0})
+db_usuarios = inicializar_usuarios_seguros()
 db_contratos = cargar_json(CONTRATOS_FILE, {})
 db_logs = cargar_json(LOGS_FILE, [])
 
@@ -78,19 +94,40 @@ def get_hora_ecuador():
     return datetime.now(timezone(timedelta(hours=-5)))
 
 def registrar_accion(usuario, accion, detalle=""):
-    """Guarda un log de auditoría"""
-    nuevo_log = {
-        "fecha": get_hora_ecuador().strftime("%Y-%m-%d %H:%M:%S"),
-        "usuario": usuario,
-        "accion": accion,
-        "detalle": detalle
-    }
-    db_logs.insert(0, nuevo_log) # Agregar al principio (más reciente primero)
+    ahora = get_hora_ecuador().strftime("%Y-%m-%d %H:%M:%S")
+    nuevo_log = {"fecha": ahora, "usuario": usuario, "accion": accion, "detalle": detalle}
+    db_logs.insert(0, nuevo_log)
     guardar_json(LOGS_FILE, db_logs)
 
+def incrementar_contador_ia():
+    config_sistema["consultas_ia_global"] = config_sistema.get("consultas_ia_global", 0) + 1
+    guardar_json(CONFIG_FILE, config_sistema)
+
+def actualizar_presencia(cedula_usuario):
+    if cedula_usuario in db_usuarios:
+        db_usuarios[cedula_usuario]['ultima_actividad'] = get_hora_ecuador().strftime("%Y-%m-%d %H:%M:%S")
+        guardar_json(DB_FILE, db_usuarios)
+
+def get_estado_usuario(cedula):
+    user_data = db_usuarios.get(cedula, {})
+    last_seen_str = user_data.get('ultima_actividad')
+    if not last_seen_str: return "🔴 DESCONECTADO"
+    try:
+        last_seen = datetime.strptime(last_seen_str, "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone(timedelta(hours=-5)))
+        diferencia = (get_hora_ecuador() - last_seen).total_seconds() / 60
+        if diferencia < 2: return "🟢 EN LÍNEA"
+        elif diferencia < 10: return "🟡 AUSENTE"
+        else: return "🔴 DESCONECTADO"
+    except: return "🔴 ERROR"
+
+def get_ultima_accion_usuario(nombre_usuario):
+    for log in db_logs:
+        if log['usuario'] == nombre_usuario:
+            return f"{log['accion']} ({log['fecha'].split(' ')[1]})"
+    return "---"
+
 def get_img_as_base64(file_path):
-    with open(file_path, "rb") as f:
-        data = f.read()
+    with open(file_path, "rb") as f: data = f.read()
     return base64.b64encode(data).decode()
 
 def get_logo_html(width="120px"):
@@ -109,38 +146,22 @@ st.markdown("""
     .login-container { max-width: 400px; margin: auto; padding: 40px; background-color: #ffffff; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); text-align: center; border-top: 5px solid #0E2F44; }
     .legal-warning { background-color: #fff3cd; border-left: 6px solid #ffc107; padding: 15px; color: #856404; font-weight: bold; margin-bottom: 15px; }
     div.stButton > button { width: 100%; font-weight: bold; border-radius: 5px; }
-    
-    .admin-badge {
-        background-color: #dc3545;
-        color: white;
-        padding: 10px;
-        border-radius: 5px;
-        text-align: center;
-        font-weight: bold;
-        margin-bottom: 10px;
-        border: 2px solid #b02a37;
-    }
+    .admin-badge { background-color: #dc3545; color: white; padding: 10px; border-radius: 5px; text-align: center; font-weight: bold; margin-bottom: 10px; border: 2px solid #b02a37; }
     </style>
 """, unsafe_allow_html=True)
 
-# --- 4. GESTIÓN DE SESIÓN ---
+# --- 4. VARIABLES DE SESIÓN ---
 if 'logged_in' not in st.session_state: st.session_state.logged_in = False
 if 'user_role' not in st.session_state: st.session_state.user_role = "" 
 if 'usuario_turno' not in st.session_state: st.session_state.usuario_turno = "" 
 if 'user_id' not in st.session_state: st.session_state.user_id = ""
-
 if 'registros' not in st.session_state: st.session_state.registros = [] 
 if 'edit_index' not in st.session_state: st.session_state.edit_index = None 
 if 'docs_procesados_hoy' not in st.session_state: st.session_state.docs_procesados_hoy = 0
-if 'consultas_ia' not in st.session_state: st.session_state.consultas_ia = 0
 if 'genai_model' not in st.session_state: st.session_state.genai_model = None
 
 if 'lista_unidades' not in st.session_state: 
-    st.session_state.lista_unidades = [
-        "DINIC", "SOPORTE OPERATIVO", "APOYO OPERATIVO", "PLANIFICACION", 
-        "JURIDICO", "COMUNICACION", "ANALISIS DE INFORMACION", "COORDINACION OPERACIONAL", 
-        "FINANCIERO", "UCAP", "UNDECOF", "UDAR", "DIGIN", "DNATH", "DAOP", "DCOP", "DSOP"
-    ]
+    st.session_state.lista_unidades = ["DINIC", "SOPORTE OPERATIVO", "APOYO OPERATIVO", "PLANIFICACION", "JURIDICO", "COMUNICACION", "ANALISIS DE INFORMACION", "COORDINACION OPERACIONAL", "FINANCIERO", "UCAP", "UNDECOF", "UDAR", "DIGIN", "DNATH", "DAOP", "DCOP", "DSOP"]
 if 'lista_reasignados' not in st.session_state: st.session_state.lista_reasignados = []
 
 # --- 5. CONFIGURACIÓN IA ---
@@ -152,8 +173,8 @@ try:
             model_name = "gemini-1.5-flash"
             try:
                 listado = genai.list_models()
-                m_names = [m.name for m in listado if 'generateContent' in m.supported_generation_methods]
-                if [m for m in m_names if 'flash' in m]: model_name = [m for m in m_names if 'flash' in m][0]
+                names = [m.name for m in listado if 'generateContent' in m.supported_generation_methods]
+                if any('flash' in n for n in names): model_name = next(n for n in names if 'flash' in n)
             except: pass
             st.session_state.genai_model = genai.GenerativeModel(model_name)
         sistema_activo = True
@@ -167,28 +188,19 @@ def frases_curiosas():
 def limpiar_codigo(texto):
     if not texto: return ""
     match = re.search(r"(PN-[A-Z0-9]+-QX(?:-\d+)?(?:-OF|-MM)?)", str(texto), re.IGNORECASE)
-    if match: return match.group(1).strip().upper()
-    match2 = re.search(r"(?:Oficio|Memorando).*?(PN-.*)", str(texto), re.IGNORECASE)
-    if match2: return match2.group(1).strip().upper()
-    return str(texto).strip()
+    return match.group(1).strip().upper() if match else str(texto).strip()
 
 def extraer_unidad_f7(texto_codigo):
-    if not texto_codigo: return "DINIC"
     match = re.search(r"PN-([A-Z\s]+)-QX", str(texto_codigo).upper())
-    if match: return match.group(1).strip()
-    return "DINIC" 
+    return match.group(1).strip() if match else "DINIC" 
 
 def determinar_sale_no_sale(destinos_str):
     unidades_externas = ["UCAP", "UNDECOF", "UDAR", "DIGIN", "DNATH", "COMANDO GENERAL", "OTRAS DIRECCIONES"]
-    destinos_upper = destinos_str.upper()
-    for u in unidades_externas:
-        if u in destinos_upper: return "SI"
-    return "NO"
+    return "SI" if any(u in destinos_str.upper() for u in unidades_externas) else "NO"
 
 def invocar_ia_segura(content):
     if not st.session_state.genai_model: raise Exception("IA no configurada")
-    max_retries = 3
-    for i in range(max_retries):
+    for i in range(3):
         try: return st.session_state.genai_model.generate_content(content)
         except Exception as e:
             if "429" in str(e): time.sleep(2); continue
@@ -207,41 +219,31 @@ def preservar_bordes(cell, fill_obj):
 def generar_html_contrato(datos_usuario, img_b64):
     fecha_hora = get_hora_ecuador().strftime("%Y-%m-%d %H:%M:%S")
     logo_b64 = ""
-    if os.path.exists("Captura.JPG"):
-        logo_b64 = get_img_as_base64("Captura.JPG")
-    
+    if os.path.exists("Captura.JPG"): logo_b64 = get_img_as_base64("Captura.JPG")
     logo_html_tag = f'<img src="data:image/jpeg;base64,{logo_b64}" style="width:100px; display:block; margin: 0 auto;">' if logo_b64 else ""
 
     html = f"""
     <div style="font-family: Arial, sans-serif; padding: 40px; border: 2px solid #000; max-width: 800px; margin: auto;">
-        <div style="text-align: center;">
-            {logo_html_tag}
-            <h2>ACTA DE COMPROMISO Y CONFIDENCIALIDAD<br>USO DEL ASESOR INTELIGENTE SIGD-DINIC</h2>
-        </div>
-        <br>
-        <p><strong>Usuario:</strong> {datos_usuario['grado']} {datos_usuario['nombre']}</p>
-        <p><strong>Cédula:</strong> {st.session_state.user_id}</p>
-        <p><strong>Fecha y Hora de Aceptación:</strong> {fecha_hora}</p>
-        <hr>
-        <h3>TÉRMINOS Y CONDICIONES DEL ASESOR INTELIGENTE SIGD</h3>
-        <p>Yo, el servidor policial arriba identificado, declaro haber leído, entendido y aceptado las siguientes políticas:</p>
+        <div style="text-align: center;">{logo_html_tag}<h2>ACTA DE COMPROMISO Y CONFIDENCIALIDAD<br>USO DEL ASESOR INTELIGENTE SIGD-DINIC</h2></div>
+        <br><p><strong>Usuario:</strong> {datos_usuario['grado']} {datos_usuario['nombre']}</p>
+        <p><strong>Cédula:</strong> {st.session_state.user_id}</p><p><strong>Fecha:</strong> {fecha_hora}</p><hr>
+        <h3>TÉRMINOS Y CONDICIONES</h3>
         <ol>
-            <li><strong>Naturaleza de Apoyo:</strong> El Asesor Estratégico es una herramienta de Inteligencia Artificial generativa diseñada exclusivamente como apoyo técnico y de consulta. No sustituye el criterio, mando ni decisión del servidor policial.</li>
-            <li><strong>Carácter Referencial:</strong> Todo contenido, análisis, extracto o redacción generado por este sistema es estrictamente referencial y tentativo. No constituye un documento oficial ni una orden vinculante hasta que sea revisado y firmado por la autoridad competente.</li>
-            <li><strong>Responsabilidad Humana:</strong> El Oficial de Turno o usuario asume la responsabilidad total y exclusiva de verificar, corregir y validar la información antes de plasmarla en sistemas oficiales (Quipux, Partes Web, etc.).</li>
-            <li><strong>Verificación Normativa:</strong> Es obligación del usuario contrastar las sugerencias de la IA con la normativa legal vigente (COIP, COESCOP, Reglamentos) para evitar errores jurídicos o de procedimiento.</li>
-            <li><strong>Prohibición de Datos Sensibles:</strong> Queda estrictamente prohibido ingresar nombres de fuentes humanas, datos de víctimas protegidas o información clasificada como "SECRETA" que ponga en riesgo operaciones en curso.</li>
-            <li><strong>No Vinculante:</strong> Las recomendaciones tácticas (diagnósticos) emitidas por el sistema no tienen validez legal ni administrativa por sí mismas y no eximen de responsabilidad al usuario por acciones tomadas basándose en ellas.</li>
-            <li><strong>Posibilidad de Error:</strong> El usuario reconoce que la IA puede incurrir en "alucinaciones" (datos inexactos) y se compromete a realizar el control de calidad de cada párrafo generado.</li>
-            <li><strong>Trazabilidad de Uso:</strong> El sistema registra la identidad, fecha y hora del acceso para fines de auditoría y control de gestión de la DINIC.</li>
-            <li><strong>Uso Ético:</strong> La herramienta debe utilizarse estrictamente para fines institucionales. Cualquier uso para fines personales o ajenos al servicio será sancionado disciplinariamente.</li>
-            <li><strong>Aceptación de Riesgo:</strong> Al ingresar, el usuario declara entender estas limitaciones y libera a la administración del sistema de cualquier responsabilidad por el mal uso de la información generada.</li>
+            <li><strong>Naturaleza de Apoyo:</strong> Herramienta de apoyo técnico, no sustituye criterio humano.</li>
+            <li><strong>Carácter Referencial:</strong> Contenido tentativo, no oficial hasta firma.</li>
+            <li><strong>Responsabilidad Humana:</strong> El usuario valida la información.</li>
+            <li><strong>Verificación Normativa:</strong> Obligación de contrastar con ley vigente.</li>
+            <li><strong>Prohibición de Datos Sensibles:</strong> NO ingresar datos secretos.</li>
+            <li><strong>No Vinculante:</strong> Recomendaciones no eximen de responsabilidad.</li>
+            <li><strong>Posibilidad de Error:</strong> La IA puede fallar, revisar todo.</li>
+            <li><strong>Trazabilidad de Uso:</strong> Accesos auditados.</li>
+            <li><strong>Uso Ético:</strong> Solo fines institucionales.</li>
+            <li><strong>Aceptación de Riesgo:</strong> Libera a administración de responsabilidad.</li>
         </ol>
-        <br><br>
         <div style="border: 1px dashed #333; padding: 15px; width: fit-content; margin-left: auto;">
-            <p style="text-align: center; font-size: 12px; margin-bottom: 5px;"><strong>EVIDENCIA BIOMÉTRICA DE ACEPTACIÓN</strong></p>
+            <p style="text-align: center; font-size: 12px;"><strong>FIRMA BIOMÉTRICA</strong></p>
             <img src="data:image/png;base64,{img_b64}" style="width: 150px; border: 1px solid #ccc;">
-            <p style="font-size: 10px; text-align: center; margin-top: 5px;">Firma Digital: {fecha_hora}</p>
+            <p style="font-size: 10px; text-align: center;">{fecha_hora}</p>
         </div>
     </div>
     """
@@ -255,13 +257,7 @@ if not st.session_state.logged_in:
     c1, c2, c3 = st.columns([1,2,1])
     with c2:
         st.markdown("<br><br>", unsafe_allow_html=True)
-        st.markdown(f"""
-        <div class="login-container">
-            {get_logo_html()}
-            <h2 style='color:#0E2F44; margin-bottom: 5px;'>ACCESO SIGD DINIC</h2>
-            <p style='color: gray; margin-top: 0;'>Sistema Oficial de Gestión Documental</p>
-        </div>
-        """, unsafe_allow_html=True)
+        st.markdown(f"""<div class="login-container">{get_logo_html()}<h2 style='color:#0E2F44; margin-bottom: 5px;'>ACCESO SIGD DINIC</h2><p style='color: gray; margin-top: 0;'>Sistema Oficial de Gestión Documental</p></div>""", unsafe_allow_html=True)
         
         with st.form("login_form"):
             usuario_input = st.text_input("Usuario (Cédula):").strip()
@@ -274,10 +270,8 @@ if not st.session_state.logged_in:
                     st.session_state.user_id = usuario_input
                     admin_data = db_usuarios.get(ADMIN_USER, {"grado": "CBOS.", "nombre": "CARRILLO NARVAEZ JOHN STALIN"})
                     st.session_state.usuario_turno = f"{admin_data['grado']} {admin_data['nombre']}"
-                    st.success("✅ Acceso Concedido: ADMINISTRADOR")
-                    registrar_accion(st.session_state.usuario_turno, "INICIO SESIÓN ADMIN")
-                    st.rerun()
-                # USUARIOS
+                    st.success("✅ Acceso ADMIN"); registrar_accion(st.session_state.usuario_turno, "INICIO SESIÓN ADMIN"); actualizar_presencia(usuario_input); st.rerun()
+                # USER
                 elif usuario_input in db_usuarios:
                     user_data = db_usuarios[usuario_input]
                     if pass_input == config_sistema["pass_universal"]:
@@ -286,32 +280,25 @@ if not st.session_state.logged_in:
                             st.session_state.user_role = "user"
                             st.session_state.user_id = usuario_input
                             st.session_state.usuario_turno = f"{user_data['grado']} {user_data['nombre']}"
-                            st.success(f"✅ Bienvenido: {st.session_state.usuario_turno}")
-                            registrar_accion(st.session_state.usuario_turno, "INICIO SESIÓN USUARIO")
-                            st.rerun()
-                        else: st.error("🚫 Usuario inactivo.")
+                            st.success(f"✅ Bienvenido"); registrar_accion(st.session_state.usuario_turno, "INICIO SESIÓN"); actualizar_presencia(usuario_input); st.rerun()
+                        else: st.error("🚫 Inactivo.")
                     else: st.error("🚫 Contraseña incorrecta.")
-                else: st.error("🚫 Usuario no autorizado.")
+                else: st.error("🚫 Usuario no encontrado.")
 
 else:
-    # ==============================================================================
-    #  SISTEMA PRINCIPAL
-    # ==============================================================================
-    
+    actualizar_presencia(st.session_state.user_id)
     with st.sidebar:
         if os.path.exists("Captura.JPG"): st.image("Captura.JPG", use_container_width=True)
         else: st.image("https://upload.wikimedia.org/wikipedia/commons/2/25/Escudo_Policia_Nacional_del_Ecuador.png", width=100)
         
         st.markdown("### 👮‍♂️ CONTROL DE MANDO")
-        
         if st.session_state.user_role == "admin":
             st.markdown("""<div class="admin-badge">🛡️ MODO ADMINISTRADOR<br><span style="font-size: 0.8em; font-weight: normal;">CONTROL TOTAL</span></div>""", unsafe_allow_html=True)
-        
         st.info(f"👤 **{st.session_state.usuario_turno}**")
         fecha_turno = st.date_input("Fecha Operación:", value=get_hora_ecuador().date())
 
         st.markdown("---")
-        if st.button("🗑️ NUEVO TURNO (Limpiar)", type="primary"):
+        if st.button("🗑️ NUEVO TURNO", type="primary"):
             st.session_state.registros = []
             st.session_state.docs_procesados_hoy = 0
             st.rerun()
@@ -319,22 +306,22 @@ else:
         st.markdown("---")
         if st.session_state.registros:
             json_str = json.dumps(st.session_state.registros, default=str)
-            st.download_button("⬇️ DESCARGAR RESPALDO SIGD", json_str, file_name="backup_sigd.json", mime="application/json")
+            st.download_button("⬇️ RESPALDO JSON", json_str, file_name="backup_sigd.json", mime="application/json")
         
-        uploaded_backup = st.file_uploader("⬆️ RESTAURAR RESPALDO SIGD", type=['json'])
-        if uploaded_backup:
+        up_backup = st.file_uploader("⬆️ RESTAURAR JSON", type=['json'])
+        if up_backup:
             try:
-                data = json.load(uploaded_backup)
+                data = json.load(up_backup)
                 st.session_state.registros = data
                 st.session_state.docs_procesados_hoy = len(data)
-                st.success("¡Backup Restaurado!")
+                st.success("¡Restaurado!")
                 time.sleep(1)
                 st.rerun()
-            except: st.error("Archivo corrupto.")
+            except: st.error("Error archivo.")
 
         st.markdown("---")
         if os.path.exists("matriz_maestra.xlsx"):
-            st.success("✅ Matriz Cargada")
+            st.success("✅ Matriz OK")
             if st.button("🔄 Cambiar Matriz"): os.remove("matriz_maestra.xlsx"); st.rerun()
         else:
             up_m = st.file_uploader("Cargar Matriz .xlsx", type=['xlsx'])
@@ -343,26 +330,25 @@ else:
                 st.rerun()
         
         st.markdown("---")
-        if st.button("🔒 CERRAR SESIÓN"):
+        if st.button("🔒 SALIR"):
             st.session_state.logged_in = False
             st.rerun()
 
     st.markdown(f'''<div class="main-header"><h1>SIGD DINIC</h1><h3>Sistema de Gestión Documental</h3></div>''', unsafe_allow_html=True)
 
-    # DASHBOARD ACTUALIZADO CON BASE CONFIGURABLE
     base_historica = config_sistema.get("base_historica", 1258)
     total_docs = base_historica + len(st.session_state.registros)
+    total_consultas_ia = config_sistema.get("consultas_ia_global", 0) + st.session_state.consultas_ia
 
     c1, c2, c3 = st.columns(3)
     with c1: st.markdown(f"<div class='metric-card'><h3>📥 {st.session_state.docs_procesados_hoy}</h3><p>Docs Turno Actual</p></div>", unsafe_allow_html=True)
     with c2: st.markdown(f"<div class='metric-card'><h3>📈 {total_docs}</h3><p>Total Histórico</p></div>", unsafe_allow_html=True)
-    with c3: st.markdown(f"<div class='metric-card'><h3>🧠 {st.session_state.consultas_ia}</h3><p>Consultas IA</p></div>", unsafe_allow_html=True)
+    with c3: st.markdown(f"<div class='metric-card'><h3>🧠 {total_consultas_ia}</h3><p>Consultas IA (Global)</p></div>", unsafe_allow_html=True)
     st.write("")
 
     if sistema_activo:
         tab1, tab2, tab3 = st.tabs(["📊 GESTOR DE MATRIZ", "🕵️‍♂️ ASESOR", "🛡️ ADMIN"])
 
-        # --- TAB 1: GESTOR ---
         with tab1:
             is_editing = st.session_state.edit_index is not None
             idx_edit = st.session_state.edit_index
@@ -376,18 +362,10 @@ else:
             col1, col2 = st.columns([1, 2])
             with col1:
                 val_tipo = registro_a_editar['L'] if (is_editing and registro_a_editar['L']) else "TRAMITE NORMAL"
-                if val_tipo == "": val_tipo = "TRAMITE NORMAL" 
-                
-                tipo_proceso = st.selectbox("Tipo Gestión:", 
-                    ["TRAMITE NORMAL", "REASIGNADO", "GENERADO DESDE DESPACHO", "CONOCIMIENTO"],
-                    index=["TRAMITE NORMAL", "REASIGNADO", "GENERADO DESDE DESPACHO", "CONOCIMIENTO"].index(val_tipo)
-                )
-                
+                if not val_tipo: val_tipo = "TRAMITE NORMAL"
+                tipo_proceso = st.selectbox("Tipo Gestión:", ["TRAMITE NORMAL", "REASIGNADO", "GENERADO DESDE DESPACHO", "CONOCIMIENTO"], index=["TRAMITE NORMAL", "REASIGNADO", "GENERADO DESDE DESPACHO", "CONOCIMIENTO"].index(val_tipo))
                 val_salida = registro_a_editar['N'] if (is_editing and registro_a_editar['N']) else "QUIPUX ELECTRONICO"
-                tipo_doc_salida = st.selectbox("Formato Salida:", 
-                    ["QUIPUX ELECTRONICO", "DOCPOL ELECTRONICO", "FISICO", "DIGITAL", "OTRO"],
-                    index=["QUIPUX ELECTRONICO", "DOCPOL ELECTRONICO", "FISICO", "DIGITAL", "OTRO"].index(val_salida) if val_salida else 0
-                )
+                tipo_doc_salida = st.selectbox("Formato Salida:", ["QUIPUX ELECTRONICO", "DOCPOL ELECTRONICO", "FISICO", "DIGITAL", "OTRO"], index=["QUIPUX ELECTRONICO", "DOCPOL ELECTRONICO", "FISICO", "DIGITAL", "OTRO"].index(val_salida) if val_salida else 0)
 
                 st.markdown("---")
                 st.caption("🏢 DEPENDENCIA/as DE DESTINO")
@@ -396,17 +374,14 @@ else:
                 if is_editing and registro_a_editar['M']:
                     prev_units = registro_a_editar['M'].split(", ")
                     default_units = [u for u in prev_units if u in opciones_unidades]
-
                 unidades_selected = st.multiselect("Seleccione Unidad(es):", opciones_unidades, default=default_units)
                 col_ning, col_otra = st.columns(2)
                 chk_ninguna = col_ning.checkbox("NINGUNA")
                 chk_otra = col_otra.checkbox("✍️ OTRA")
                 input_otra_unidad = ""
                 if chk_otra: input_otra_unidad = st.text_input("Nueva Unidad:").upper()
-
                 lista_final_unidades = []
-                if chk_ninguna: lista_final_unidades = [] 
-                else:
+                if not chk_ninguna:
                     lista_final_unidades = unidades_selected.copy()
                     if input_otra_unidad: lista_final_unidades.append(input_otra_unidad)
                 str_unidades_final = ", ".join(lista_final_unidades)
@@ -416,22 +391,17 @@ else:
                     st.markdown("---")
                     st.markdown("👤 **DESTINATARIO REASIGNADO**")
                     opciones_reasig = ["SELECCIONAR..."] + st.session_state.lista_reasignados + ["✍️ NUEVO"]
-                    idx_rea = 0 
+                    idx_rea = 0
                     if is_editing and registro_a_editar.get("O") in st.session_state.lista_reasignados:
-                            idx_rea = opciones_reasig.index(registro_a_editar["O"])
+                        idx_rea = opciones_reasig.index(registro_a_editar["O"])
                     sel_reasig = st.selectbox("Historial:", opciones_reasig, index=idx_rea)
-                    val_manual = ""
-                    if is_editing and registro_a_editar.get("O") and registro_a_editar.get("O") not in st.session_state.lista_reasignados:
-                        val_manual = registro_a_editar.get("O")
+                    val_manual = registro_a_editar.get("O") if (is_editing and registro_a_editar.get("O") not in st.session_state.lista_reasignados) else ""
                     input_manual_reasig = st.text_input("Grado y Nombre:", value=val_manual)
-                    if sel_reasig == "✍️ NUEVO" or input_manual_reasig:
-                        destinatario_reasignado_final = input_manual_reasig.upper()
-                    elif sel_reasig != "SELECCIONAR...":
-                        destinatario_reasignado_final = sel_reasig
+                    if sel_reasig == "✍️ NUEVO" or input_manual_reasig: destinatario_reasignado_final = input_manual_reasig.upper()
+                    elif sel_reasig != "SELECCIONAR...": destinatario_reasignado_final = sel_reasig
 
             with col2:
-                doc_entrada = None
-                doc_salida = None
+                doc_entrada = None; doc_salida = None
                 if tipo_proceso == "TRAMITE NORMAL":
                     c1_in, c2_out = st.columns(2)
                     doc_entrada = c1_in.file_uploader("1. Doc RECIBIDO", type=['pdf'], key="in_main")
@@ -442,15 +412,12 @@ else:
                     doc_salida = st.file_uploader("2. Doc GENERADO", type=['pdf'], key="out_s")
 
             btn_text = "🔄 ACTUALIZAR" if is_editing else "➕ AGREGAR"
-            
             if st.button(btn_text, type="primary"):
-                if not os.path.exists("matriz_maestra.xlsx"):
-                    st.error("❌ Falta Matriz Base.")
+                if not os.path.exists("matriz_maestra.xlsx"): st.error("❌ Falta Matriz Base.")
                 else:
                     valid_units = True
                     if tipo_proceso != "CONOCIMIENTO" and not str_unidades_final and not chk_ninguna:
-                        st.warning("⚠️ Seleccione Dependencia de Destino.")
-                        valid_units = False
+                        st.warning("⚠️ Seleccione Dependencia."); valid_units = False
                     
                     if valid_units:
                         process = False
@@ -463,11 +430,9 @@ else:
                                 try:
                                     paths = []; path_in = None; path_out = None
                                     if doc_entrada:
-                                        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as t:
-                                            t.write(doc_entrada.getvalue()); path_in = t.name; paths.append(t.name)
+                                        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as t: t.write(doc_entrada.getvalue()); path_in = t.name; paths.append(t.name)
                                     if doc_salida:
-                                        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as t:
-                                            t.write(doc_salida.getvalue()); path_out = t.name; paths.append(t.name)
+                                        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as t: t.write(doc_salida.getvalue()); path_out = t.name; paths.append(t.name)
 
                                     files_ia = []
                                     if path_in: files_ia.append(genai.upload_file(path_in, display_name="In"))
@@ -483,12 +448,8 @@ else:
                                     final_data = registro_a_editar.copy() if is_editing else {}
                                     def get_val(key_ia, key_row): return data.get(key_ia) if data.get(key_ia) else final_data.get(key_row, "")
 
-                                    raw_code_in = get_val("codigo_completo_entrada", "G")
-                                    cod_in = limpiar_codigo(raw_code_in)
-                                    unidad_f7 = extraer_unidad_f7(cod_in)
-                                    dest_ia = get_val("destinatarios_todos", "O")
-                                    raw_code_out = get_val("codigo_completo_salida", "P")
-                                    cod_out = limpiar_codigo(raw_code_out)
+                                    raw_code_in = get_val("codigo_completo_entrada", "G"); cod_in = limpiar_codigo(raw_code_in); unidad_f7 = extraer_unidad_f7(cod_in)
+                                    dest_ia = get_val("destinatarios_todos", "O"); raw_code_out = get_val("codigo_completo_salida", "P"); cod_out = limpiar_codigo(raw_code_out)
 
                                     estado_s7 = "PENDIENTE"
                                     if tipo_proceso in ["CONOCIMIENTO", "REASIGNADO", "GENERADO DESDE DESPACHO"]: estado_s7 = "FINALIZADO"
@@ -498,9 +459,7 @@ else:
                                     if tipo_proceso == "CONOCIMIENTO": es_interno = "NO"
 
                                     row = {
-                                        "C": get_val("fecha_recepcion", "C"), "D": get_val("remitente_grado_nombre", "D"), "E": get_val("remitente_cargo", "E"), "F": unidad_f7, "G": cod_in, "H": get_val("fecha_recepcion", "H"), "I": get_val("asunto_entrada", "I"), "J": get_val("resumen_breve", "J"),
-                                        "K": st.session_state.usuario_turno, 
-                                        "L": "", "M": str_unidades_final, "N": tipo_doc_salida, "O": dest_ia, "P": cod_out, "Q": get_val("fecha_salida", "Q"), "R": "", "S": estado_s7, "T": es_interno, "U": str_unidades_final, "V": cod_out, "W": get_val("fecha_salida", "W"), "X": get_val("fecha_salida", "X"), "Y": "", "Z": ""
+                                        "C": get_val("fecha_recepcion", "C"), "D": get_val("remitente_grado_nombre", "D"), "E": get_val("remitente_cargo", "E"), "F": unidad_f7, "G": cod_in, "H": get_val("fecha_recepcion", "H"), "I": get_val("asunto_entrada", "I"), "J": get_val("resumen_breve", "J"), "K": st.session_state.usuario_turno, "L": "", "M": str_unidades_final, "N": tipo_doc_salida, "O": dest_ia, "P": cod_out, "Q": get_val("fecha_salida", "Q"), "R": "", "S": estado_s7, "T": es_interno, "U": str_unidades_final, "V": cod_out, "W": get_val("fecha_salida", "W"), "X": get_val("fecha_salida", "X"), "Y": "", "Z": ""
                                     }
 
                                     if tipo_proceso == "TRAMITE NORMAL": row["L"] = ""
@@ -518,19 +477,14 @@ else:
                                     if row["S"] == "PENDIENTE":
                                         for k in ["O", "P", "Q", "V", "W", "X"]: row[k] = ""
 
-                                    if input_otra_unidad and input_otra_unidad not in st.session_state.lista_unidades:
-                                        st.session_state.lista_unidades.append(input_otra_unidad)
+                                    if input_otra_unidad and input_otra_unidad not in st.session_state.lista_unidades: st.session_state.lista_unidades.append(input_otra_unidad)
 
-                                    if is_editing: 
-                                        st.session_state.registros[idx_edit] = row; st.session_state.edit_index = None; st.success("✅ Actualizado")
-                                        registrar_accion(st.session_state.usuario_turno, f"EDITÓ REGISTRO {row['G']}")
-                                    else: 
-                                        st.session_state.registros.append(row); st.session_state.docs_procesados_hoy += 1; st.success("✅ Agregado")
-                                        registrar_accion(st.session_state.usuario_turno, f"NUEVO REGISTRO {row['G']}")
+                                    if is_editing: st.session_state.registros[idx_edit] = row; st.session_state.edit_index = None; st.success("✅ Actualizado"); registrar_accion(st.session_state.usuario_turno, f"EDITÓ {row['G']}")
+                                    else: st.session_state.registros.append(row); st.session_state.docs_procesados_hoy += 1; st.success("✅ Agregado"); registrar_accion(st.session_state.usuario_turno, f"NUEVO {row['G']}")
 
                                     for p in paths: os.remove(p)
                                     st.rerun()
-                                except Exception as e: st.error(f"Error Técnico: {e}")
+                                except Exception as e: st.error(f"Error: {e}")
                         else: st.warning("⚠️ Sube documento.")
 
             if st.session_state.registros:
@@ -572,113 +526,96 @@ else:
                         st.download_button(label="📥 DESCARGAR MATRIZ FINAL", data=out_buffer, file_name=f"TURNO {f_str} {u_str}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", type="primary")
                     except Exception as e: st.error(f"Error Excel: {e}")
 
-        # --- TAB 2: ASESOR ---
         with tab2:
             st.markdown("#### 🧠 Consultor de Despacho (IA)")
             usuario_actual = st.session_state.user_id
             ya_acepto = usuario_actual in db_contratos
             
             if not ya_acepto:
-                st.warning("⚠️ **ACCIÓN REQUERIDA:** Debe aceptar los Términos.")
-                with st.expander("📜 TÉRMINOS Y CONDICIONES (DECÁLOGO)", expanded=True):
+                st.warning("⚠️ Debe aceptar los Términos.")
+                with st.expander("📜 TÉRMINOS (DECÁLOGO)", expanded=True):
                     politicas = ["Naturaleza de Apoyo...", "Carácter Referencial...", "Responsabilidad Humana...", "Verificación Normativa...", "Prohibición de Datos Sensibles...", "No Vinculante...", "Posibilidad de Error...", "Trazabilidad de Uso...", "Uso Ético...", "Aceptación de Riesgo..."]
-                    checks = [st.checkbox(p) for p in politicas]
-                    if all(checks):
+                    if all([st.checkbox(p) for p in politicas]):
                         st.success("✅ Aceptado. Capture foto.")
                         foto = st.camera_input("Firma Biométrica")
                         if foto:
-                            b64_foto = base64.b64encode(foto.getvalue()).decode()
-                            db_contratos[usuario_actual] = {"fecha": get_hora_ecuador().strftime("%Y-%m-%d %H:%M:%S"), "foto": b64_foto, "usuario": st.session_state.usuario_turno}
-                            guardar_json(CONTRATOS_FILE, db_contratos)
-                            registrar_accion(st.session_state.usuario_turno, "FIRMÓ CONTRATO USO IA")
-                            st.success("¡Firmado!"); time.sleep(2); st.rerun()
+                            b64 = base64.b64encode(foto.getvalue()).decode()
+                            db_contratos[usuario_actual] = {"fecha": get_hora_ecuador().strftime("%Y-%m-%d %H:%M:%S"), "foto": b64, "usuario": st.session_state.usuario_turno}
+                            guardar_json(CONTRATOS_FILE, db_contratos); registrar_accion(st.session_state.usuario_turno, "FIRMÓ CONTRATO"); st.success("¡Firmado!"); time.sleep(2); st.rerun()
             else:
                 st.markdown("""<div class="legal-warning">⚠️ AVISO LEGAL: Uso referencial.</div>""", unsafe_allow_html=True)
                 if usuario_actual in db_contratos:
-                    datos = db_contratos[usuario_actual]
-                    u_info = db_usuarios.get(usuario_actual, {"grado":"", "nombre": st.session_state.usuario_turno})
-                    html_c = generar_html_contrato(u_info, datos["foto"])
-                    st.download_button("📜 Descargar Mi Contrato", html_c, file_name="Contrato.html", mime="text/html")
+                    st.download_button("📜 Descargar Mi Contrato", generar_html_contrato(db_usuarios.get(usuario_actual, {}), db_contratos[usuario_actual]["foto"]), file_name="Contrato.html", mime="text/html")
                 st.markdown("---")
                 up_asesor = st.file_uploader("Sube documento (PDF)", type=['pdf'], key="asesor_up")
                 if up_asesor and st.button("ANALIZAR ESTRATEGIA"):
                     with st.spinner("Analizando..."):
                         try:
-                            with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as t:
-                                t.write(up_asesor.getvalue()); p_as = t.name
+                            with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as t: t.write(up_asesor.getvalue()); p_as = t.name
                             f_as = genai.upload_file(p_as, display_name="Consulta")
                             prompt_asesor = """Actúa como JEFE DE AYUDANTÍA. Estructura: 1. DIAGNÓSTICO, 2. CRITERIO, 3. EXTRACTO TENTATIVO (Solo texto)."""
                             res = invocar_ia_segura([prompt_asesor, f_as])
                             st.markdown(res.text)
                             st.session_state.consultas_ia += 1
-                            registrar_accion(st.session_state.usuario_turno, "CONSULTA ASESOR IA")
+                            incrementar_contador_ia()
+                            registrar_accion(st.session_state.usuario_turno, "CONSULTA IA")
                             os.remove(p_as)
                         except Exception as e: st.error(f"Error: {e}")
 
-        # --- TAB 3: ADMIN ---
         with tab3:
             st.markdown("### 🛡️ PANEL DE ADMINISTRADOR")
             if st.session_state.user_role == "admin":
                 verif_pass = st.text_input("Confirme Contraseña Maestra:", type="password")
                 if verif_pass == ADMIN_PASS_MASTER:
                     st.success("ACCESO VERIFICADO")
-                    t3_1, t3_2, t3_3, t3_4 = st.tabs(["👥 Usuarios (Semáforo)", "📜 Contratos", "🕵️ Historial", "⚙️ Configuración"])
+                    t3_1, t3_2, t3_3, t3_4 = st.tabs(["👥 Monitor", "📜 Contratos", "🕵️ Historial", "⚙️ Config"])
                     
                     with t3_1:
-                        # VISUALIZADOR SEMAFORO
-                        data_semaforo = []
-                        for k, v in db_usuarios.items():
-                            estado = "🟢 ACTIVO" if v['activo'] else "🔴 INACTIVO"
-                            data_semaforo.append({"Cédula": k, "Grado": v['grado'], "Nombre": v['nombre'], "Estado": estado})
-                        st.dataframe(pd.DataFrame(data_semaforo), use_container_width=True)
+                        st.markdown("#### 📡 Monitor en Tiempo Real")
+                        data_monitor = []
+                        for cedula, datos in db_usuarios.items():
+                            data_monitor.append({"Grado y Nombre": f"{datos['grado']} {datos['nombre']}", "Estado": get_estado_usuario(cedula), "Última Acción": get_ultima_accion_usuario(f"{datos['grado']} {datos['nombre']}")})
                         
+                        df_m = pd.DataFrame(data_monitor)
+                        def color_estado(val): return f'color: {"green" if "EN LÍNEA" in val else "orange" if "AUSENTE" in val else "red"}; font-weight: bold;'
+                        st.dataframe(df_m.style.map(color_estado, subset=['Estado']), use_container_width=True)
+                        if st.button("🔄 Actualizar"): st.rerun()
+                        
+                        st.markdown("---")
                         c_add, c_del = st.columns(2)
                         with c_add:
-                            st.caption("Agregar")
-                            new_ced = st.text_input("Cédula:")
-                            new_grado = st.text_input("Grado:")
-                            new_nom = st.text_input("Nombres:")
-                            if st.button("Guardar"):
-                                db_usuarios[new_ced] = {"grado": new_grado, "nombre": new_nom, "activo": True}
-                                guardar_json(DB_FILE, db_usuarios)
-                                st.success("Guardado.")
-                                st.rerun()
+                            st.caption("Agregar"); new_ced = st.text_input("Cédula:"); new_grado = st.text_input("Grado:"); new_nom = st.text_input("Nombres:")
+                            if st.button("Guardar"): db_usuarios[new_ced] = {"grado": new_grado, "nombre": new_nom, "activo": True}; guardar_json(DB_FILE, db_usuarios); st.success("Guardado."); st.rerun()
                         with c_del:
-                            st.caption("Desactivar/Eliminar")
-                            del_ced = st.selectbox("Usuario:", options=list(db_usuarios.keys()))
-                            if st.button("Eliminar"):
-                                del db_usuarios[del_ced]
-                                guardar_json(DB_FILE, db_usuarios)
-                                st.success("Eliminado.")
-                                st.rerun()
+                            st.caption("Eliminar"); del_ced = st.selectbox("Usuario:", options=list(db_usuarios.keys()))
+                            if st.button("Eliminar"): del db_usuarios[del_ced]; guardar_json(DB_FILE, db_usuarios); st.success("Eliminado."); st.rerun()
 
                     with t3_2:
                         if db_contratos:
                             for ced, data in db_contratos.items():
                                 with st.expander(f"{data['usuario']} - {data['fecha']}"):
-                                    u_info = db_usuarios.get(ced, {"grado":"", "nombre": data['usuario']})
-                                    html_c = generar_html_contrato(u_info, data["foto"])
-                                    st.download_button(f"Descargar {ced}", html_c, file_name=f"C_{ced}.html", mime="text/html")
+                                    c1c, c2c, c3c = st.columns([1,1,1])
+                                    html_c = generar_html_contrato(db_usuarios.get(ced, {}), data["foto"])
+                                    with c1c: st.components.v1.html(html_c, height=300, scrolling=True)
+                                    with c2c: st.download_button(f"⬇️ Descargar", html_c, file_name=f"C_{ced}.html", mime="text/html")
+                                    with c3c: 
+                                        if st.button(f"🗑️ Eliminar {ced}"): 
+                                            del db_contratos[ced]; guardar_json(CONTRATOS_FILE, db_contratos); st.rerun()
                         else: st.info("Sin contratos.")
 
-                    with t3_3:
-                        st.markdown("#### Historial de Acciones")
-                        st.dataframe(pd.DataFrame(db_logs), use_container_width=True)
+                    with t3_3: st.markdown("#### Historial"); st.dataframe(pd.DataFrame(db_logs), use_container_width=True)
 
                     with t3_4:
-                        st.markdown("#### Configuración General")
-                        new_base = st.number_input("Base Histórica Documentos:", value=config_sistema.get("base_historica", 1258))
-                        if st.button("Actualizar Base Histórica"):
-                            config_sistema["base_historica"] = new_base
-                            guardar_json(CONFIG_FILE, config_sistema)
-                            st.success("Actualizado.")
-                            st.rerun()
+                        st.markdown("#### Configuración")
+                        c_ia, c_base = st.columns(2)
+                        with c_ia: 
+                            if st.button("🔄 Reiniciar Contador IA Global"): config_sistema["consultas_ia_global"] = 0; guardar_json(CONFIG_FILE, config_sistema); st.success("Reiniciado."); st.rerun()
+                        with c_base:
+                            new_base = st.number_input("Base Histórica:", value=config_sistema.get("base_historica", 1258))
+                            if st.button("Actualizar Base"): config_sistema["base_historica"] = new_base; guardar_json(CONFIG_FILE, config_sistema); st.success("Actualizado."); st.rerun()
                         
-                        new_pass = st.text_input("Contraseña Universal Usuarios:", value=config_sistema["pass_universal"])
-                        if st.button("Actualizar Contraseña"):
-                            config_sistema["pass_universal"] = new_pass
-                            guardar_json(CONFIG_FILE, config_sistema)
-                            st.success("Actualizada.")
+                        new_pass = st.text_input("Nueva Contraseña Universal:", value=config_sistema["pass_universal"])
+                        if st.button("Guardar Contraseña"): config_sistema["pass_universal"] = new_pass; guardar_json(CONFIG_FILE, config_sistema); st.success("Guardado.")
 
                 else: st.info("Ingrese contraseña maestra.")
             else: st.error("ACCESO DENEGADO.")
