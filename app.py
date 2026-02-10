@@ -16,7 +16,7 @@ from openpyxl.styles import PatternFill, Border, Side, Alignment
 from datetime import datetime, timedelta, timezone
 
 # --- 1. CONFIGURACIÓN Y ESTILOS ---
-VER_SISTEMA = "v33.0"
+VER_SISTEMA = "v33.1"
 ADMIN_USER = "1723623011"
 ADMIN_PASS_MASTER = "9994915010022"
 
@@ -322,11 +322,11 @@ def frases_curiosas():
     frases = ["¿Sabías que? El primer virus se llamó Creeper.", "¿Sabías que? La seguridad es responsabilidad de todos.", "¿Sabías que? Tu contraseña es tu llave digital.", "¿Sabías que? La IA procesa, tú decides.", "¿Sabías que? Un escritorio limpio mejora la productividad."]
     return random.choice(frases)
 
-# --- FUNCIÓN DE LIMPIEZA DE CÓDIGO (IA MEJORADA) ---
+# --- FUNCIÓN DE LIMPIEZA DE CÓDIGO (IA MEJORADA v33) ---
 def limpiar_codigo_prioridad(texto):
     if not texto: return ""
     # REGEX AMPLIADO: Captura todo desde PN- hasta que encuentre un salto de línea o caracteres no válidos
-    # Esto asegura que capture PN-DINIC-2026-001-QX-OF completo
+    # Incluye: letras, números, guiones y paréntesis
     match = re.search(r"(PN-[\w\-\(\)\.]+)", str(texto).upper())
     if match: return match.group(1).strip()
     
@@ -367,7 +367,7 @@ def invocar_ia_segura(content):
 def preservar_bordes(cell, fill_obj):
     original_border = copy(cell.border)
     cell.fill = fill_obj
-    cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=False) # WRAP TEXT FALSE (NO AGRANDAR)
+    cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=False) # WRAP TEXT FALSE
     if original_border: cell.border = original_border
     else:
         thin = Side(border_style="thin", color="000000")
@@ -444,7 +444,7 @@ def generar_fila_matriz(tipo, ia_data, manual_data, usuario_turno, paths_files):
         "C": fecha_ia_in, # Fecha Doc Recibido
         "D": ia_data.get("remitente_grado_nombre", ""),
         "E": ia_data.get("remitente_cargo", ""),
-        "F": unidad_f7, # Unidad Origen
+        "F": unidad_f7, # Unidad Origen (IA detecta entre parentesis)
         "G": cod_in,    # Num Doc Recibido
         "H": fecha_ia_in, # Fecha Doc Recibido
         "I": ia_data.get("asunto_entrada", ""),
@@ -466,9 +466,9 @@ def generar_fila_matriz(tipo, ia_data, manual_data, usuario_turno, paths_files):
         "Y": "", "Z": ""
     }
 
-    # APLICACIÓN DE REGLAS ESPECÍFICAS
+    # APLICACIÓN DE REGLAS ESPECÍFICAS (4.1 - 4.4)
     if tipo == "TRAMITE NORMAL":
-        row["L"] = ""
+        row["L"] = "" # Celda L vacía
 
     elif tipo == "REASIGNADO":
         row["L"] = "REASIGNADO"
@@ -477,13 +477,13 @@ def generar_fila_matriz(tipo, ia_data, manual_data, usuario_turno, paths_files):
         row["V"] = row["P"]
         if manual_data.get("reasignado_a"):
             row["O"] = manual_data.get("reasignado_a")
-        row["F"] = extraer_unidad_f7(row["G"])
         
     elif tipo == "GENERADO DESDE DESPACHO":
         row["L"] = "GENERADO DESDE DESPACHO"
         f_gen = fecha_ia_out if fecha_ia_out else fecha_ia_in
         row["C"] = f_gen; row["H"] = f_gen; row["Q"] = f_gen; row["W"] = f_gen; row["X"] = f_gen
         row["D"] = ""; row["E"] = ""
+        # Priorizar cod_out, sino cod_in
         code_final = cod_out if cod_out else cod_in
         row["G"] = code_final; row["P"] = code_final; row["V"] = code_final
         row["F"] = extraer_unidad_f7(code_final)
@@ -516,6 +516,7 @@ if not st.session_state.logged_in:
             usuario_input = st.text_input("Usuario (Cédula):").strip()
             pass_input = st.text_input("Contraseña:", type="password").strip()
             if st.form_submit_button("INGRESAR AL SISTEMA", type="primary"):
+                # ADMIN
                 if usuario_input == ADMIN_USER and pass_input == ADMIN_PASS_MASTER:
                     st.session_state.logged_in = True
                     st.session_state.user_role = "admin"
@@ -526,6 +527,7 @@ if not st.session_state.logged_in:
                     registrar_accion(st.session_state.usuario_turno, "INICIO SESIÓN ADMIN")
                     actualizar_presencia(usuario_input)
                     st.rerun()
+                # USER
                 elif usuario_input in db_usuarios:
                     user_data = db_usuarios[usuario_input]
                     if pass_input == config_sistema["pass_universal"]:
@@ -645,6 +647,7 @@ else:
 
                 st.markdown("---")
                 st.caption("🏢 DEPENDENCIA/as DE DESTINO")
+                
                 opciones_unidades = sorted(st.session_state.lista_unidades)
                 default_units = []
                 if is_editing and registro_a_editar['M']:
@@ -723,24 +726,24 @@ else:
                                     Analiza el documento y extrae JSON ESTRICTO.
 
                                     1. CÓDIGO DEL DOCUMENTO (CRÍTICO):
-                                       - Ubicación: Esquina superior DERECHA (encabezado).
+                                       - Ubicación: Esquina superior DERECHA.
                                        - Formato: "Oficio Nro. PN-UNIDAD-QX..." o "Memorando Nro. PN-...".
-                                       - INSTRUCCIÓN: Extrae TODO el código. Ignora códigos citados en el cuerpo del texto.
+                                       - INSTRUCCIÓN: Extrae TODO el código tal cual. Ignora códigos citados en el cuerpo.
 
                                     2. DESTINATARIOS (PARA):
-                                       - Busca la sección explícita "PARA:" o "DESTINATARIO:".
-                                       - NO confundir con la firma ("Atentamente").
-                                       - Extrae Grados y Nombres de TODOS.
+                                       - Busca la sección explícita "PARA:" en el encabezado.
+                                       - NO confundir con la firma ("Atentamente") ni con "De:".
+                                       - Extrae Grados y Nombres.
 
                                     3. REMITENTE (DE):
-                                       - Quien firma al final ("Atentamente").
+                                       - Quien firma al final ("Atentamente") o la sección "DE:" del encabezado.
 
                                     JSON:
                                     {
                                         "fecha_recepcion": "DD/MM/AAAA",
                                         "remitente_grado_nombre": "Texto",
                                         "remitente_cargo": "Texto",
-                                        "codigo_completo_entrada": "Texto (El de la esquina superior derecha)",
+                                        "codigo_completo_entrada": "Texto",
                                         "asunto_entrada": "Texto",
                                         "resumen_breve": "Texto",
                                         "destinatarios_todos": "Texto (A quién va dirigido)",
@@ -752,7 +755,12 @@ else:
                                     if files_ia:
                                         res = invocar_ia_segura([prompt, *files_ia])
                                         txt_clean = res.text.replace("```json", "").replace("```", "")
-                                        data = json.loads(txt_clean)
+                                        # Defensa contra formato lista
+                                        parsed = json.loads(txt_clean)
+                                        if isinstance(parsed, list):
+                                            if len(parsed) > 0: data = parsed[0]
+                                        else:
+                                            data = parsed
 
                                     final_data = registro_a_editar.copy() if is_editing else {}
                                     manual_data = {
