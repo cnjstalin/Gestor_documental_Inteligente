@@ -16,7 +16,7 @@ from openpyxl.styles import PatternFill, Border, Side, Alignment
 from datetime import datetime, timedelta, timezone
 
 # --- 1. CONFIGURACIÓN Y ESTILOS ---
-VER_SISTEMA = "v33.1"
+VER_SISTEMA = "v34.0"
 ADMIN_USER = "1723623011"
 ADMIN_PASS_MASTER = "9994915010022"
 
@@ -59,7 +59,6 @@ CONTRATOS_FILE = "contratos_legal.json"
 LOGS_FILE = "historial_acciones.json"
 LISTAS_FILE = "listas_db.json"
 
-# FUNCIONES DE CARGA/GUARDADO
 def cargar_json(filepath, default):
     if os.path.exists(filepath):
         try:
@@ -101,7 +100,6 @@ def guardar_nueva_entrada_lista(tipo, valor):
         if tipo == "unidades": st.session_state.lista_unidades = datos["unidades"]
         if tipo == "reasignados": st.session_state.lista_reasignados = datos["reasignados"]
 
-# CARGA INICIAL
 config_sistema = cargar_json(CONFIG_FILE, {"pass_universal": "DINIC2026", "pass_th": "THDINIC123", "base_historica": 1258, "consultas_ia_global": 0})
 db_usuarios = inicializar_usuarios_seguros()
 db_contratos = cargar_json(CONTRATOS_FILE, {})
@@ -322,15 +320,12 @@ def frases_curiosas():
     frases = ["¿Sabías que? El primer virus se llamó Creeper.", "¿Sabías que? La seguridad es responsabilidad de todos.", "¿Sabías que? Tu contraseña es tu llave digital.", "¿Sabías que? La IA procesa, tú decides.", "¿Sabías que? Un escritorio limpio mejora la productividad."]
     return random.choice(frases)
 
-# --- FUNCIÓN DE LIMPIEZA DE CÓDIGO (IA MEJORADA v33) ---
+# --- FUNCIÓN DE LIMPIEZA DE CÓDIGO (IA MEJORADA) ---
 def limpiar_codigo_prioridad(texto):
     if not texto: return ""
-    # REGEX AMPLIADO: Captura todo desde PN- hasta que encuentre un salto de línea o caracteres no válidos
-    # Incluye: letras, números, guiones y paréntesis
+    # REGEX AMPLIADO
     match = re.search(r"(PN-[\w\-\(\)\.]+)", str(texto).upper())
     if match: return match.group(1).strip()
-    
-    # Fallback: Buscar "Oficio Nro"
     match2 = re.search(r"(?:OFICIO|MEMORANDO).*?(PN-.*)", str(texto), re.IGNORECASE)
     if match2: return match2.group(1).strip().upper()
     return str(texto).strip()
@@ -338,11 +333,11 @@ def limpiar_codigo_prioridad(texto):
 # --- FUNCIÓN EXTRACCIÓN UNIDAD F7 BLINDADA ---
 def extraer_unidad_f7(texto_codigo):
     if not texto_codigo: return "DINIC"
-    # REGEX AGRESIVO: Busca TODO lo que esté entre 'PN-' y '-QX'
+    # Captura EXCLUSIVAMENTE entre PN- y -QX
     match = re.search(r"PN-(.+?)-QX", str(texto_codigo), re.IGNORECASE)
     if match:
         unidad = match.group(1).strip().upper()
-        # Limpieza extra de paréntesis si los hubiera
+        # Limpieza de paréntesis
         unidad = unidad.replace('(', '').replace(')', '')
         return unidad
     return "DINIC"
@@ -367,7 +362,7 @@ def invocar_ia_segura(content):
 def preservar_bordes(cell, fill_obj):
     original_border = copy(cell.border)
     cell.fill = fill_obj
-    cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=False) # WRAP TEXT FALSE
+    cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=False)
     if original_border: cell.border = original_border
     else:
         thin = Side(border_style="thin", color="000000")
@@ -411,22 +406,32 @@ def generar_html_contrato(datos_usuario, img_b64):
     """
     return html
 
-# --- LÓGICA DE MATRIZ BLINDADA (NO MODIFICAR) ---
+# --- LÓGICA DE MATRIZ BLINDADA Y ENCAPSULADA (v34) ---
 def generar_fila_matriz(tipo, ia_data, manual_data, usuario_turno, paths_files):
+    """
+    ESTA FUNCIÓN CONTROLA LA LÓGICA DE NEGOCIO Y NO DEBE SER MODIFICADA.
+    """
+    
     # 1. EXTRACCIÓN Y LIMPIEZA
+    # Código: Se usa la nueva función para limpiar priorizando el encabezado
     raw_code_in = ia_data.get("codigo_completo_entrada", "")
     cod_in = limpiar_codigo_prioridad(raw_code_in)
+    
+    # Unidad: Se extrae EXCLUSIVAMENTE lo que está entre PN- y -QX
     unidad_f7 = extraer_unidad_f7(cod_in)
     
+    # Destinatarios IA
     dest_ia = ia_data.get("destinatarios_todos", "")
     
+    # Código Salida
     raw_code_out = ia_data.get("codigo_completo_salida", "")
     cod_out = limpiar_codigo_prioridad(raw_code_out)
     
+    # Fechas
     fecha_ia_in = ia_data.get("fecha_recepcion", "")
     fecha_ia_out = ia_data.get("fecha_salida", "")
     
-    # Lógica de Estado (S7)
+    # Estado (S7)
     estado_s7 = "PENDIENTE"
     has_in = True if (paths_files.get("in") or manual_data.get("G")) else False
     has_out = True if (paths_files.get("out") or manual_data.get("P")) else False
@@ -434,29 +439,29 @@ def generar_fila_matriz(tipo, ia_data, manual_data, usuario_turno, paths_files):
     if tipo in ["CONOCIMIENTO", "REASIGNADO", "GENERADO DESDE DESPACHO"]: estado_s7 = "FINALIZADO"
     elif has_in and has_out: estado_s7 = "FINALIZADO"
 
-    # Lógica de Interno/Externo (T7)
+    # Interno/Externo (T7)
     str_unidades = manual_data.get("unidades_str", "")
     es_interno = determinar_sale_no_sale(str_unidades)
     if tipo == "CONOCIMIENTO": es_interno = "NO"
 
     # CONSTRUCCIÓN BASE DEL DICCIONARIO
     row = {
-        "C": fecha_ia_in, # Fecha Doc Recibido
+        "C": fecha_ia_in, 
         "D": ia_data.get("remitente_grado_nombre", ""),
         "E": ia_data.get("remitente_cargo", ""),
-        "F": unidad_f7, # Unidad Origen (IA detecta entre parentesis)
-        "G": cod_in,    # Num Doc Recibido
-        "H": fecha_ia_in, # Fecha Doc Recibido
+        "F": unidad_f7, 
+        "G": cod_in,    
+        "H": fecha_ia_in, 
         "I": ia_data.get("asunto_entrada", ""),
         "J": ia_data.get("resumen_breve", ""),
         "K": usuario_turno,
-        "L": "", # Se define abajo según tipo
-        "M": str_unidades, # Dependencia Destino
+        "L": "", 
+        "M": str_unidades, 
         "N": manual_data.get("tipo_doc_salida", ""),
-        "O": dest_ia, # Destinatarios Respuesta
-        "P": cod_out, # Num Doc Respuesta
-        "Q": fecha_ia_out, # Fecha Doc Respuesta
-        "R": "", # Vacio
+        "O": dest_ia, 
+        "P": cod_out, 
+        "Q": fecha_ia_out, 
+        "R": "", 
         "S": estado_s7,
         "T": es_interno,
         "U": str_unidades,
@@ -466,15 +471,18 @@ def generar_fila_matriz(tipo, ia_data, manual_data, usuario_turno, paths_files):
         "Y": "", "Z": ""
     }
 
-    # APLICACIÓN DE REGLAS ESPECÍFICAS (4.1 - 4.4)
+    # REGLAS ESPECÍFICAS
     if tipo == "TRAMITE NORMAL":
-        row["L"] = "" # Celda L vacía
+        row["L"] = "" # Celda L vacía en normal
 
     elif tipo == "REASIGNADO":
         row["L"] = "REASIGNADO"
-        row["P"] = row["G"]
+        # Según documento: P7 y V7 VACÍAS
+        row["P"] = ""
+        row["V"] = ""
+        # Fechas de salida replican entrada
         row["Q"] = row["H"]; row["W"] = row["H"]; row["X"] = row["H"]
-        row["V"] = row["P"]
+        # Destinatario manual obligatorio
         if manual_data.get("reasignado_a"):
             row["O"] = manual_data.get("reasignado_a")
         
@@ -482,21 +490,24 @@ def generar_fila_matriz(tipo, ia_data, manual_data, usuario_turno, paths_files):
         row["L"] = "GENERADO DESDE DESPACHO"
         f_gen = fecha_ia_out if fecha_ia_out else fecha_ia_in
         row["C"] = f_gen; row["H"] = f_gen; row["Q"] = f_gen; row["W"] = f_gen; row["X"] = f_gen
+        # D y E Vacías
         row["D"] = ""; row["E"] = ""
-        # Priorizar cod_out, sino cod_in
+        
+        # Código único
         code_final = cod_out if cod_out else cod_in
         row["G"] = code_final; row["P"] = code_final; row["V"] = code_final
         row["F"] = extraer_unidad_f7(code_final)
 
     elif tipo == "CONOCIMIENTO":
         row["L"] = "CONOCIMIENTO"
+        # Limpieza total salida
         row["M"] = ""; row["U"] = ""
         row["O"] = ""
         row["P"] = ""; row["V"] = ""
         row["T"] = "NO"
         row["Q"] = row["C"]; row["W"] = row["C"]; row["X"] = row["C"]
 
-    # Limpieza final para PENDIENTES
+    # Limpieza final para PENDIENTES (Normal sin respuesta)
     if row["S"] == "PENDIENTE":
         for k in ["O", "P", "Q", "V", "W", "X"]: row[k] = ""
 
@@ -516,7 +527,6 @@ if not st.session_state.logged_in:
             usuario_input = st.text_input("Usuario (Cédula):").strip()
             pass_input = st.text_input("Contraseña:", type="password").strip()
             if st.form_submit_button("INGRESAR AL SISTEMA", type="primary"):
-                # ADMIN
                 if usuario_input == ADMIN_USER and pass_input == ADMIN_PASS_MASTER:
                     st.session_state.logged_in = True
                     st.session_state.user_role = "admin"
@@ -527,7 +537,6 @@ if not st.session_state.logged_in:
                     registrar_accion(st.session_state.usuario_turno, "INICIO SESIÓN ADMIN")
                     actualizar_presencia(usuario_input)
                     st.rerun()
-                # USER
                 elif usuario_input in db_usuarios:
                     user_data = db_usuarios[usuario_input]
                     if pass_input == config_sistema["pass_universal"]:
@@ -547,7 +556,7 @@ if not st.session_state.logged_in:
 else:
     actualizar_presencia(st.session_state.user_id)
     
-    # === SIDEBAR DE NAVEGACIÓN ===
+    # === SIDEBAR ===
     with st.sidebar:
         if os.path.exists("Captura.JPG"): st.image("Captura.JPG", use_container_width=True)
         else: st.image("https://upload.wikimedia.org/wikipedia/commons/2/25/Escudo_Policia_Nacional_del_Ecuador.png", width=100)
@@ -583,13 +592,12 @@ else:
             st.session_state.logged_in = False
             st.rerun()
 
-    # === RENDERIZADO DE MÓDULOS ===
+    # === MÓDULOS ===
     
-    # 1. SECRETARIO/A (MATRIZ)
+    # 1. SECRETARIO/A
     if st.session_state.active_module == 'secretario':
         st.markdown(f'''<div class="main-header"><h1>SIGD DINIC</h1><h3>Módulo Secretario/a - Gestión Documental</h3></div>''', unsafe_allow_html=True)
         
-        # Dashboard
         base_historica = config_sistema.get("base_historica", 1258)
         total_docs = base_historica + len(st.session_state.registros)
         total_consultas_ia = config_sistema.get("consultas_ia_global", 0) + st.session_state.consultas_ia
@@ -598,7 +606,6 @@ else:
         with c2: st.markdown(f"<div class='metric-card'><h3>📈 {total_docs}</h3><p>Total Histórico</p></div>", unsafe_allow_html=True)
         with c3: st.markdown(f"<div class='metric-card'><h3>🧠 {total_consultas_ia}</h3><p>Consultas IA (Global)</p></div>", unsafe_allow_html=True)
         
-        # BOTÓN CONFIGURACIÓN RÁPIDA
         with st.expander("⚙️ CONFIGURACIÓN Y RESPALDO RÁPIDO"):
             c_conf1, c_conf2 = st.columns(2)
             with c_conf1:
@@ -720,13 +727,13 @@ else:
                                     if paths["in"]: files_ia.append(genai.upload_file(paths["in"], display_name="In"))
                                     if paths["out"]: files_ia.append(genai.upload_file(paths["out"], display_name="Out"))
 
-                                    # PROMPT MEJORADO Y ESPECÍFICO
+                                    # PROMPT BLINDADO
                                     prompt = """
                                     ACTÚA COMO EXPERTO EN GESTIÓN DOCUMENTAL POLICIAL.
                                     Analiza el documento y extrae JSON ESTRICTO.
 
                                     1. CÓDIGO DEL DOCUMENTO (CRÍTICO):
-                                       - Ubicación: Esquina superior DERECHA.
+                                       - Ubicación: Esquina superior DERECHA (encabezado).
                                        - Formato: "Oficio Nro. PN-UNIDAD-QX..." o "Memorando Nro. PN-...".
                                        - INSTRUCCIÓN: Extrae TODO el código tal cual. Ignora códigos citados en el cuerpo.
 
@@ -755,7 +762,6 @@ else:
                                     if files_ia:
                                         res = invocar_ia_segura([prompt, *files_ia])
                                         txt_clean = res.text.replace("```json", "").replace("```", "")
-                                        # Defensa contra formato lista
                                         parsed = json.loads(txt_clean)
                                         if isinstance(parsed, list):
                                             if len(parsed) > 0: data = parsed[0]
@@ -876,7 +882,6 @@ else:
                     st.rerun()
                 else: st.error("Contraseña Incorrecta")
         else:
-            # PANTALLA COMPLETA TH
             components.html(get_generador_policial_html(), height=800, scrolling=True)
             if st.button("Cerrar TH"):
                 st.session_state.th_unlocked = False
@@ -885,7 +890,6 @@ else:
     # 4. ADMINISTRADOR
     elif st.session_state.active_module == 'admin':
         st.markdown("### 🛡️ PANEL DE ADMINISTRADOR")
-        # VERIFICACIÓN DE SEGURIDAD (DOBLE CHECK)
         verif_pass = st.text_input("Confirme Contraseña Maestra:", type="password")
         if verif_pass == ADMIN_PASS_MASTER:
             st.success("ACCESO VERIFICADO")
