@@ -16,7 +16,7 @@ from openpyxl.styles import PatternFill, Border, Side, Alignment
 from datetime import datetime, timedelta, timezone
 
 # --- 1. CONFIGURACIÓN Y ESTILOS ---
-VER_SISTEMA = "v31.0"
+VER_SISTEMA = "v32.0"
 ADMIN_USER = "1723623011"
 ADMIN_PASS_MASTER = "9994915010022"
 
@@ -333,11 +333,19 @@ def limpiar_codigo_prioridad(texto):
     if match2: return match2.group(1).strip().upper()
     return str(texto).strip()
 
+# --- FUNCIÓN EXTRACCIÓN UNIDAD F7 BLINDADA ---
 def extraer_unidad_f7(texto_codigo):
     if not texto_codigo: return "DINIC"
-    match = re.search(r"PN-([A-Z\s]+)-QX", str(texto_codigo).upper())
-    if match: return match.group(1).strip()
-    return "DINIC" 
+    # REGEX AGRESIVO: Busca TODO lo que esté entre 'PN-' y '-QX' (o solo 'QX' al final)
+    # Ejemplo: PN-(DIGIN)-QX... -> (DIGIN)
+    # Ejemplo: PN-U.COT-QX... -> U.COT
+    match = re.search(r"PN-(.+?)-QX", str(texto_codigo), re.IGNORECASE)
+    if match:
+        # Extrae el grupo, quita espacios y lo hace mayúsculas
+        unidad = match.group(1).strip().upper()
+        # Opcional: Si quieres quitar paréntesis puedes usar: unidad = unidad.replace('(','').replace(')','')
+        return unidad
+    return "DINIC"
 
 def determinar_sale_no_sale(destinos_str):
     unidades_externas = ["UCAP", "UNDECOF", "UDAR", "DIGIN", "DNATH", "COMANDO GENERAL", "OTRAS DIRECCIONES"]
@@ -358,9 +366,15 @@ def invocar_ia_segura(content):
 
 def preservar_bordes(cell, fill_obj):
     original_border = copy(cell.border)
+    # Aplicar relleno
     cell.fill = fill_obj
-    cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
-    if original_border: cell.border = original_border
+    
+    # ⚠️ IMPORTANTE: No activar wrap_text para no alterar altura de filas
+    cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=False)
+    
+    # Bordes: Usar el original o crear uno fino estándar
+    if original_border and original_border.left.style: 
+        cell.border = original_border
     else:
         thin = Side(border_style="thin", color="000000")
         cell.border = Border(top=thin, left=thin, right=thin, bottom=thin)
@@ -403,16 +417,12 @@ def generar_html_contrato(datos_usuario, img_b64):
     """
     return html
 
-# --- LÓGICA DE MATRIZ BLINDADA ---
+# --- LÓGICA DE MATRIZ BLINDADA (NO MODIFICAR) ---
 def generar_fila_matriz(tipo, ia_data, manual_data, usuario_turno, paths_files):
-    """
-    Genera el diccionario de la fila para la matriz Excel siguiendo estrictamente las reglas.
-    No modificar sin autorización.
-    """
-    
-    # 1. EXTRACCIÓN Y LIMPIEZA DE DATOS BASE
+    # 1. EXTRACCIÓN Y LIMPIEZA
     raw_code_in = ia_data.get("codigo_completo_entrada", "")
     cod_in = limpiar_codigo_prioridad(raw_code_in)
+    # USO DE LA NUEVA FUNCIÓN DE EXTRACCIÓN DE UNIDAD
     unidad_f7 = extraer_unidad_f7(cod_in)
     
     dest_ia = ia_data.get("destinatarios_todos", "")
@@ -466,41 +476,31 @@ def generar_fila_matriz(tipo, ia_data, manual_data, usuario_turno, paths_files):
     # APLICACIÓN DE REGLAS ESPECÍFICAS (4.1 - 4.4)
     if tipo == "TRAMITE NORMAL":
         row["L"] = "" # Celda L vacía
-        # Resto sigue la lógica base (O7 = Destinatarios IA)
 
     elif tipo == "REASIGNADO":
         row["L"] = "REASIGNADO"
-        # P7 = Numero doc cargado (Entrada)
         row["P"] = row["G"]
-        # Q, W, X = Fecha doc cargado (Entrada)
         row["Q"] = row["H"]; row["W"] = row["H"]; row["X"] = row["H"]
-        # V = Igual a P
         row["V"] = row["P"]
-        # O = Destinatario Manual
         if manual_data.get("reasignado_a"):
             row["O"] = manual_data.get("reasignado_a")
         
     elif tipo == "GENERADO DESDE DESPACHO":
         row["L"] = "GENERADO DESDE DESPACHO"
-        # C, H, Q, W, X -> Fecha doc cargado (que es la salida)
         f_gen = fecha_ia_out if fecha_ia_out else fecha_ia_in
         row["C"] = f_gen; row["H"] = f_gen; row["Q"] = f_gen; row["W"] = f_gen; row["X"] = f_gen
-        # D, E Vacíos
         row["D"] = ""; row["E"] = ""
-        # G, P, V -> Mismo código del doc generado
         # Priorizar cod_out, sino cod_in
         code_final = cod_out if cod_out else cod_in
         row["G"] = code_final; row["P"] = code_final; row["V"] = code_final
-        # F = Unidad del doc generado
         row["F"] = extraer_unidad_f7(code_final)
 
     elif tipo == "CONOCIMIENTO":
         row["L"] = "CONOCIMIENTO"
-        row["M"] = ""; row["U"] = "" # Vacías
-        row["O"] = "" # Vacía
-        row["P"] = ""; row["V"] = "" # Vacías
+        row["M"] = ""; row["U"] = ""
+        row["O"] = ""
+        row["P"] = ""; row["V"] = ""
         row["T"] = "NO"
-        # Q, W, X = Fecha doc cargado
         row["Q"] = row["C"]; row["W"] = row["C"]; row["X"] = row["C"]
 
     # Limpieza final para PENDIENTES
@@ -569,6 +569,7 @@ else:
         st.markdown("---")
         st.markdown("### 📂 MÓDULOS")
         
+        # BOTONES DE NAVEGACIÓN
         if st.button("📝 SECRETARIO/A", use_container_width=True, type="primary" if st.session_state.active_module == 'secretario' else "secondary"):
             st.session_state.active_module = 'secretario'
             st.rerun()
