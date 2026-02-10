@@ -16,7 +16,7 @@ from openpyxl.styles import PatternFill, Border, Side, Alignment
 from datetime import datetime, timedelta, timezone
 
 # --- 1. CONFIGURACIÓN Y ESTILOS ---
-VER_SISTEMA = "v29.0"
+VER_SISTEMA = "v30.0"
 ADMIN_USER = "1723623011"
 ADMIN_PASS_MASTER = "9994915010022"
 
@@ -102,7 +102,6 @@ def guardar_nueva_entrada_lista(tipo, valor):
         if tipo == "reasignados": st.session_state.lista_reasignados = datos["reasignados"]
 
 # CARGA INICIAL
-# AÑADIDO: "pass_th": "THDINIC123" en la configuración
 config_sistema = cargar_json(CONFIG_FILE, {"pass_universal": "DINIC2026", "pass_th": "THDINIC123", "base_historica": 1258, "consultas_ia_global": 0})
 db_usuarios = inicializar_usuarios_seguros()
 db_contratos = cargar_json(CONTRATOS_FILE, {})
@@ -173,7 +172,7 @@ def get_generador_policial_html():
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Generador Policial v7.9</title>
+    <title>Generador Policial</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
@@ -186,23 +185,18 @@ def get_generador_policial_html():
         .group-title { font-size: 11px; color: #00acc1; font-weight: bold; text-transform: uppercase; margin-bottom: 8px; border-bottom: 1px solid #444; padding-bottom: 4px; }
         label { display: block; font-size: 11px; margin-bottom: 3px; color: #ccc; }
         input, select, textarea { width: 100%; padding: 6px; background: #1e1e1e; border: 1px solid #555; color: white; border-radius: 3px; font-size: 12px; box-sizing: border-box; }
-        
         .preview-wrapper { flex: 1; background: #525659; display: flex; justify-content: center; padding: 20px; overflow-y: auto; }
         #hoja-a4 { background: white; width: 210mm; min-height: 296mm; padding: 20mm; box-shadow: 0 0 15px rgba(0,0,0,0.5); color: black; font-family: 'Arial', sans-serif; display: flex; flex-direction: column; box-sizing: border-box; }
-        
         .meta-data { text-align: right; font-weight: bold; font-size: 11pt; margin-bottom: 20px; }
         .body-text { font-size: 12pt; text-align: justify; line-height: 1.5; margin-bottom: 40px; white-space: pre-wrap; }
         .firma-section { margin-top: auto; }
-        
         .btn-main { width: 100%; padding: 10px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; color: white; margin-top: 5px; }
         .btn-blue { background: #00509e; } 
-        .btn-cyan { background: #00838f; }
     </style>
 </head>
 <body>
     <div class="sidebar">
         <div class="header-app"><h2>Generador Policial</h2></div>
-        
         <div class="group">
             <div class="group-title">Configuración</div>
             <label>Tipo Documento</label>
@@ -217,13 +211,11 @@ def get_generador_policial_html():
             <label>Asunto</label>
             <input type="text" id="inpAsunto" value="ASUNTO DEL DOCUMENTO" oninput="updateView()">
         </div>
-
         <div class="group">
             <div class="group-title">Contenido</div>
             <label>Cuerpo del Documento</label>
             <div id="editor" contenteditable="true" style="min-height:100px; background:#1e1e1e; border:1px solid #555; padding:5px; font-size:12px;" oninput="updateView()">Escriba aquí el contenido...</div>
         </div>
-
         <div class="group">
             <div class="group-title">Firmas</div>
             <label>Nombre Firma</label>
@@ -231,10 +223,8 @@ def get_generador_policial_html():
             <label>Cargo</label>
             <input type="text" id="inpFirmaCargo" value="CARGO POLICIAL" oninput="updateView()">
         </div>
-
         <button class="btn-main btn-blue" onclick="genPDF()">DESCARGAR PDF</button>
     </div>
-
     <div class="preview-wrapper">
         <div id="hoja-a4">
             <div class="meta-data">
@@ -255,16 +245,13 @@ def get_generador_policial_html():
             </div>
         </div>
     </div>
-
     <script>
         function getAutoDate() {
             const meses = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
             const hoy = new Date();
             return `Quito, ${hoy.getDate()} de ${meses[hoy.getMonth()]} de ${hoy.getFullYear()}`;
         }
-        
         document.getElementById('inpFecha').value = getAutoDate();
-
         function updateView() {
             document.getElementById('view-num').innerText = document.getElementById('inpNum').value;
             document.getElementById('view-fecha').innerText = document.getElementById('inpFecha').value;
@@ -273,12 +260,10 @@ def get_generador_policial_html():
             document.getElementById('view-firma-nombre').innerText = document.getElementById('inpFirmaNombre').value;
             document.getElementById('view-firma-cargo').innerText = document.getElementById('inpFirmaCargo').value;
         }
-
         function genPDF() {
             const element = document.getElementById('hoja-a4');
             html2pdf().from(element).save('documento_policial.pdf');
         }
-        
         updateView();
     </script>
 </body>
@@ -291,11 +276,9 @@ st.markdown("""
     .main-header { background-color: #0E2F44; padding: 20px; border-radius: 10px; color: white; text-align: center; margin-bottom: 20px; border-bottom: 4px solid #D4AF37; }
     .main-header h1 { margin: 0; font-size: 2.5rem; font-weight: 800; }
     .main-header h3 { margin: 5px 0 0 0; font-size: 1.2rem; font-style: italic; color: #e0e0e0; }
-    
     .metric-card { background-color: #f8f9fa !important; border-radius: 10px; padding: 15px; text-align: center; border: 1px solid #dee2e6; }
     .metric-card h3 { color: #0E2F44 !important; font-size: 2rem; margin: 0; font-weight: 800; }
     .metric-card p { color: #555555 !important; font-size: 1rem; margin: 0; font-weight: 600; }
-
     .login-container { max-width: 400px; margin: auto; padding: 40px; background-color: #ffffff; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); text-align: center; border-top: 5px solid #0E2F44; }
     .legal-warning { background-color: #fff3cd; border-left: 6px solid #ffc107; padding: 15px; color: #856404; font-weight: bold; margin-bottom: 15px; }
     div.stButton > button { width: 100%; font-weight: bold; border-radius: 5px; }
@@ -313,7 +296,8 @@ if 'edit_index' not in st.session_state: st.session_state.edit_index = None
 if 'docs_procesados_hoy' not in st.session_state: st.session_state.docs_procesados_hoy = 0
 if 'consultas_ia' not in st.session_state: st.session_state.consultas_ia = 0
 if 'genai_model' not in st.session_state: st.session_state.genai_model = None
-if 'modo_th' not in st.session_state: st.session_state.modo_th = False # Controla si estamos en Talento Humano
+if 'active_module' not in st.session_state: st.session_state.active_module = 'secretario' # MÓDULO POR DEFECTO
+if 'th_unlocked' not in st.session_state: st.session_state.th_unlocked = False
 
 # --- 5. CONFIGURACIÓN IA ---
 try:
@@ -448,94 +432,64 @@ if not st.session_state.logged_in:
                             st.session_state.user_role = "user"
                             st.session_state.user_id = usuario_input
                             st.session_state.usuario_turno = f"{user_data['grado']} {user_data['nombre']}"
-                            st.success(f"✅ Bienvenido"); registrar_accion(st.session_state.usuario_turno, "INICIO SESIÓN"); actualizar_presencia(usuario_input); st.rerun()
-                        else: st.error("🚫 Inactivo.")
+                            st.success(f"✅ Bienvenido: {st.session_state.usuario_turno}")
+                            registrar_accion(st.session_state.usuario_turno, "INICIO SESIÓN USUARIO")
+                            actualizar_presencia(usuario_input)
+                            st.rerun()
+                        else: st.error("🚫 Usuario inactivo.")
                     else: st.error("🚫 Contraseña incorrecta.")
-                else: st.error("🚫 Usuario no encontrado.")
+                else: st.error("🚫 Usuario no autorizado.")
 
 else:
     actualizar_presencia(st.session_state.user_id)
     
-    # === MODO TALENTO HUMANO (PANTALLA COMPLETA) ===
-    if st.session_state.get('modo_th', False):
-        st.markdown(f'<div class="main-header" style="margin-bottom:0;"><h1>TALENTO HUMANO</h1><h3>Generador Policial v7.9</h3></div>', unsafe_allow_html=True)
-        if st.button("⬅️ VOLVER AL SIGD", type="primary"):
-            st.session_state.modo_th = False
+    # === SIDEBAR DE NAVEGACIÓN ===
+    with st.sidebar:
+        if os.path.exists("Captura.JPG"): st.image("Captura.JPG", use_container_width=True)
+        else: st.image("https://upload.wikimedia.org/wikipedia/commons/2/25/Escudo_Policia_Nacional_del_Ecuador.png", width=100)
+        
+        st.markdown("### 👮‍♂️ CONTROL DE MANDO")
+        if st.session_state.user_role == "admin":
+            st.markdown("""<div class="admin-badge">🛡️ MODO ADMINISTRADOR<br><span style="font-size: 0.8em; font-weight: normal;">CONTROL TOTAL</span></div>""", unsafe_allow_html=True)
+        st.info(f"👤 **{st.session_state.usuario_turno}**")
+        
+        fecha_turno = st.date_input("Fecha Operación:", value=get_hora_ecuador().date())
+
+        st.markdown("---")
+        st.markdown("### 📂 MÓDULOS")
+        
+        # BOTONES DE NAVEGACIÓN
+        if st.button("📝 SECRETARIO/A", use_container_width=True, type="primary" if st.session_state.active_module == 'secretario' else "secondary"):
+            st.session_state.active_module = 'secretario'
             st.rerun()
+            
+        if st.button("🧠 ASESOR INTELIGENTE", use_container_width=True, type="primary" if st.session_state.active_module == 'asesor' else "secondary"):
+            st.session_state.active_module = 'asesor'
+            st.rerun()
+            
+        if st.button("👤 TALENTO HUMANO", use_container_width=True, type="primary" if st.session_state.active_module == 'th' else "secondary"):
+            st.session_state.active_module = 'th'
+            st.rerun()
+            
+        if st.button("🛡️ ADMINISTRADOR", use_container_width=True, type="primary" if st.session_state.active_module == 'admin' else "secondary"):
+            st.session_state.active_module = 'admin'
+            st.rerun()
+
+        st.markdown("---")
+        if st.button("🔒 CERRAR SESIÓN"):
+            st.session_state.logged_in = False
+            st.rerun()
+
+    # === RENDERIZADO DE MÓDULOS ===
+    
+    # 1. SECRETARIO/A (MATRIZ)
+    if st.session_state.active_module == 'secretario':
+        st.markdown(f'''<div class="main-header"><h1>SIGD DINIC</h1><h3>Módulo Secretario/a - Gestión Documental</h3></div>''', unsafe_allow_html=True)
         
-        # INCRUSTAR GENERADOR HTML
-        components.html(get_generador_policial_html(), height=800, scrolling=True)
-        
-    else:
-        # === MODO SIGD NORMAL ===
-        with st.sidebar:
-            if os.path.exists("Captura.JPG"): st.image("Captura.JPG", use_container_width=True)
-            else: st.image("https://upload.wikimedia.org/wikipedia/commons/2/25/Escudo_Policia_Nacional_del_Ecuador.png", width=100)
-            
-            st.markdown("### 👮‍♂️ CONTROL DE MANDO")
-            if st.session_state.user_role == "admin":
-                st.markdown("""<div class="admin-badge">🛡️ MODO ADMINISTRADOR<br><span style="font-size: 0.8em; font-weight: normal;">CONTROL TOTAL</span></div>""", unsafe_allow_html=True)
-            st.info(f"👤 **{st.session_state.usuario_turno}**")
-            fecha_turno = st.date_input("Fecha Operación:", value=get_hora_ecuador().date())
-
-            st.markdown("---")
-            if st.button("🗑️ NUEVO TURNO", type="primary"):
-                st.session_state.registros = []
-                st.session_state.docs_procesados_hoy = 0
-                st.rerun()
-
-            st.markdown("---")
-            # --- ACCESO A TALENTO HUMANO ---
-            with st.expander("👤 TALENTO HUMANO"):
-                pass_th = st.text_input("Contraseña TH:", type="password", key="pass_th_input")
-                if st.button("Ingresar a TH"):
-                    if pass_th == config_sistema.get("pass_th", "THDINIC123"):
-                        st.session_state.modo_th = True
-                        st.success("Acceso Autorizado")
-                        time.sleep(0.5)
-                        st.rerun()
-                    else:
-                        st.error("Contraseña Incorrecta")
-            # -------------------------------
-
-            st.markdown("---")
-            if st.session_state.registros:
-                json_str = json.dumps(st.session_state.registros, default=str)
-                st.download_button("⬇️ RESPALDO JSON", json_str, file_name="backup_sigd.json", mime="application/json")
-            
-            up_backup = st.file_uploader("⬆️ RESTAURAR JSON", type=['json'])
-            if up_backup:
-                try:
-                    data = json.load(up_backup)
-                    st.session_state.registros = data
-                    st.session_state.docs_procesados_hoy = len(data)
-                    st.success("¡Restaurado!")
-                    time.sleep(1)
-                    st.rerun()
-                except: st.error("Error archivo.")
-
-            st.markdown("---")
-            if os.path.exists("matriz_maestra.xlsx"):
-                st.success("✅ Matriz OK")
-                if st.button("🔄 Cambiar Matriz"): os.remove("matriz_maestra.xlsx"); st.rerun()
-            else:
-                up_m = st.file_uploader("Cargar Matriz .xlsx", type=['xlsx'])
-                if up_m:
-                    with open("matriz_maestra.xlsx", "wb") as f: f.write(up_m.getbuffer())
-                    st.rerun()
-            
-            st.markdown("---")
-            if st.button("🔒 SALIR"):
-                st.session_state.logged_in = False
-                st.rerun()
-
-        st.markdown(f'''<div class="main-header"><h1>SIGD DINIC</h1><h3>Sistema de Gestión Documental</h3></div>''', unsafe_allow_html=True)
-
+        # Dashboard
         base_historica = config_sistema.get("base_historica", 1258)
         total_docs = base_historica + len(st.session_state.registros)
         total_consultas_ia = config_sistema.get("consultas_ia_global", 0) + st.session_state.consultas_ia
-
-        # DASHBOARD
         c1, c2, c3 = st.columns(3)
         with c1: st.markdown(f"<div class='metric-card'><h3>📥 {st.session_state.docs_procesados_hoy}</h3><p>Docs Turno Actual</p></div>", unsafe_allow_html=True)
         with c2: st.markdown(f"<div class='metric-card'><h3>📈 {total_docs}</h3><p>Total Histórico</p></div>", unsafe_allow_html=True)
@@ -543,308 +497,325 @@ else:
         st.write("")
 
         if sistema_activo:
-            tab1, tab2, tab3 = st.tabs(["📊 GESTOR DE MATRIZ", "🕵️‍♂️ ASESOR", "🛡️ ADMIN"])
+            # Aquí va todo el código de la matriz (anteriormente en tab1)
+            is_editing = st.session_state.edit_index is not None
+            idx_edit = st.session_state.edit_index
+            registro_a_editar = st.session_state.registros[idx_edit] if is_editing else None
 
-            with tab1:
-                is_editing = st.session_state.edit_index is not None
-                idx_edit = st.session_state.edit_index
-                registro_a_editar = st.session_state.registros[idx_edit] if is_editing else None
+            if is_editing:
+                st.warning(f"✏️ EDITANDO REGISTRO #{idx_edit + 1}")
+                if st.button("❌ CANCELAR EDICIÓN"): st.session_state.edit_index = None; st.rerun()
+            else: st.info("🆕 NUEVO REGISTRO")
 
-                if is_editing:
-                    st.warning(f"✏️ EDITANDO REGISTRO #{idx_edit + 1}")
-                    if st.button("❌ CANCELAR EDICIÓN"): st.session_state.edit_index = None; st.rerun()
-                else: st.info("🆕 NUEVO REGISTRO")
+            col1, col2 = st.columns([1, 2])
+            with col1:
+                val_tipo = registro_a_editar['L'] if (is_editing and registro_a_editar['L']) else "TRAMITE NORMAL"
+                if not val_tipo: val_tipo = "TRAMITE NORMAL"
+                tipo_proceso = st.selectbox("Tipo Gestión:", ["TRAMITE NORMAL", "REASIGNADO", "GENERADO DESDE DESPACHO", "CONOCIMIENTO"], index=["TRAMITE NORMAL", "REASIGNADO", "GENERADO DESDE DESPACHO", "CONOCIMIENTO"].index(val_tipo))
+                val_salida = registro_a_editar['N'] if (is_editing and registro_a_editar['N']) else "QUIPUX ELECTRONICO"
+                tipo_doc_salida = st.selectbox("Formato Salida:", ["QUIPUX ELECTRONICO", "DOCPOL ELECTRONICO", "FISICO", "DIGITAL", "OTRO"], index=["QUIPUX ELECTRONICO", "DOCPOL ELECTRONICO", "FISICO", "DIGITAL", "OTRO"].index(val_salida) if val_salida else 0)
 
-                col1, col2 = st.columns([1, 2])
-                with col1:
-                    val_tipo = registro_a_editar['L'] if (is_editing and registro_a_editar['L']) else "TRAMITE NORMAL"
-                    if not val_tipo: val_tipo = "TRAMITE NORMAL"
-                    tipo_proceso = st.selectbox("Tipo Gestión:", ["TRAMITE NORMAL", "REASIGNADO", "GENERADO DESDE DESPACHO", "CONOCIMIENTO"], index=["TRAMITE NORMAL", "REASIGNADO", "GENERADO DESDE DESPACHO", "CONOCIMIENTO"].index(val_tipo))
-                    val_salida = registro_a_editar['N'] if (is_editing and registro_a_editar['N']) else "QUIPUX ELECTRONICO"
-                    tipo_doc_salida = st.selectbox("Formato Salida:", ["QUIPUX ELECTRONICO", "DOCPOL ELECTRONICO", "FISICO", "DIGITAL", "OTRO"], index=["QUIPUX ELECTRONICO", "DOCPOL ELECTRONICO", "FISICO", "DIGITAL", "OTRO"].index(val_salida) if val_salida else 0)
+                st.markdown("---")
+                st.caption("🏢 DEPENDENCIA/as DE DESTINO")
+                opciones_unidades = sorted(st.session_state.lista_unidades)
+                default_units = []
+                if is_editing and registro_a_editar['M']:
+                    prev_units = registro_a_editar['M'].split(", ")
+                    default_units = [u for u in prev_units if u in opciones_unidades]
+                unidades_selected = st.multiselect("Seleccione Unidad(es):", opciones_unidades, default=default_units)
+                col_ning, col_otra = st.columns(2)
+                chk_ninguna = col_ning.checkbox("NINGUNA")
+                chk_otra = col_otra.checkbox("✍️ OTRA")
+                input_otra_unidad = ""
+                if chk_otra: input_otra_unidad = st.text_input("Nueva Unidad:").upper()
+                lista_final_unidades = []
+                if not chk_ninguna:
+                    lista_final_unidades = unidades_selected.copy()
+                    if input_otra_unidad: lista_final_unidades.append(input_otra_unidad)
+                str_unidades_final = ", ".join(lista_final_unidades)
 
+                destinatario_reasignado_final = ""
+                if tipo_proceso == "REASIGNADO":
                     st.markdown("---")
-                    st.caption("🏢 DEPENDENCIA/as DE DESTINO")
-                    
-                    opciones_unidades = sorted(st.session_state.lista_unidades)
-                    default_units = []
-                    if is_editing and registro_a_editar['M']:
-                        prev_units = registro_a_editar['M'].split(", ")
-                        default_units = [u for u in prev_units if u in opciones_unidades]
-                    unidades_selected = st.multiselect("Seleccione Unidad(es):", opciones_unidades, default=default_units)
-                    col_ning, col_otra = st.columns(2)
-                    chk_ninguna = col_ning.checkbox("NINGUNA")
-                    chk_otra = col_otra.checkbox("✍️ OTRA")
-                    input_otra_unidad = ""
-                    if chk_otra: input_otra_unidad = st.text_input("Nueva Unidad:").upper()
-                    lista_final_unidades = []
-                    if not chk_ninguna:
-                        lista_final_unidades = unidades_selected.copy()
-                        if input_otra_unidad: lista_final_unidades.append(input_otra_unidad)
-                    str_unidades_final = ", ".join(lista_final_unidades)
+                    st.markdown("👤 **DESTINATARIO REASIGNADO**")
+                    opciones_reasig = ["SELECCIONAR..."] + sorted(st.session_state.lista_reasignados) + ["✍️ NUEVO"]
+                    idx_rea = 0
+                    if is_editing and registro_a_editar.get("O") in st.session_state.lista_reasignados:
+                        idx_rea = opciones_reasig.index(registro_a_editar["O"])
+                    sel_reasig = st.selectbox("Historial:", opciones_reasig, index=idx_rea)
+                    val_manual = registro_a_editar.get("O") if (is_editing and registro_a_editar.get("O") not in st.session_state.lista_reasignados) else ""
+                    input_manual_reasig = ""
+                    if sel_reasig == "✍️ NUEVO":
+                        input_manual_reasig = st.text_input("Escribir Grado y Nombre:", value=val_manual).upper()
+                        destinatario_reasignado_final = input_manual_reasig
+                    elif sel_reasig != "SELECCIONAR...":
+                        destinatario_reasignado_final = sel_reasig
 
-                    destinatario_reasignado_final = ""
-                    if tipo_proceso == "REASIGNADO":
-                        st.markdown("---")
-                        st.markdown("👤 **DESTINATARIO REASIGNADO**")
-                        opciones_reasig = ["SELECCIONAR..."] + sorted(st.session_state.lista_reasignados) + ["✍️ NUEVO"]
-                        idx_rea = 0
-                        if is_editing and registro_a_editar.get("O") in st.session_state.lista_reasignados:
-                            idx_rea = opciones_reasig.index(registro_a_editar["O"])
-                        sel_reasig = st.selectbox("Historial:", opciones_reasig, index=idx_rea)
-                        val_manual = registro_a_editar.get("O") if (is_editing and registro_a_editar.get("O") not in st.session_state.lista_reasignados) else ""
-                        input_manual_reasig = ""
-                        if sel_reasig == "✍️ NUEVO":
-                            input_manual_reasig = st.text_input("Escribir Grado y Nombre:", value=val_manual).upper()
-                            destinatario_reasignado_final = input_manual_reasig
-                        elif sel_reasig != "SELECCIONAR...":
-                            destinatario_reasignado_final = sel_reasig
+            with col2:
+                doc_entrada = None; doc_salida = None
+                if tipo_proceso == "TRAMITE NORMAL":
+                    c1_in, c2_out = st.columns(2)
+                    doc_entrada = c1_in.file_uploader("1. Doc RECIBIDO", type=['pdf'], key="in_main")
+                    doc_salida = c2_out.file_uploader("2. Doc RESPUESTA", type=['pdf'], key="out_main")
+                elif tipo_proceso in ["REASIGNADO", "CONOCIMIENTO"]:
+                    doc_entrada = st.file_uploader("1. Doc RECIBIDO", type=['pdf'], key="in_s")
+                elif tipo_proceso == "GENERADO DESDE DESPACHO":
+                    doc_salida = st.file_uploader("2. Doc GENERADO", type=['pdf'], key="out_s")
 
-                with col2:
-                    doc_entrada = None; doc_salida = None
-                    if tipo_proceso == "TRAMITE NORMAL":
-                        c1_in, c2_out = st.columns(2)
-                        doc_entrada = c1_in.file_uploader("1. Doc RECIBIDO", type=['pdf'], key="in_main")
-                        doc_salida = c2_out.file_uploader("2. Doc RESPUESTA", type=['pdf'], key="out_main")
-                    elif tipo_proceso in ["REASIGNADO", "CONOCIMIENTO"]:
-                        doc_entrada = st.file_uploader("1. Doc RECIBIDO", type=['pdf'], key="in_s")
-                    elif tipo_proceso == "GENERADO DESDE DESPACHO":
-                        doc_salida = st.file_uploader("2. Doc GENERADO", type=['pdf'], key="out_s")
-
-                btn_text = "🔄 ACTUALIZAR" if is_editing else "➕ AGREGAR"
-                if st.button(btn_text, type="primary"):
-                    if not os.path.exists("matriz_maestra.xlsx"): st.error("❌ Falta Matriz Base.")
-                    else:
-                        valid_units = True
-                        if tipo_proceso != "CONOCIMIENTO" and not str_unidades_final and not chk_ninguna:
-                            st.warning("⚠️ Seleccione Dependencia."); valid_units = False
-                        
-                        if valid_units:
-                            process = False
-                            if tipo_proceso == "TRAMITE NORMAL": process = True if (is_editing or doc_entrada or doc_salida) else False
-                            elif doc_entrada or doc_salida: process = True
-                            
-                            if process:
-                                frase = frases_curiosas()
-                                with st.spinner(f"⏳ AGREGANDO...\n\n👀 {frase}"):
-                                    try:
-                                        paths = []; path_in = None; path_out = None
-                                        if doc_entrada:
-                                            with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as t: t.write(doc_entrada.getvalue()); path_in = t.name; paths.append(t.name)
-                                        if doc_salida:
-                                            with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as t: t.write(doc_salida.getvalue()); path_out = t.name; paths.append(t.name)
-
-                                        files_ia = []
-                                        if path_in: files_ia.append(genai.upload_file(path_in, display_name="In"))
-                                        if path_out: files_ia.append(genai.upload_file(path_out, display_name="Out"))
-
-                                        prompt = """Extrae en JSON: { "fecha_recepcion": "DD/MM/AAAA", "remitente_grado_nombre": "Texto", "remitente_cargo": "Texto", "codigo_completo_entrada": "Texto", "asunto_entrada": "Texto", "resumen_breve": "Texto", "destinatarios_todos": "Texto", "codigo_completo_salida": "Texto", "fecha_salida": "DD/MM/AAAA" }"""
-                                        data = {}
-                                        if files_ia:
-                                            res = invocar_ia_segura([prompt, *files_ia])
-                                            txt_clean = res.text.replace("```json", "").replace("```", "")
-                                            data = json.loads(txt_clean)
-
-                                        final_data = registro_a_editar.copy() if is_editing else {}
-                                        def get_val(key_ia, key_row): return data.get(key_ia) if data.get(key_ia) else final_data.get(key_row, "")
-
-                                        raw_code_in = get_val("codigo_completo_entrada", "G"); cod_in = limpiar_codigo(raw_code_in); unidad_f7 = extraer_unidad_f7(cod_in)
-                                        dest_ia = get_val("destinatarios_todos", "O"); raw_code_out = get_val("codigo_completo_salida", "P"); cod_out = limpiar_codigo(raw_code_out)
-
-                                        estado_s7 = "PENDIENTE"
-                                        if tipo_proceso in ["CONOCIMIENTO", "REASIGNADO", "GENERADO DESDE DESPACHO"]: estado_s7 = "FINALIZADO"
-                                        elif (path_in or final_data.get("G")) and (path_out or final_data.get("P")): estado_s7 = "FINALIZADO"
-
-                                        es_interno = determinar_sale_no_sale(str_unidades_final)
-                                        if tipo_proceso == "CONOCIMIENTO": es_interno = "NO"
-
-                                        row = {
-                                            "C": get_val("fecha_recepcion", "C"), "D": get_val("remitente_grado_nombre", "D"), "E": get_val("remitente_cargo", "E"), "F": unidad_f7, "G": cod_in, "H": get_val("fecha_recepcion", "H"), "I": get_val("asunto_entrada", "I"), "J": get_val("resumen_breve", "J"), "K": st.session_state.usuario_turno, "L": "", "M": str_unidades_final, "N": tipo_doc_salida, "O": dest_ia, "P": cod_out, "Q": get_val("fecha_salida", "Q"), "R": "", "S": estado_s7, "T": es_interno, "U": str_unidades_final, "V": cod_out, "W": get_val("fecha_salida", "W"), "X": get_val("fecha_salida", "X"), "Y": "", "Z": ""
-                                        }
-
-                                        if tipo_proceso == "TRAMITE NORMAL": row["L"] = ""
-                                        elif tipo_proceso == "REASIGNADO":
-                                            row["L"] = "REASIGNADO"; row["P"] = row["G"]; row["V"] = row["P"]; row["Q"] = row["H"]; row["W"] = row["H"]; row["X"] = row["H"]
-                                            if destinatario_reasignado_final:
-                                                row["O"] = destinatario_reasignado_final
-                                                guardar_nueva_entrada_lista("reasignados", destinatario_reasignado_final)
-                                        elif tipo_proceso == "GENERADO DESDE DESPACHO":
-                                            row["L"] = "GENERADO DESDE DESPACHO"; fecha_gen = get_val("fecha_salida", "Q"); row["C"]=fecha_gen; row["H"]=fecha_gen; row["Q"]=fecha_gen; row["W"]=fecha_gen; row["X"]=fecha_gen; row["D"] = ""; row["E"] = ""
-                                            if not cod_out and cod_in: cod_out = cod_in
-                                            row["G"] = cod_out; row["P"] = cod_out; row["V"] = cod_out; row["F"] = extraer_unidad_f7(cod_out)
-                                        elif tipo_proceso == "CONOCIMIENTO":
-                                            row["L"] = "CONOCIMIENTO"; row["M"] = ""; row["U"] = ""; row["O"] = ""; row["P"] = ""; row["V"] = ""; row["T"] = "NO"; row["Q"] = row["C"]; row["W"] = row["C"]; row["X"] = row["C"]
-
-                                        if row["S"] == "PENDIENTE":
-                                            for k in ["O", "P", "Q", "V", "W", "X"]: row[k] = ""
-
-                                        if input_otra_unidad:
-                                            guardar_nueva_entrada_lista("unidades", input_otra_unidad)
-
-                                        if is_editing: 
-                                            st.session_state.registros[idx_edit] = row; st.session_state.edit_index = None; st.success("✅ Actualizado"); registrar_accion(st.session_state.usuario_turno, f"EDITÓ {row['G']}")
-                                        else: 
-                                            st.session_state.registros.append(row); st.session_state.docs_procesados_hoy += 1; st.success("✅ Agregado"); registrar_accion(st.session_state.usuario_turno, f"NUEVO {row['G']}")
-
-                                        for p in paths: os.remove(p)
-                                        st.rerun()
-                                    except Exception as e: st.error(f"Error: {e}")
-                            else: st.warning("⚠️ Sube documento.")
-
-                if st.session_state.registros:
-                    st.markdown("#### 📋 Cola de Trabajo")
-                    if len(st.session_state.registros) > 0:
-                        indices = [f"#{i+1} | {r.get('G','')} | {r.get('L','')}" for i, r in enumerate(st.session_state.registros)]
-                        sel_idx = st.selectbox("Seleccionar Registro:", range(len(st.session_state.registros)), format_func=lambda x: indices[x], index=len(st.session_state.registros)-1, label_visibility="collapsed")
-                        st.dataframe(pd.DataFrame([st.session_state.registros[sel_idx]]), hide_index=True, use_container_width=True)
-
-                    for i, reg in enumerate(st.session_state.registros):
-                        bg = "#e8f5e9" if reg["S"] == "FINALIZADO" else "#ffebee"
-                        with st.container():
-                            st.markdown(f"""<div style="background-color: {bg}; padding: 10px; border-left: 5px solid {'green' if reg['S']=='FINALIZADO' else 'red'}; margin-bottom: 5px; border-radius: 5px;"><b>#{i+1}</b> | <b>{reg.get('G','')}</b> <br>Tipo: <b>{reg.get('L') if reg.get('L') else 'NORMAL'}</b> | Destino: {reg.get('M','')}</div>""", unsafe_allow_html=True)
-                            c_edit, c_del = st.columns([1, 1])
-                            if c_edit.button("✏️ EDITAR", key=f"e_{i}"): st.session_state.edit_index = i; st.rerun()
-                            if c_del.button("🗑️ BORRAR", key=f"d_{i}"): st.session_state.registros.pop(i); st.session_state.docs_procesados_hoy = max(0, st.session_state.docs_procesados_hoy - 1); st.session_state.edit_index = None; st.rerun()
-
-                    if os.path.exists("matriz_maestra.xlsx"):
-                        try:
-                            wb = load_workbook("matriz_maestra.xlsx")
-                            ws = wb[next((s for s in wb.sheetnames if "CONTROL" in s.upper()), wb.sheetnames[0])]
-                            start_row = 7
-                            while ws.cell(row=start_row, column=1).value is not None: start_row += 1
-                            gf = PatternFill(start_color="92D050", end_color="92D050", fill_type="solid")
-                            rf = PatternFill(start_color="FF0000", end_color="FF0000", fill_type="solid")
-                            for i, reg in enumerate(st.session_state.registros):
-                                r = start_row + i
-                                def w(c, v): ws.cell(row=r, column=c).value = v
-                                w(1, i+1); w(2, ""); w(3, reg["C"]); w(4, reg["D"]); w(5, reg["E"]); w(6, reg["F"]); w(7, reg["G"]); w(8, reg["H"]); w(9, reg["I"]); w(10, reg["J"]); w(11, reg["K"]); w(12, reg["L"]); w(13, reg["M"]); w(14, reg["N"]); w(15, reg["O"]); w(16, reg["P"]); w(17, reg["Q"]); w(18, "")
-                                cell_s = ws.cell(row=r, column=19); cell_s.value = reg["S"]
-                                if reg["S"]=="FINALIZADO": preservar_bordes(cell_s, gf)
-                                elif reg["S"]=="PENDIENTE": preservar_bordes(cell_s, rf)
-                                w(20, reg["T"]); w(21, reg["U"]); w(22, reg["V"]); w(23, reg["W"]); w(24, reg["X"]); w(25, ""); w(26, "")
-                                for col_idx in range(1, 27):
-                                    cell = ws.cell(row=r, column=col_idx)
-                                    if col_idx != 19: preservar_bordes(cell, PatternFill(fill_type=None))
-                            out_buffer = io.BytesIO(); wb.save(out_buffer); out_buffer.seek(0)
-                            f_str = fecha_turno.strftime("%d-%m-%y"); u_str = st.session_state.usuario_turno.upper()
-                            st.download_button(label="📥 DESCARGAR MATRIZ FINAL", data=out_buffer, file_name=f"TURNO {f_str} {u_str}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", type="primary")
-                        except Exception as e: st.error(f"Error Excel: {e}")
-
-            with tab2:
-                st.markdown("#### 🧠 Consultor de Despacho (IA)")
-                usuario_actual = st.session_state.user_id
-                ya_acepto = usuario_actual in db_contratos
-                
-                if not ya_acepto:
-                    st.warning("⚠️ Debe aceptar los Términos.")
-                    with st.expander("📜 TÉRMINOS (DECÁLOGO)", expanded=True):
-                        politicas = ["Naturaleza de Apoyo...", "Carácter Referencial...", "Responsabilidad Humana...", "Verificación Normativa...", "Prohibición de Datos Sensibles...", "No Vinculante...", "Posibilidad de Error...", "Trazabilidad de Uso...", "Uso Ético...", "Aceptación de Riesgo..."]
-                        if all([st.checkbox(p) for p in politicas]):
-                            st.success("✅ Aceptado. Capture foto.")
-                            foto = st.camera_input("Firma Biométrica")
-                            if foto:
-                                b64 = base64.b64encode(foto.getvalue()).decode()
-                                db_contratos[usuario_actual] = {"fecha": get_hora_ecuador().strftime("%Y-%m-%d %H:%M:%S"), "foto": b64, "usuario": st.session_state.usuario_turno}
-                                guardar_json(CONTRATOS_FILE, db_contratos); registrar_accion(st.session_state.usuario_turno, "FIRMÓ CONTRATO"); st.success("¡Firmado!"); time.sleep(2); st.rerun()
+            btn_text = "🔄 ACTUALIZAR" if is_editing else "➕ AGREGAR"
+            if st.button(btn_text, type="primary"):
+                if not os.path.exists("matriz_maestra.xlsx"): st.error("❌ Falta Matriz Base.")
                 else:
-                    st.markdown("""<div class="legal-warning">⚠️ AVISO LEGAL: Uso referencial.</div>""", unsafe_allow_html=True)
-                    if usuario_actual in db_contratos:
-                        st.download_button("📜 Descargar Mi Contrato", generar_html_contrato(db_usuarios.get(usuario_actual, {}), db_contratos[usuario_actual]["foto"]), file_name="Contrato.html", mime="text/html")
-                    st.markdown("---")
-                    up_asesor = st.file_uploader("Sube documento (PDF)", type=['pdf'], key="asesor_up")
-                    if up_asesor and st.button("ANALIZAR ESTRATEGIA"):
-                        with st.spinner("Analizando..."):
-                            try:
-                                with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as t: t.write(up_asesor.getvalue()); p_as = t.name
-                                f_as = genai.upload_file(p_as, display_name="Consulta")
-                                prompt_asesor = """Actúa como JEFE DE AYUDANTÍA. Estructura: 1. DIAGNÓSTICO, 2. CRITERIO, 3. EXTRACTO TENTATIVO (Solo texto)."""
-                                res = invocar_ia_segura([prompt_asesor, f_as])
-                                st.markdown(res.text)
-                                st.session_state.consultas_ia += 1
-                                incrementar_contador_ia()
-                                registrar_accion(st.session_state.usuario_turno, "CONSULTA IA")
-                                os.remove(p_as)
-                            except Exception as e: st.error(f"Error: {e}")
-
-            with tab3:
-                st.markdown("### 🛡️ PANEL DE ADMINISTRADOR")
-                if st.session_state.user_role == "admin":
-                    verif_pass = st.text_input("Confirme Contraseña Maestra:", type="password")
-                    if verif_pass == ADMIN_PASS_MASTER:
-                        st.success("ACCESO VERIFICADO")
-                        t3_1, t3_2, t3_3, t3_4 = st.tabs(["👥 Monitor", "📜 Contratos", "🕵️ Historial", "⚙️ Config"])
+                    valid_units = True
+                    if tipo_proceso != "CONOCIMIENTO" and not str_unidades_final and not chk_ninguna:
+                        st.warning("⚠️ Seleccione Dependencia."); valid_units = False
+                    
+                    if valid_units:
+                        process = False
+                        if tipo_proceso == "TRAMITE NORMAL": process = True if (is_editing or doc_entrada or doc_salida) else False
+                        elif doc_entrada or doc_salida: process = True
                         
-                        with t3_1:
-                            st.markdown("#### 📡 Monitor en Tiempo Real")
-                            data_monitor = []
-                            for cedula, datos in db_usuarios.items():
-                                data_monitor.append({"Grado y Nombre": f"{datos['grado']} {datos['nombre']}", "Estado": get_estado_usuario(cedula), "Última Acción": get_ultima_accion_usuario(f"{datos['grado']} {datos['nombre']}")})
-                            
-                            df_m = pd.DataFrame(data_monitor)
-                            def color_estado(val): return f'color: {"green" if "EN LÍNEA" in val else "orange" if "AUSENTE" in val else "red"}; font-weight: bold;'
-                            st.dataframe(df_m.style.map(color_estado, subset=['Estado']), use_container_width=True)
-                            if st.button("🔄 Actualizar"): st.rerun()
-                            
-                            st.markdown("---")
-                            c_add, c_del = st.columns(2)
-                            with c_add:
-                                st.caption("Agregar"); new_ced = st.text_input("Cédula:"); new_grado = st.text_input("Grado:"); new_nom = st.text_input("Nombres:")
-                                if st.button("Guardar"): db_usuarios[new_ced] = {"grado": new_grado, "nombre": new_nom, "activo": True}; guardar_json(DB_FILE, db_usuarios); st.success("Guardado."); st.rerun()
-                            with c_del:
-                                st.caption("Eliminar"); del_ced = st.selectbox("Usuario:", options=list(db_usuarios.keys()))
-                                if st.button("Eliminar"): del db_usuarios[del_ced]; guardar_json(DB_FILE, db_usuarios); st.success("Eliminado."); st.rerun()
+                        if process:
+                            frase = frases_curiosas()
+                            with st.spinner(f"⏳ AGREGANDO...\n\n👀 {frase}"):
+                                try:
+                                    paths = []; path_in = None; path_out = None
+                                    if doc_entrada:
+                                        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as t: t.write(doc_entrada.getvalue()); path_in = t.name; paths.append(t.name)
+                                    if doc_salida:
+                                        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as t: t.write(doc_salida.getvalue()); path_out = t.name; paths.append(t.name)
 
-                        with t3_2:
-                            try:
-                                if db_contratos:
-                                    for ced, data in db_contratos.items():
-                                        with st.expander(f"{data.get('usuario', 'Desconocido')} - {ced}"):
-                                            c1c, c2c, c3c = st.columns([1,1,1])
-                                            u_info = db_usuarios.get(ced, {"grado":"", "nombre": data.get("usuario","")})
-                                            html_c = generar_html_contrato(u_info, data["foto"])
-                                            with c1c: st.components.v1.html(html_c, height=300, scrolling=True)
-                                            with c2c: st.download_button(f"⬇️ Descargar", html_c, file_name=f"C_{ced}.html", mime="text/html", key=f"dl_{ced}")
-                                            with c3c: 
-                                                if st.button(f"🗑️ Eliminar", key=f"del_{ced}"): 
-                                                    del db_contratos[ced]; guardar_json(CONTRATOS_FILE, db_contratos); st.rerun()
-                                else: st.info("Sin contratos.")
-                            except Exception as e: st.error("Error cargando contratos.")
+                                    files_ia = []
+                                    if path_in: files_ia.append(genai.upload_file(path_in, display_name="In"))
+                                    if path_out: files_ia.append(genai.upload_file(path_out, display_name="Out"))
 
-                        with t3_3: 
-                            st.markdown("#### Historial"); 
-                            if db_logs: st.dataframe(pd.DataFrame(db_logs), use_container_width=True)
-                            else: st.info("Historial vacío.")
+                                    prompt = """Extrae en JSON: { "fecha_recepcion": "DD/MM/AAAA", "remitente_grado_nombre": "Texto", "remitente_cargo": "Texto", "codigo_completo_entrada": "Texto", "asunto_entrada": "Texto", "resumen_breve": "Texto", "destinatarios_todos": "Texto", "codigo_completo_salida": "Texto", "fecha_salida": "DD/MM/AAAA" }"""
+                                    data = {}
+                                    if files_ia:
+                                        res = invocar_ia_segura([prompt, *files_ia])
+                                        txt_clean = res.text.replace("```json", "").replace("```", "")
+                                        data = json.loads(txt_clean)
 
-                        with t3_4:
-                            st.markdown("#### Configuración")
-                            c_ia, c_base = st.columns(2)
-                            with c_ia:
-                                st.caption("Contador IA Global")
-                                current_ia = config_sistema.get("consultas_ia_global", 0)
-                                new_ia_count = st.number_input("Valor del Contador IA:", value=current_ia, key="input_ia_global")
-                                if st.button("🔄 Actualizar Contador IA"):
-                                    config_sistema["consultas_ia_global"] = new_ia_count
-                                    guardar_json(CONFIG_FILE, config_sistema)
-                                    st.success("Actualizado.")
+                                    final_data = registro_a_editar.copy() if is_editing else {}
+                                    def get_val(key_ia, key_row): return data.get(key_ia) if data.get(key_ia) else final_data.get(key_row, "")
+
+                                    raw_code_in = get_val("codigo_completo_entrada", "G"); cod_in = limpiar_codigo(raw_code_in); unidad_f7 = extraer_unidad_f7(cod_in)
+                                    dest_ia = get_val("destinatarios_todos", "O"); raw_code_out = get_val("codigo_completo_salida", "P"); cod_out = limpiar_codigo(raw_code_out)
+
+                                    estado_s7 = "PENDIENTE"
+                                    if tipo_proceso in ["CONOCIMIENTO", "REASIGNADO", "GENERADO DESDE DESPACHO"]: estado_s7 = "FINALIZADO"
+                                    elif (path_in or final_data.get("G")) and (path_out or final_data.get("P")): estado_s7 = "FINALIZADO"
+
+                                    es_interno = determinar_sale_no_sale(str_unidades_final)
+                                    if tipo_proceso == "CONOCIMIENTO": es_interno = "NO"
+
+                                    row = {
+                                        "C": get_val("fecha_recepcion", "C"), "D": get_val("remitente_grado_nombre", "D"), "E": get_val("remitente_cargo", "E"), "F": unidad_f7, "G": cod_in, "H": get_val("fecha_recepcion", "H"), "I": get_val("asunto_entrada", "I"), "J": get_val("resumen_breve", "J"), "K": st.session_state.usuario_turno, "L": "", "M": str_unidades_final, "N": tipo_doc_salida, "O": dest_ia, "P": cod_out, "Q": get_val("fecha_salida", "Q"), "R": "", "S": estado_s7, "T": es_interno, "U": str_unidades_final, "V": cod_out, "W": get_val("fecha_salida", "W"), "X": get_val("fecha_salida", "X"), "Y": "", "Z": ""
+                                    }
+
+                                    if tipo_proceso == "TRAMITE NORMAL": row["L"] = ""
+                                    elif tipo_proceso == "REASIGNADO":
+                                        row["L"] = "REASIGNADO"; row["P"] = row["G"]; row["V"] = row["P"]; row["Q"] = row["H"]; row["W"] = row["H"]; row["X"] = row["H"]
+                                        if destinatario_reasignado_final:
+                                            row["O"] = destinatario_reasignado_final
+                                            guardar_nueva_entrada_lista("reasignados", destinatario_reasignado_final)
+                                    elif tipo_proceso == "GENERADO DESDE DESPACHO":
+                                        row["L"] = "GENERADO DESDE DESPACHO"; fecha_gen = get_val("fecha_salida", "Q"); row["C"]=fecha_gen; row["H"]=fecha_gen; row["Q"]=fecha_gen; row["W"]=fecha_gen; row["X"]=fecha_gen; row["D"] = ""; row["E"] = ""
+                                        if not cod_out and cod_in: cod_out = cod_in
+                                        row["G"] = cod_out; row["P"] = cod_out; row["V"] = cod_out; row["F"] = extraer_unidad_f7(cod_out)
+                                    elif tipo_proceso == "CONOCIMIENTO":
+                                        row["L"] = "CONOCIMIENTO"; row["M"] = ""; row["U"] = ""; row["O"] = ""; row["P"] = ""; row["V"] = ""; row["T"] = "NO"; row["Q"] = row["C"]; row["W"] = row["C"]; row["X"] = row["C"]
+
+                                    if row["S"] == "PENDIENTE":
+                                        for k in ["O", "P", "Q", "V", "W", "X"]: row[k] = ""
+
+                                    if input_otra_unidad:
+                                        guardar_nueva_entrada_lista("unidades", input_otra_unidad)
+
+                                    if is_editing: 
+                                        st.session_state.registros[idx_edit] = row; st.session_state.edit_index = None; st.success("✅ Actualizado"); registrar_accion(st.session_state.usuario_turno, f"EDITÓ {row['G']}")
+                                    else: 
+                                        st.session_state.registros.append(row); st.session_state.docs_procesados_hoy += 1; st.success("✅ Agregado"); registrar_accion(st.session_state.usuario_turno, f"NUEVO {row['G']}")
+
+                                    for p in paths: os.remove(p)
                                     st.rerun()
+                                except Exception as e: st.error(f"Error: {e}")
+                        else: st.warning("⚠️ Sube documento.")
 
-                            with c_base:
-                                st.caption("Base Histórica")
-                                new_base = st.number_input("Valor Base Histórica:", value=config_sistema.get("base_historica", 1258))
-                                if st.button("Actualizar Base"): 
-                                    config_sistema["base_historica"] = new_base; guardar_json(CONFIG_FILE, config_sistema); st.success("Actualizado."); st.rerun()
-                            
-                            st.markdown("---")
-                            c_p1, c_p2 = st.columns(2)
-                            with c_p1:
-                                pass_u = st.text_input("Pass Usuarios:", value=config_sistema["pass_universal"])
-                                if st.button("Guardar Pass Usuarios"): config_sistema["pass_universal"] = pass_u; guardar_json(CONFIG_FILE, config_sistema); st.success("OK")
-                            with c_p2:
-                                pass_th = st.text_input("Pass Talento Humano:", value=config_sistema.get("pass_th", "THDINIC123"))
-                                if st.button("Guardar Pass TH"): config_sistema["pass_th"] = pass_th; guardar_json(CONFIG_FILE, config_sistema); st.success("OK")
+            if st.session_state.registros:
+                st.markdown("#### 📋 Cola de Trabajo")
+                if len(st.session_state.registros) > 0:
+                    indices = [f"#{i+1} | {r.get('G','')} | {r.get('L','')}" for i, r in enumerate(st.session_state.registros)]
+                    sel_idx = st.selectbox("Seleccionar Registro:", range(len(st.session_state.registros)), format_func=lambda x: indices[x], index=len(st.session_state.registros)-1, label_visibility="collapsed")
+                    st.dataframe(pd.DataFrame([st.session_state.registros[sel_idx]]), hide_index=True, use_container_width=True)
 
-                    else: st.info("Ingrese contraseña maestra.")
-                else: st.error("ACCESO DENEGADO.")
+                for i, reg in enumerate(st.session_state.registros):
+                    bg = "#e8f5e9" if reg["S"] == "FINALIZADO" else "#ffebee"
+                    with st.container():
+                        st.markdown(f"""<div style="background-color: {bg}; padding: 10px; border-left: 5px solid {'green' if reg['S']=='FINALIZADO' else 'red'}; margin-bottom: 5px; border-radius: 5px;"><b>#{i+1}</b> | <b>{reg.get('G','')}</b> <br>Tipo: <b>{reg.get('L') if reg.get('L') else 'NORMAL'}</b> | Destino: {reg.get('M','')}</div>""", unsafe_allow_html=True)
+                        c_edit, c_del = st.columns([1, 1])
+                        if c_edit.button("✏️ EDITAR", key=f"e_{i}"): st.session_state.edit_index = i; st.rerun()
+                        if c_del.button("🗑️ BORRAR", key=f"d_{i}"): st.session_state.registros.pop(i); st.session_state.docs_procesados_hoy = max(0, st.session_state.docs_procesados_hoy - 1); st.session_state.edit_index = None; st.rerun()
+
+                if os.path.exists("matriz_maestra.xlsx"):
+                    try:
+                        wb = load_workbook("matriz_maestra.xlsx")
+                        ws = wb[next((s for s in wb.sheetnames if "CONTROL" in s.upper()), wb.sheetnames[0])]
+                        start_row = 7
+                        while ws.cell(row=start_row, column=1).value is not None: start_row += 1
+                        gf = PatternFill(start_color="92D050", end_color="92D050", fill_type="solid")
+                        rf = PatternFill(start_color="FF0000", end_color="FF0000", fill_type="solid")
+                        for i, reg in enumerate(st.session_state.registros):
+                            r = start_row + i
+                            def w(c, v): ws.cell(row=r, column=c).value = v
+                            w(1, i+1); w(2, ""); w(3, reg["C"]); w(4, reg["D"]); w(5, reg["E"]); w(6, reg["F"]); w(7, reg["G"]); w(8, reg["H"]); w(9, reg["I"]); w(10, reg["J"]); w(11, reg["K"]); w(12, reg["L"]); w(13, reg["M"]); w(14, reg["N"]); w(15, reg["O"]); w(16, reg["P"]); w(17, reg["Q"]); w(18, "")
+                            cell_s = ws.cell(row=r, column=19); cell_s.value = reg["S"]
+                            if reg["S"]=="FINALIZADO": preservar_bordes(cell_s, gf)
+                            elif reg["S"]=="PENDIENTE": preservar_bordes(cell_s, rf)
+                            w(20, reg["T"]); w(21, reg["U"]); w(22, reg["V"]); w(23, reg["W"]); w(24, reg["X"]); w(25, ""); w(26, "")
+                            for col_idx in range(1, 27):
+                                cell = ws.cell(row=r, column=col_idx)
+                                if col_idx != 19: preservar_bordes(cell, PatternFill(fill_type=None))
+                        out_buffer = io.BytesIO(); wb.save(out_buffer); out_buffer.seek(0)
+                        f_str = fecha_turno.strftime("%d-%m-%y"); u_str = st.session_state.usuario_turno.upper()
+                        st.download_button(label="📥 DESCARGAR MATRIZ FINAL", data=out_buffer, file_name=f"TURNO {f_str} {u_str}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", type="primary")
+                    except Exception as e: st.error(f"Error Excel: {e}")
+
+    # 2. ASESOR INTELIGENTE (ANALISIS + CONTRATO)
+    elif st.session_state.active_module == 'asesor':
+        st.markdown("### 🧠 Asesor Inteligente")
+        
+        usuario_actual = st.session_state.user_id
+        ya_acepto = usuario_actual in db_contratos
+        
+        if not ya_acepto:
+            st.warning("⚠️ Debe aceptar los Términos.")
+            with st.expander("📜 TÉRMINOS (DECÁLOGO)", expanded=True):
+                politicas = ["Naturaleza de Apoyo...", "Carácter Referencial...", "Responsabilidad Humana...", "Verificación Normativa...", "Prohibición de Datos Sensibles...", "No Vinculante...", "Posibilidad de Error...", "Trazabilidad de Uso...", "Uso Ético...", "Aceptación de Riesgo..."]
+                if all([st.checkbox(p) for p in politicas]):
+                    st.success("✅ Aceptado. Capture foto.")
+                    foto = st.camera_input("Firma Biométrica")
+                    if foto:
+                        b64 = base64.b64encode(foto.getvalue()).decode()
+                        db_contratos[usuario_actual] = {"fecha": get_hora_ecuador().strftime("%Y-%m-%d %H:%M:%S"), "foto": b64, "usuario": st.session_state.usuario_turno}
+                        guardar_json(CONTRATOS_FILE, db_contratos); registrar_accion(st.session_state.usuario_turno, "FIRMÓ CONTRATO"); st.success("¡Firmado!"); time.sleep(2); st.rerun()
+        else:
+            st.markdown("""<div class="legal-warning">⚠️ AVISO LEGAL: Uso referencial.</div>""", unsafe_allow_html=True)
+            if usuario_actual in db_contratos:
+                st.download_button("📜 Descargar Mi Contrato", generar_html_contrato(db_usuarios.get(usuario_actual, {}), db_contratos[usuario_actual]["foto"]), file_name="Contrato.html", mime="text/html")
+            st.markdown("---")
+            up_asesor = st.file_uploader("Sube documento (PDF)", type=['pdf'], key="asesor_up")
+            if up_asesor and st.button("ANALIZAR ESTRATEGIA"):
+                with st.spinner("Analizando..."):
+                    try:
+                        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as t: t.write(up_asesor.getvalue()); p_as = t.name
+                        f_as = genai.upload_file(p_as, display_name="Consulta")
+                        prompt_asesor = """Actúa como JEFE DE AYUDANTÍA. Estructura: 1. DIAGNÓSTICO, 2. CRITERIO, 3. EXTRACTO TENTATIVO (Solo texto)."""
+                        res = invocar_ia_segura([prompt_asesor, f_as])
+                        st.markdown(res.text)
+                        st.session_state.consultas_ia += 1
+                        incrementar_contador_ia()
+                        registrar_accion(st.session_state.usuario_turno, "CONSULTA IA")
+                        os.remove(p_as)
+                    except Exception as e: st.error(f"Error: {e}")
+
+    # 3. TALENTO HUMANO (GENERADOR POLICIAL)
+    elif st.session_state.active_module == 'th':
+        if not st.session_state.th_unlocked:
+            st.markdown("### 👤 Módulo Talento Humano")
+            pass_th_input = st.text_input("Contraseña de Acceso:", type="password")
+            if st.button("Ingresar a TH"):
+                if pass_th_input == config_sistema.get("pass_th", "THDINIC123"):
+                    st.session_state.th_unlocked = True
+                    st.success("Acceso Concedido")
+                    st.rerun()
+                else: st.error("Contraseña Incorrecta")
+        else:
+            # PANTALLA COMPLETA TH
+            components.html(get_generador_policial_html(), height=800, scrolling=True)
+            if st.button("Cerrar TH"):
+                st.session_state.th_unlocked = False
+                st.rerun()
+
+    # 4. ADMINISTRADOR
+    elif st.session_state.active_module == 'admin':
+        st.markdown("### 🛡️ PANEL DE ADMINISTRADOR")
+        # VERIFICACIÓN DE SEGURIDAD (DOBLE CHECK)
+        verif_pass = st.text_input("Confirme Contraseña Maestra:", type="password")
+        if verif_pass == ADMIN_PASS_MASTER:
+            st.success("ACCESO VERIFICADO")
+            t3_1, t3_2, t3_3, t3_4 = st.tabs(["👥 Monitor", "📜 Contratos", "🕵️ Historial", "⚙️ Config"])
+            
+            with t3_1:
+                st.markdown("#### 📡 Monitor en Tiempo Real")
+                data_monitor = []
+                for cedula, datos in db_usuarios.items():
+                    data_monitor.append({"Grado y Nombre": f"{datos['grado']} {datos['nombre']}", "Estado": get_estado_usuario(cedula), "Última Acción": get_ultima_accion_usuario(f"{datos['grado']} {datos['nombre']}")})
+                
+                df_m = pd.DataFrame(data_monitor)
+                def color_estado(val): return f'color: {"green" if "EN LÍNEA" in val else "orange" if "AUSENTE" in val else "red"}; font-weight: bold;'
+                st.dataframe(df_m.style.map(color_estado, subset=['Estado']), use_container_width=True)
+                if st.button("🔄 Actualizar"): st.rerun()
+                
+                st.markdown("---")
+                c_add, c_del = st.columns(2)
+                with c_add:
+                    st.caption("Agregar"); new_ced = st.text_input("Cédula:"); new_grado = st.text_input("Grado:"); new_nom = st.text_input("Nombres:")
+                    if st.button("Guardar"): db_usuarios[new_ced] = {"grado": new_grado, "nombre": new_nom, "activo": True}; guardar_json(DB_FILE, db_usuarios); st.success("Guardado."); st.rerun()
+                with c_del:
+                    st.caption("Eliminar"); del_ced = st.selectbox("Usuario:", options=list(db_usuarios.keys()))
+                    if st.button("Eliminar"): del db_usuarios[del_ced]; guardar_json(DB_FILE, db_usuarios); st.success("Eliminado."); st.rerun()
+
+            with t3_2:
+                try:
+                    if db_contratos:
+                        for ced, data in db_contratos.items():
+                            with st.expander(f"{data.get('usuario', 'Desconocido')} - {ced}"):
+                                c1c, c2c, c3c = st.columns([1,1,1])
+                                u_info = db_usuarios.get(ced, {"grado":"", "nombre": data.get("usuario","")})
+                                html_c = generar_html_contrato(u_info, data["foto"])
+                                with c1c: st.components.v1.html(html_c, height=300, scrolling=True)
+                                with c2c: st.download_button(f"⬇️ Descargar", html_c, file_name=f"C_{ced}.html", mime="text/html", key=f"dl_{ced}")
+                                with c3c: 
+                                    if st.button(f"🗑️ Eliminar", key=f"del_{ced}"): 
+                                        del db_contratos[ced]; guardar_json(CONTRATOS_FILE, db_contratos); st.rerun()
+                    else: st.info("Sin contratos.")
+                except Exception as e: st.error("Error cargando contratos.")
+
+            with t3_3: 
+                st.markdown("#### Historial"); 
+                if db_logs: st.dataframe(pd.DataFrame(db_logs), use_container_width=True)
+                else: st.info("Historial vacío.")
+
+            with t3_4:
+                st.markdown("#### Configuración")
+                c_ia, c_base = st.columns(2)
+                with c_ia:
+                    st.caption("Contador IA Global")
+                    current_ia = config_sistema.get("consultas_ia_global", 0)
+                    new_ia_count = st.number_input("Valor del Contador IA:", value=current_ia, key="input_ia_global")
+                    if st.button("🔄 Actualizar Contador IA"):
+                        config_sistema["consultas_ia_global"] = new_ia_count
+                        guardar_json(CONFIG_FILE, config_sistema)
+                        st.success("Actualizado.")
+                        st.rerun()
+
+                with c_base:
+                    st.caption("Base Histórica")
+                    new_base = st.number_input("Valor Base Histórica:", value=config_sistema.get("base_historica", 1258))
+                    if st.button("Actualizar Base"): 
+                        config_sistema["base_historica"] = new_base; guardar_json(CONFIG_FILE, config_sistema); st.success("Actualizado."); st.rerun()
+                
+                st.markdown("---")
+                c_p1, c_p2 = st.columns(2)
+                with c_p1:
+                    pass_u = st.text_input("Pass Usuarios:", value=config_sistema["pass_universal"])
+                    if st.button("Guardar Pass Usuarios"): config_sistema["pass_universal"] = pass_u; guardar_json(CONFIG_FILE, config_sistema); st.success("OK")
+                with c_p2:
+                    pass_th = st.text_input("Pass Talento Humano:", value=config_sistema.get("pass_th", "THDINIC123"))
+                    if st.button("Guardar Pass TH"): config_sistema["pass_th"] = pass_th; guardar_json(CONFIG_FILE, config_sistema); st.success("OK")
+
+        else: st.info("Ingrese contraseña maestra.")
 
 # FOOTER
 st.markdown("---")
