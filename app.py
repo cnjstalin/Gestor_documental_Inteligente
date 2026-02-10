@@ -15,7 +15,7 @@ from openpyxl.styles import PatternFill, Border, Side, Alignment
 from datetime import datetime, timedelta, timezone
 
 # --- 1. CONFIGURACIÓN Y ESTILOS ---
-VER_SISTEMA = "v28.2"
+VER_SISTEMA = "v28.3"
 ADMIN_USER = "1723623011"
 ADMIN_PASS_MASTER = "9994915010022"
 
@@ -46,34 +46,28 @@ USUARIOS_BASE = {
     "1723623011": {"grado": "CBOS", "nombre": "CARRILLO NARVAEZ JOHN STALIN", "activo": True}
 }
 
-# LISTAS POR DEFECTO
 UNIDADES_DEFAULT = [
     "DINIC", "SOPORTE OPERATIVO", "APOYO OPERATIVO", "PLANIFICACION", 
     "JURIDICO", "COMUNICACION", "ANALISIS DE INFORMACION", "COORDINACION OPERACIONAL", 
     "FINANCIERO", "UCAP", "UNDECOF", "UDAR", "DIGIN", "DNATH", "DAOP", "DCOP", "DSOP"
 ]
 
-# ARCHIVOS DE PERSISTENCIA
 DB_FILE = "usuarios_db.json"
 CONFIG_FILE = "config_sistema.json"
 CONTRATOS_FILE = "contratos_legal.json"
 LOGS_FILE = "historial_acciones.json"
 LISTAS_FILE = "listas_db.json"
 
-# FUNCIONES DE CARGA/GUARDADO (CON PROTECCIÓN DE ERRORES)
 def cargar_json(filepath, default):
     if os.path.exists(filepath):
         try:
-            with open(filepath, 'r') as f:
-                data = json.load(f)
-                return data if data is not None else default
+            with open(filepath, 'r') as f: return json.load(f) or default
         except: return default
     return default
 
 def guardar_json(filepath, data):
     try:
-        with open(filepath, 'w') as f:
-            json.dump(data, f)
+        with open(filepath, 'w') as f: json.dump(data, f)
     except: pass
 
 def inicializar_usuarios_seguros():
@@ -81,24 +75,17 @@ def inicializar_usuarios_seguros():
     if os.path.exists(DB_FILE):
         try:
             with open(DB_FILE, 'r') as f:
-                usuarios_locales = json.load(f)
-                if isinstance(usuarios_locales, dict):
-                    usuarios_finales.update(usuarios_locales)
+                local = json.load(f)
+                if isinstance(local, dict): usuarios_finales.update(local)
         except: pass
     guardar_json(DB_FILE, usuarios_finales)
     return usuarios_finales
 
-# --- GESTIÓN DE LISTAS PERSISTENTES ---
 def cargar_listas_desplegables():
     datos = cargar_json(LISTAS_FILE, {"unidades": UNIDADES_DEFAULT, "reasignados": []})
-    # Validación por si el archivo está corrupto o incompleto
     if not isinstance(datos, dict): datos = {"unidades": UNIDADES_DEFAULT, "reasignados": []}
-    if "unidades" not in datos: datos["unidades"] = UNIDADES_DEFAULT
-    if "reasignados" not in datos: datos["reasignados"] = []
-    
-    # Asegurar defaults
     for u in UNIDADES_DEFAULT:
-        if u not in datos["unidades"]: datos["unidades"].append(u)
+        if u not in datos.get("unidades", []): datos.setdefault("unidades", []).append(u)
     return datos
 
 def guardar_nueva_entrada_lista(tipo, valor):
@@ -109,15 +96,13 @@ def guardar_nueva_entrada_lista(tipo, valor):
         if tipo == "unidades": st.session_state.lista_unidades = datos["unidades"]
         if tipo == "reasignados": st.session_state.lista_reasignados = datos["reasignados"]
 
-# CARGA INICIAL
 config_sistema = cargar_json(CONFIG_FILE, {"pass_universal": "DINIC2026", "base_historica": 1258, "consultas_ia_global": 0})
 db_usuarios = inicializar_usuarios_seguros()
 db_contratos = cargar_json(CONTRATOS_FILE, {})
 db_logs = cargar_json(LOGS_FILE, [])
-if not isinstance(db_logs, list): db_logs = [] # Corrección por si el log se corrompe
+if not isinstance(db_logs, list): db_logs = []
 db_listas = cargar_listas_desplegables()
 
-# Cargar listas a sesión
 if 'lista_unidades' not in st.session_state: st.session_state.lista_unidades = db_listas["unidades"]
 if 'lista_reasignados' not in st.session_state: st.session_state.lista_reasignados = db_listas["reasignados"]
 
@@ -128,9 +113,7 @@ def get_hora_ecuador():
 def registrar_accion(usuario, accion, detalle=""):
     ahora = get_hora_ecuador().strftime("%Y-%m-%d %H:%M:%S")
     nuevo_log = {"fecha": ahora, "usuario": usuario, "accion": accion, "detalle": detalle}
-    # Asegurar que db_logs es lista
     global db_logs
-    if not isinstance(db_logs, list): db_logs = []
     db_logs.insert(0, nuevo_log)
     guardar_json(LOGS_FILE, db_logs)
 
@@ -177,12 +160,34 @@ def get_logo_html(width="120px"):
         return f'<img src="data:image/jpeg;base64,{b64}" style="width:{width}; margin-bottom:15px;">'
     return f'<img src="https://upload.wikimedia.org/wikipedia/commons/2/25/Escudo_Policia_Nacional_del_Ecuador.png" style="width:{width}; margin-bottom:15px;">'
 
+# --- ESTILOS CORREGIDOS (VISIBILIDAD DE NÚMEROS) ---
 st.markdown("""
     <style>
     .main-header { background-color: #0E2F44; padding: 20px; border-radius: 10px; color: white; text-align: center; margin-bottom: 20px; border-bottom: 4px solid #D4AF37; }
     .main-header h1 { margin: 0; font-size: 2.5rem; font-weight: 800; }
     .main-header h3 { margin: 5px 0 0 0; font-size: 1.2rem; font-style: italic; color: #e0e0e0; }
-    .metric-card { background-color: #f8f9fa; border-radius: 10px; padding: 15px; text-align: center; border: 1px solid #dee2e6; }
+    
+    /* CORRECCIÓN DE TARJETAS PARA QUE SIEMPRE SE VEAN LOS NÚMEROS */
+    .metric-card { 
+        background-color: #f8f9fa !important; 
+        border-radius: 10px; 
+        padding: 15px; 
+        text-align: center; 
+        border: 1px solid #dee2e6;
+    }
+    .metric-card h3 {
+        color: #0E2F44 !important; /* Azul oscuro institucional para el número */
+        font-size: 2rem;
+        margin: 0;
+        font-weight: 800;
+    }
+    .metric-card p {
+        color: #555555 !important; /* Gris oscuro para el texto */
+        font-size: 1rem;
+        margin: 0;
+        font-weight: 600;
+    }
+
     .login-container { max-width: 400px; margin: auto; padding: 40px; background-color: #ffffff; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); text-align: center; border-top: 5px solid #0E2F44; }
     .legal-warning { background-color: #fff3cd; border-left: 6px solid #ffc107; padding: 15px; color: #856404; font-weight: bold; margin-bottom: 15px; }
     div.stButton > button { width: 100%; font-weight: bold; border-radius: 5px; }
@@ -269,8 +274,6 @@ def generar_html_contrato(datos_usuario, img_b64):
         logo_b64 = get_img_as_base64("Captura.JPG")
     
     logo_html_tag = f'<img src="data:image/jpeg;base64,{logo_b64}" style="width:100px; display:block; margin: 0 auto;">' if logo_b64 else ""
-
-    # Defensa contra datos faltantes
     grado = datos_usuario.get('grado', 'N/A')
     nombre = datos_usuario.get('nombre', 'Usuario Desconocido')
 
@@ -323,7 +326,10 @@ if not st.session_state.logged_in:
                     st.session_state.user_id = usuario_input
                     admin_data = db_usuarios.get(ADMIN_USER, {"grado": "CBOS.", "nombre": "CARRILLO NARVAEZ JOHN STALIN"})
                     st.session_state.usuario_turno = f"{admin_data['grado']} {admin_data['nombre']}"
-                    st.success("✅ Acceso ADMIN"); registrar_accion(st.session_state.usuario_turno, "INICIO SESIÓN ADMIN"); actualizar_presencia(usuario_input); st.rerun()
+                    st.success("✅ Acceso Concedido: ADMINISTRADOR")
+                    registrar_accion(st.session_state.usuario_turno, "INICIO SESIÓN ADMIN")
+                    actualizar_presencia(usuario_input)
+                    st.rerun()
                 # USER
                 elif usuario_input in db_usuarios:
                     user_data = db_usuarios[usuario_input]
@@ -393,6 +399,7 @@ else:
     total_docs = base_historica + len(st.session_state.registros)
     total_consultas_ia = config_sistema.get("consultas_ia_global", 0) + st.session_state.consultas_ia
 
+    # DASHBOARD
     c1, c2, c3 = st.columns(3)
     with c1: st.markdown(f"<div class='metric-card'><h3>📥 {st.session_state.docs_procesados_hoy}</h3><p>Docs Turno Actual</p></div>", unsafe_allow_html=True)
     with c2: st.markdown(f"<div class='metric-card'><h3>📈 {total_docs}</h3><p>Total Histórico</p></div>", unsafe_allow_html=True)
@@ -423,12 +430,12 @@ else:
                 st.markdown("---")
                 st.caption("🏢 DEPENDENCIA/as DE DESTINO")
                 
-                # LISTAS PERSISTENTES
                 opciones_unidades = sorted(st.session_state.lista_unidades)
                 default_units = []
                 if is_editing and registro_a_editar['M']:
                     prev_units = registro_a_editar['M'].split(", ")
                     default_units = [u for u in prev_units if u in opciones_unidades]
+                
                 unidades_selected = st.multiselect("Seleccione Unidad(es):", opciones_unidades, default=default_units)
                 col_ning, col_otra = st.columns(2)
                 chk_ninguna = col_ning.checkbox("NINGUNA")
@@ -676,11 +683,22 @@ else:
                     with t3_4:
                         st.markdown("#### Configuración")
                         c_ia, c_base = st.columns(2)
-                        with c_ia: 
-                            if st.button("🔄 Reiniciar Contador IA"): config_sistema["consultas_ia_global"] = 0; guardar_json(CONFIG_FILE, config_sistema); st.success("Reiniciado."); st.rerun()
+                        with c_ia:
+                            st.caption("Contador IA Global")
+                            # CAMBIO: Number Input para editar el contador
+                            current_ia = config_sistema.get("consultas_ia_global", 0)
+                            new_ia_count = st.number_input("Valor del Contador IA:", value=current_ia, key="input_ia_global")
+                            if st.button("🔄 Actualizar Contador IA"):
+                                config_sistema["consultas_ia_global"] = new_ia_count
+                                guardar_json(CONFIG_FILE, config_sistema)
+                                st.success("Actualizado.")
+                                st.rerun()
+
                         with c_base:
-                            new_base = st.number_input("Base Histórica:", value=config_sistema.get("base_historica", 1258))
-                            if st.button("Actualizar Base"): config_sistema["base_historica"] = new_base; guardar_json(CONFIG_FILE, config_sistema); st.success("Actualizado."); st.rerun()
+                            st.caption("Base Histórica")
+                            new_base = st.number_input("Valor Base Histórica:", value=config_sistema.get("base_historica", 1258))
+                            if st.button("Actualizar Base"): 
+                                config_sistema["base_historica"] = new_base; guardar_json(CONFIG_FILE, config_sistema); st.success("Actualizado."); st.rerun()
                         
                         new_pass = st.text_input("Nueva Contraseña:", value=config_sistema["pass_universal"])
                         if st.button("Guardar Contraseña"): config_sistema["pass_universal"] = new_pass; guardar_json(CONFIG_FILE, config_sistema); st.success("Guardado.")
