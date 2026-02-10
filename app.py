@@ -16,7 +16,7 @@ from openpyxl.styles import PatternFill, Border, Side, Alignment
 from datetime import datetime, timedelta, timezone
 
 # --- 1. CONFIGURACIÓN Y ESTILOS ---
-VER_SISTEMA = "v32.0"
+VER_SISTEMA = "v33.0"
 ADMIN_USER = "1723623011"
 ADMIN_PASS_MASTER = "9994915010022"
 
@@ -325,25 +325,25 @@ def frases_curiosas():
 # --- FUNCIÓN DE LIMPIEZA DE CÓDIGO (IA MEJORADA) ---
 def limpiar_codigo_prioridad(texto):
     if not texto: return ""
-    # 1. Prioridad: Patrón de oficio policial completo
-    match = re.search(r"(PN-[A-Z0-9]+-QX(?:-\d+)?(?:-OF|-MM)?)", str(texto), re.IGNORECASE)
-    if match: return match.group(1).strip().upper()
-    # 2. Prioridad: Buscar palabra clave en encabezados
-    match2 = re.search(r"(?:Oficio|Memorando).*?(PN-.*)", str(texto), re.IGNORECASE)
+    # REGEX AMPLIADO: Captura todo desde PN- hasta que encuentre un salto de línea o caracteres no válidos
+    # Esto asegura que capture PN-DINIC-2026-001-QX-OF completo
+    match = re.search(r"(PN-[\w\-\(\)\.]+)", str(texto).upper())
+    if match: return match.group(1).strip()
+    
+    # Fallback: Buscar "Oficio Nro"
+    match2 = re.search(r"(?:OFICIO|MEMORANDO).*?(PN-.*)", str(texto), re.IGNORECASE)
     if match2: return match2.group(1).strip().upper()
     return str(texto).strip()
 
 # --- FUNCIÓN EXTRACCIÓN UNIDAD F7 BLINDADA ---
 def extraer_unidad_f7(texto_codigo):
     if not texto_codigo: return "DINIC"
-    # REGEX AGRESIVO: Busca TODO lo que esté entre 'PN-' y '-QX' (o solo 'QX' al final)
-    # Ejemplo: PN-(DIGIN)-QX... -> (DIGIN)
-    # Ejemplo: PN-U.COT-QX... -> U.COT
+    # REGEX AGRESIVO: Busca TODO lo que esté entre 'PN-' y '-QX'
     match = re.search(r"PN-(.+?)-QX", str(texto_codigo), re.IGNORECASE)
     if match:
-        # Extrae el grupo, quita espacios y lo hace mayúsculas
         unidad = match.group(1).strip().upper()
-        # Opcional: Si quieres quitar paréntesis puedes usar: unidad = unidad.replace('(','').replace(')','')
+        # Limpieza extra de paréntesis si los hubiera
+        unidad = unidad.replace('(', '').replace(')', '')
         return unidad
     return "DINIC"
 
@@ -366,15 +366,9 @@ def invocar_ia_segura(content):
 
 def preservar_bordes(cell, fill_obj):
     original_border = copy(cell.border)
-    # Aplicar relleno
     cell.fill = fill_obj
-    
-    # ⚠️ IMPORTANTE: No activar wrap_text para no alterar altura de filas
-    cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=False)
-    
-    # Bordes: Usar el original o crear uno fino estándar
-    if original_border and original_border.left.style: 
-        cell.border = original_border
+    cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=False) # WRAP TEXT FALSE (NO AGRANDAR)
+    if original_border: cell.border = original_border
     else:
         thin = Side(border_style="thin", color="000000")
         cell.border = Border(top=thin, left=thin, right=thin, bottom=thin)
@@ -422,7 +416,6 @@ def generar_fila_matriz(tipo, ia_data, manual_data, usuario_turno, paths_files):
     # 1. EXTRACCIÓN Y LIMPIEZA
     raw_code_in = ia_data.get("codigo_completo_entrada", "")
     cod_in = limpiar_codigo_prioridad(raw_code_in)
-    # USO DE LA NUEVA FUNCIÓN DE EXTRACCIÓN DE UNIDAD
     unidad_f7 = extraer_unidad_f7(cod_in)
     
     dest_ia = ia_data.get("destinatarios_todos", "")
@@ -451,7 +444,7 @@ def generar_fila_matriz(tipo, ia_data, manual_data, usuario_turno, paths_files):
         "C": fecha_ia_in, # Fecha Doc Recibido
         "D": ia_data.get("remitente_grado_nombre", ""),
         "E": ia_data.get("remitente_cargo", ""),
-        "F": unidad_f7, # Unidad Origen (IA detecta entre parentesis)
+        "F": unidad_f7, # Unidad Origen
         "G": cod_in,    # Num Doc Recibido
         "H": fecha_ia_in, # Fecha Doc Recibido
         "I": ia_data.get("asunto_entrada", ""),
@@ -473,9 +466,9 @@ def generar_fila_matriz(tipo, ia_data, manual_data, usuario_turno, paths_files):
         "Y": "", "Z": ""
     }
 
-    # APLICACIÓN DE REGLAS ESPECÍFICAS (4.1 - 4.4)
+    # APLICACIÓN DE REGLAS ESPECÍFICAS
     if tipo == "TRAMITE NORMAL":
-        row["L"] = "" # Celda L vacía
+        row["L"] = ""
 
     elif tipo == "REASIGNADO":
         row["L"] = "REASIGNADO"
@@ -484,13 +477,13 @@ def generar_fila_matriz(tipo, ia_data, manual_data, usuario_turno, paths_files):
         row["V"] = row["P"]
         if manual_data.get("reasignado_a"):
             row["O"] = manual_data.get("reasignado_a")
+        row["F"] = extraer_unidad_f7(row["G"])
         
     elif tipo == "GENERADO DESDE DESPACHO":
         row["L"] = "GENERADO DESDE DESPACHO"
         f_gen = fecha_ia_out if fecha_ia_out else fecha_ia_in
         row["C"] = f_gen; row["H"] = f_gen; row["Q"] = f_gen; row["W"] = f_gen; row["X"] = f_gen
         row["D"] = ""; row["E"] = ""
-        # Priorizar cod_out, sino cod_in
         code_final = cod_out if cod_out else cod_in
         row["G"] = code_final; row["P"] = code_final; row["V"] = code_final
         row["F"] = extraer_unidad_f7(code_final)
@@ -523,7 +516,6 @@ if not st.session_state.logged_in:
             usuario_input = st.text_input("Usuario (Cédula):").strip()
             pass_input = st.text_input("Contraseña:", type="password").strip()
             if st.form_submit_button("INGRESAR AL SISTEMA", type="primary"):
-                # ADMIN
                 if usuario_input == ADMIN_USER and pass_input == ADMIN_PASS_MASTER:
                     st.session_state.logged_in = True
                     st.session_state.user_role = "admin"
@@ -534,7 +526,6 @@ if not st.session_state.logged_in:
                     registrar_accion(st.session_state.usuario_turno, "INICIO SESIÓN ADMIN")
                     actualizar_presencia(usuario_input)
                     st.rerun()
-                # USER
                 elif usuario_input in db_usuarios:
                     user_data = db_usuarios[usuario_input]
                     if pass_input == config_sistema["pass_universal"]:
@@ -569,7 +560,6 @@ else:
         st.markdown("---")
         st.markdown("### 📂 MÓDULOS")
         
-        # BOTONES DE NAVEGACIÓN
         if st.button("📝 SECRETARIO/A", use_container_width=True, type="primary" if st.session_state.active_module == 'secretario' else "secondary"):
             st.session_state.active_module = 'secretario'
             st.rerun()
@@ -606,7 +596,7 @@ else:
         with c2: st.markdown(f"<div class='metric-card'><h3>📈 {total_docs}</h3><p>Total Histórico</p></div>", unsafe_allow_html=True)
         with c3: st.markdown(f"<div class='metric-card'><h3>🧠 {total_consultas_ia}</h3><p>Consultas IA (Global)</p></div>", unsafe_allow_html=True)
         
-        # BOTÓN CONFIGURACIÓN RÁPIDA (NUEVO REQUERIMIENTO)
+        # BOTÓN CONFIGURACIÓN RÁPIDA
         with st.expander("⚙️ CONFIGURACIÓN Y RESPALDO RÁPIDO"):
             c_conf1, c_conf2 = st.columns(2)
             with c_conf1:
@@ -655,7 +645,6 @@ else:
 
                 st.markdown("---")
                 st.caption("🏢 DEPENDENCIA/as DE DESTINO")
-                
                 opciones_unidades = sorted(st.session_state.lista_unidades)
                 default_units = []
                 if is_editing and registro_a_editar['M']:
@@ -728,18 +717,36 @@ else:
                                     if paths["in"]: files_ia.append(genai.upload_file(paths["in"], display_name="In"))
                                     if paths["out"]: files_ia.append(genai.upload_file(paths["out"], display_name="Out"))
 
+                                    # PROMPT MEJORADO Y ESPECÍFICO
                                     prompt = """
-                                    Extrae en JSON estricto. IMPORTANTE: El CÓDIGO del documento (Oficio Nro o PN-...) suele estar en la esquina superior DERECHA. Búscalo ahí con prioridad. Ignora referencias en el cuerpo.
-                                    Campos:
-                                    - fecha_recepcion: DD/MM/AAAA
-                                    - remitente_grado_nombre: Texto
-                                    - remitente_cargo: Texto
-                                    - codigo_completo_entrada: El código de la esquina superior derecha (Ej: PN-DINIC-2026-001).
-                                    - asunto_entrada: Texto
-                                    - resumen_breve: Texto
-                                    - destinatarios_todos: Nombres y grados separados por coma.
-                                    - codigo_completo_salida: Código del documento de respuesta.
-                                    - fecha_salida: DD/MM/AAAA
+                                    ACTÚA COMO EXPERTO EN GESTIÓN DOCUMENTAL POLICIAL.
+                                    Analiza el documento y extrae JSON ESTRICTO.
+
+                                    1. CÓDIGO DEL DOCUMENTO (CRÍTICO):
+                                       - Ubicación: Esquina superior DERECHA (encabezado).
+                                       - Formato: "Oficio Nro. PN-UNIDAD-QX..." o "Memorando Nro. PN-...".
+                                       - INSTRUCCIÓN: Extrae TODO el código. Ignora códigos citados en el cuerpo del texto.
+
+                                    2. DESTINATARIOS (PARA):
+                                       - Busca la sección explícita "PARA:" o "DESTINATARIO:".
+                                       - NO confundir con la firma ("Atentamente").
+                                       - Extrae Grados y Nombres de TODOS.
+
+                                    3. REMITENTE (DE):
+                                       - Quien firma al final ("Atentamente").
+
+                                    JSON:
+                                    {
+                                        "fecha_recepcion": "DD/MM/AAAA",
+                                        "remitente_grado_nombre": "Texto",
+                                        "remitente_cargo": "Texto",
+                                        "codigo_completo_entrada": "Texto (El de la esquina superior derecha)",
+                                        "asunto_entrada": "Texto",
+                                        "resumen_breve": "Texto",
+                                        "destinatarios_todos": "Texto (A quién va dirigido)",
+                                        "codigo_completo_salida": "Texto",
+                                        "fecha_salida": "DD/MM/AAAA"
+                                    }
                                     """
                                     data = {}
                                     if files_ia:
@@ -748,20 +755,16 @@ else:
                                         data = json.loads(txt_clean)
 
                                     final_data = registro_a_editar.copy() if is_editing else {}
-                                    # Datos Manuales para la función constructora
                                     manual_data = {
                                         "unidades_str": str_unidades_final,
                                         "tipo_doc_salida": tipo_doc_salida,
                                         "reasignado_a": destinatario_reasignado_final,
-                                        # Pasar datos previos si es edición para no perderlos si la IA falla
                                         "G": final_data.get("G", ""),
                                         "P": final_data.get("P", "")
                                     }
 
-                                    # --- GENERACIÓN DE LA FILA USANDO LA FUNCIÓN BLINDADA ---
                                     row = generar_fila_matriz(tipo_proceso, data, manual_data, st.session_state.usuario_turno, paths)
 
-                                    # Guardar en Listas Persistentes
                                     if input_otra_unidad: guardar_nueva_entrada_lista("unidades", input_otra_unidad)
                                     if destinatario_reasignado_final: guardar_nueva_entrada_lista("reasignados", destinatario_reasignado_final)
 
