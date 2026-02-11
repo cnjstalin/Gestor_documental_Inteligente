@@ -16,7 +16,7 @@ from openpyxl.styles import PatternFill, Border, Side, Alignment
 from datetime import datetime, timedelta, timezone
 
 # --- 1. CONFIGURACIÓN Y ESTILOS ---
-VER_SISTEMA = "v38.0"
+VER_SISTEMA = "v39.0"
 ADMIN_USER = "1723623011"
 ADMIN_PASS_MASTER = "9994915010022"
 
@@ -335,6 +335,7 @@ def extract_json_safe(text):
 
 def limpiar_codigo_prioridad(texto):
     if not texto: return ""
+    # REGEX AMPLIADO
     match = re.search(r"(PN-[\w\-\(\)\.]+)", str(texto).upper())
     if match: 
         codigo = match.group(1).strip()
@@ -379,23 +380,21 @@ def preservar_bordes(cell, fill_obj):
         thin = Side(border_style="thin", color="000000")
         cell.border = Border(top=thin, left=thin, right=thin, bottom=thin)
 
-# --- ENCAPSULAMIENTO DE MATRIZ V38 ---
+# --- GENERADOR DE FILA MATRIZ BLINDADO v39 ---
 def generar_fila_matriz(tipo, ia_data, manual_data, usuario_turno, paths_files):
-    # 1. EXTRACCIÓN Y LIMPIEZA
-    raw_code_in = ia_data.get("codigo_entrada", "")
+    raw_code_in = ia_data.get("codigo_completo_entrada", "")
     cod_in = limpiar_codigo_prioridad(raw_code_in)
     unidad_f7 = extraer_unidad_f7(cod_in)
     
-    # DATOS DE IA (SEPARADOS POR DOC)
-    dest_salida = ia_data.get("destinatarios_salida", "")
+    # IMPORTANTE: Destinatarios (NO CARGOS, NO REMITENTE)
+    dest_ia = ia_data.get("destinatarios_todos", "")
     
-    raw_code_out = ia_data.get("codigo_salida", "")
+    raw_code_out = ia_data.get("codigo_completo_salida", "")
     cod_out = limpiar_codigo_prioridad(raw_code_out)
     
     fecha_ia_in = ia_data.get("fecha_recepcion", "")
     fecha_ia_out = ia_data.get("fecha_salida", "")
     
-    # ESTADO (S7)
     estado_s7 = "PENDIENTE"
     has_in = True if (paths_files.get("in") or manual_data.get("G")) else False
     has_out = True if (paths_files.get("out") or manual_data.get("P")) else False
@@ -406,70 +405,41 @@ def generar_fila_matriz(tipo, ia_data, manual_data, usuario_turno, paths_files):
     es_interno = determinar_sale_no_sale(str_unidades)
     if tipo == "CONOCIMIENTO": es_interno = "NO"
 
-    # ROW BASE
     row = {
-        "C": fecha_ia_in, # C7: Fecha Doc Entrada
-        "D": ia_data.get("remitente_grado_nombre", ""), # D7
-        "E": ia_data.get("remitente_cargo", ""), # E7
-        "F": unidad_f7, # F7
-        "G": cod_in, # G7
-        "H": fecha_ia_in, # H7
-        "I": ia_data.get("asunto_entrada", ""), # I7
-        "J": ia_data.get("resumen_entrada", ""), # J7
-        "K": usuario_turno, # K7
-        "L": "", # L7
-        "M": str_unidades, # M7
-        "N": manual_data.get("tipo_doc_salida", ""), # N7
-        "O": "", # O7 (Se llena según lógica)
-        "P": cod_out, # P7
-        "Q": fecha_ia_out, # Q7
-        "R": "", # R7
-        "S": estado_s7, # S7
-        "T": es_interno, # T7
-        "U": str_unidades, # U7
-        "V": cod_out, # V7
-        "W": fecha_ia_out, # W7
-        "X": fecha_ia_out, # X7
+        "C": fecha_ia_in, "D": ia_data.get("remitente_grado_nombre", ""),
+        "E": ia_data.get("remitente_cargo", ""), "F": unidad_f7,
+        "G": cod_in, "H": fecha_ia_in, "I": ia_data.get("asunto_entrada", ""),
+        "J": ia_data.get("resumen_breve", ""), "K": usuario_turno,
+        "L": "", "M": str_unidades, "N": manual_data.get("tipo_doc_salida", ""),
+        "O": dest_ia, "P": cod_out, "Q": fecha_ia_out, "R": "", "S": estado_s7,
+        "T": es_interno, "U": str_unidades, "V": cod_out, "W": fecha_ia_out, "X": fecha_ia_out,
         "Y": "", "Z": ""
     }
 
-    # --- REGLAS BLINDADAS POR TIPO ---
     if tipo == "TRAMITE NORMAL":
         row["L"] = ""
-        # O7: Destinatarios del Doc Respuesta (IA)
-        row["O"] = dest_salida
     
     elif tipo == "REASIGNADO":
         row["L"] = "REASIGNADO"
-        # P7, V7 VACIAS
         row["P"] = ""; row["V"] = ""
-        # O7: Manual
-        if manual_data.get("reasignado_a"): row["O"] = manual_data.get("reasignado_a")
-        # Fechas Q,W,X = H
         row["Q"] = row["H"]; row["W"] = row["H"]; row["X"] = row["H"]
+        if manual_data.get("reasignado_a"): row["O"] = manual_data.get("reasignado_a")
 
     elif tipo == "GENERADO DESDE DESPACHO":
         row["L"] = "GENERADO DESDE DESPACHO"
-        # D7, E7 VACIAS
-        row["D"] = ""; row["E"] = ""
-        # Fechas salida mandan
         f_gen = fecha_ia_out if fecha_ia_out else fecha_ia_in
         row["C"] = f_gen; row["H"] = f_gen; row["Q"] = f_gen; row["W"] = f_gen; row["X"] = f_gen
-        # Codigo único
+        row["D"] = ""; row["E"] = ""
         code_final = cod_out if cod_out else cod_in
         row["G"] = code_final; row["P"] = code_final; row["V"] = code_final
         row["F"] = extraer_unidad_f7(code_final)
-        # O7: Destinatarios del Doc Respuesta (IA)
-        row["O"] = dest_salida
 
     elif tipo == "CONOCIMIENTO":
         row["L"] = "CONOCIMIENTO"
-        # M,O,P,U,V VACIAS
         row["M"] = ""; row["O"] = ""; row["P"] = ""; row["U"] = ""; row["V"] = ""
         row["T"] = "NO"
         row["Q"] = row["C"]; row["W"] = row["C"]; row["X"] = row["C"]
 
-    # Limpieza PENDIENTES
     if row["S"] == "PENDIENTE":
         for k in ["O", "P", "Q", "V", "W", "X"]: row[k] = ""
 
@@ -630,30 +600,31 @@ else:
                                 if paths["out"]: files_ia.append(genai.upload_file(paths["out"], display_name="Out"))
                                 
                                 prompt = """
-                                ANÁLISIS DOCUMENTAL POLICIAL (DOS ARCHIVOS: ENTRADA Y SALIDA).
-                                Distingue claramente entre el documento recibido (antecedente) y el generado (respuesta).
+                                Eres experto en gestión documental policial. Analiza y extrae JSON ESTRICTO.
+                                
+                                SI HAY DOCUMENTO DE RESPUESTA (SALIDA):
+                                1. DESTINATARIOS (Campo 'O'):
+                                   - UBICACIÓN CLAVE: Busca "PARA:" o bajo "ASUNTO:".
+                                   - INSTRUCCIÓN: Extrae TODOS los Grados y Nombres.
+                                   - ¡PROHIBIDO!: NO incluyas el nombre del REMITENTE (quien firma "Atentamente"). 
+                                   - NO incluyas cargos (Jefe, Director, etc).
+                                
+                                2. CÓDIGO SALIDA (Campo P): Esquina superior derecha.
 
-                                DEL DOCUMENTO DE RESPUESTA (DOC 2 - SALIDA):
-                                1. DESTINATARIOS (Campo O): Busca la sección 'PARA:' o bajo 'ASUNTO:'. Extrae GRADO y NOMBRE de todos.
-                                   - ¡CRÍTICO!: NO incluyas cargos. NO pongas al firmante (Remitente). Separa con comas.
-                                2. CÓDIGO (Campo P): Esquina superior derecha (Ej: Oficio Nro. PN-...). Extrae el código completo.
-                                3. FECHA SALIDA (Campo Q): Fecha del documento.
+                                SI HAY DOCUMENTO DE ENTRADA:
+                                3. CÓDIGO ENTRADA (Campo G): Esquina superior derecha.
+                                4. REMITENTE (Campo D): Quien firma al final.
 
-                                DEL DOCUMENTO RECIBIDO (DOC 1 - ENTRADA):
-                                4. REMITENTE (Campo D): Quien firma.
-                                5. CÓDIGO ENTRADA (Campo G): Esquina superior derecha.
-                                6. RESUMEN (Campo J): Breve síntesis.
-
-                                JSON ESTRICTO:
+                                JSON:
                                 {
                                     "fecha_recepcion": "DD/MM/AAAA",
                                     "remitente_grado_nombre": "Texto",
                                     "remitente_cargo": "Texto",
-                                    "codigo_entrada": "Texto",
+                                    "codigo_completo_entrada": "Texto",
                                     "asunto_entrada": "Texto",
-                                    "resumen_entrada": "Texto",
-                                    "destinatarios_salida": "Texto (Solo Grado y Nombre, comas)",
-                                    "codigo_salida": "Texto",
+                                    "resumen_breve": "Texto",
+                                    "destinatarios_todos": "Texto (Destinatarios Doc Salida, SIN remitente)",
+                                    "codigo_completo_salida": "Texto",
                                     "fecha_salida": "DD/MM/AAAA"
                                 }
                                 """
