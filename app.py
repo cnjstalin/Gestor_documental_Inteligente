@@ -15,14 +15,19 @@ from openpyxl import load_workbook
 from openpyxl.styles import PatternFill, Border, Side, Alignment
 from datetime import datetime, timedelta, timezone
 
-# --- 1. CONFIGURACIÓN ---
-VER_SISTEMA = "v42.0"
+# --- 1. CONFIGURACIÓN Y ESTILOS ---
+VER_SISTEMA = "v43.0"
 ADMIN_USER = "1723623011"
 ADMIN_PASS_MASTER = "9994915010022"
 
-st.set_page_config(page_title="SIGD DINIC", layout="wide", page_icon="🛡️", initial_sidebar_state="expanded")
+st.set_page_config(
+    page_title="SIGD DINIC",
+    layout="wide",
+    page_icon="🛡️",
+    initial_sidebar_state="expanded"
+)
 
-# --- 2. DATOS ---
+# --- 2. BASES DE DATOS ---
 USUARIOS_BASE = {
     "0702870460": {"grado": "SGOS", "nombre": "VILLALTA OCHOA XAVIER BISMARK", "activo": True},
     "1715081731": {"grado": "SGOS", "nombre": "MINDA MINDA FRANCISCO GABRIEL", "activo": True},
@@ -42,7 +47,11 @@ USUARIOS_BASE = {
     "1723623011": {"grado": "CBOS", "nombre": "CARRILLO NARVAEZ JOHN STALIN", "activo": True}
 }
 
-UNIDADES_DEFAULT = ["DINIC", "SOPORTE OPERATIVO", "APOYO OPERATIVO", "PLANIFICACION", "JURIDICO", "COMUNICACION", "ANALISIS DE INFORMACION", "COORDINACION OPERACIONAL", "FINANCIERO", "UCAP", "UNDECOF", "UDAR", "DIGIN", "DNATH", "DAOP", "DCOP", "DSOP"]
+UNIDADES_DEFAULT = [
+    "DINIC", "SOPORTE OPERATIVO", "APOYO OPERATIVO", "PLANIFICACION", 
+    "JURIDICO", "COMUNICACION", "ANALISIS DE INFORMACION", "COORDINACION OPERACIONAL", 
+    "FINANCIERO", "UCAP", "UNDECOF", "UDAR", "DIGIN", "DNATH", "DAOP", "DCOP", "DSOP"
+]
 
 DB_FILE = "usuarios_db.json"
 CONFIG_FILE = "config_sistema.json"
@@ -50,16 +59,19 @@ CONTRATOS_FILE = "contratos_legal.json"
 LOGS_FILE = "historial_acciones.json"
 LISTAS_FILE = "listas_db.json"
 
+# FUNCIONES DE CARGA/GUARDADO
 def cargar_json(filepath, default):
     if os.path.exists(filepath):
         try:
-            with open(filepath, 'r') as f: return json.load(f)
+            with open(filepath, 'r') as f:
+                return json.load(f)
         except: return default
     return default
 
 def guardar_json(filepath, data):
     try:
-        with open(filepath, 'w') as f: json.dump(data, f)
+        with open(filepath, 'w') as f:
+            json.dump(data, f)
     except: pass
 
 def inicializar_usuarios_seguros():
@@ -68,7 +80,8 @@ def inicializar_usuarios_seguros():
         try:
             with open(DB_FILE, 'r') as f:
                 usuarios_locales = json.load(f)
-                if isinstance(usuarios_locales, dict): usuarios_finales.update(usuarios_locales)
+                if isinstance(usuarios_locales, dict):
+                    usuarios_finales.update(usuarios_locales)
         except: pass
     guardar_json(DB_FILE, usuarios_finales)
     return usuarios_finales
@@ -88,6 +101,7 @@ def guardar_nueva_entrada_lista(tipo, valor):
         if tipo == "unidades": st.session_state.lista_unidades = datos["unidades"]
         if tipo == "reasignados": st.session_state.lista_reasignados = datos["reasignados"]
 
+# CARGA INICIAL
 config_sistema = cargar_json(CONFIG_FILE, {"pass_universal": "DINIC2026", "pass_th": "THDINIC123", "base_historica": 1258, "consultas_ia_global": 0})
 db_usuarios = inicializar_usuarios_seguros()
 db_contratos = cargar_json(CONTRATOS_FILE, {})
@@ -98,7 +112,7 @@ db_listas = cargar_listas_desplegables()
 if 'lista_unidades' not in st.session_state: st.session_state.lista_unidades = db_listas["unidades"]
 if 'lista_reasignados' not in st.session_state: st.session_state.lista_reasignados = db_listas["reasignados"]
 
-# --- 3. FUNCIONES AUXILIARES ---
+# --- 3. FUNCIONES ---
 def get_hora_ecuador(): return datetime.now(timezone(timedelta(hours=-5)))
 
 def registrar_accion(usuario, accion, detalle=""):
@@ -133,21 +147,25 @@ def get_ultima_accion_usuario(nombre_usuario):
     if not isinstance(db_logs, list): return "---"
     for log in db_logs:
         if log.get('usuario') == nombre_usuario:
-            return f"{log.get('accion')} ({log.get('fecha','').split(' ')[1]})"
+            fecha = log.get('fecha', '').split(' ')
+            hora = fecha[1] if len(fecha) > 1 else ""
+            return f"{log.get('accion')} ({hora})"
     return "---"
 
 def get_img_as_base64(file_path):
     try:
-        with open(file_path, "rb") as f: return base64.b64encode(f.read()).decode()
+        with open(file_path, "rb") as f: data = f.read()
+        return base64.b64encode(data).decode()
     except: return ""
 
 def get_logo_html(width="120px"):
     img_path = "Captura.JPG"
-    b64 = get_img_as_base64(img_path)
-    if b64: return f'<img src="data:image/jpeg;base64,{b64}" style="width:{width}; margin-bottom:15px;">'
+    if os.path.exists(img_path):
+        b64 = get_img_as_base64(img_path)
+        return f'<img src="data:image/jpeg;base64,{b64}" style="width:{width}; margin-bottom:15px;">'
     return f'<img src="https://upload.wikimedia.org/wikipedia/commons/2/25/Escudo_Policia_Nacional_del_Ecuador.png" style="width:{width}; margin-bottom:15px;">'
 
-# --- 4. EXTRACCIÓN Y LIMPIEZA ---
+# --- FUNCIÓN DE LIMPIEZA DE CÓDIGO ---
 def extract_json_safe(text):
     try: return json.loads(text)
     except:
@@ -162,8 +180,12 @@ def extract_json_safe(text):
 
 def limpiar_codigo_prioridad(texto):
     if not texto: return ""
+    # REGEX AMPLIADO
     match = re.search(r"(PN-[\w\-\(\)\.]+)", str(texto).upper())
-    if match: return match.group(1).strip()
+    if match: 
+        codigo = match.group(1).strip()
+        codigo = re.sub(r'-(OF|M|MEM|OFICIO|MEMORANDO)$', '', codigo)
+        return codigo
     match2 = re.search(r"(?:OFICIO|MEMORANDO).*?(PN-.*)", str(texto), re.IGNORECASE)
     if match2: return match2.group(1).strip().upper()
     return str(texto).strip()
@@ -184,111 +206,10 @@ def determinar_sale_no_sale(destinos_str):
         if u in destinos_upper: return "SI"
     return "NO"
 
-# --- 5. LOGICA MATRIZ BLINDADA V42 ---
-def generar_fila_matriz(tipo, ia_data, manual_data, usuario_turno, paths_files):
-    # DATOS IA
-    raw_code_in = ia_data.get("recibido_codigo", "")
-    cod_in = limpiar_codigo_prioridad(raw_code_in)
-    unidad_f7 = extraer_unidad_f7(cod_in)
-    
-    # Destinatarios de respuesta (Campo O7 para Normal/Generado)
-    dest_out = ia_data.get("respuesta_destinatarios", "")
-    
-    raw_code_out = ia_data.get("respuesta_codigo", "")
-    cod_out = limpiar_codigo_prioridad(raw_code_out)
-    
-    fecha_in = ia_data.get("recibido_fecha", "")
-    fecha_out = ia_data.get("respuesta_fecha", "")
+# DEFINICIÓN GLOBAL SEGURA
+sistema_activo = False
 
-    # ESTADO (S7)
-    estado_s7 = "PENDIENTE"
-    has_in = True if (paths_files.get("in") or manual_data.get("G")) else False
-    has_out = True if (paths_files.get("out") or manual_data.get("P")) else False
-    if tipo in ["CONOCIMIENTO", "REASIGNADO", "GENERADO DESDE DESPACHO"]: estado_s7 = "FINALIZADO"
-    elif has_in and has_out: estado_s7 = "FINALIZADO"
-
-    str_unidades = manual_data.get("unidades_str", "")
-    es_interno = determinar_sale_no_sale(str_unidades)
-    if tipo == "CONOCIMIENTO": es_interno = "NO"
-
-    # ROW BASE
-    row = {
-        "C": fecha_in, "D": ia_data.get("recibido_remitente_nombre", ""),
-        "E": ia_data.get("recibido_remitente_cargo", ""), "F": unidad_f7,
-        "G": cod_in, "H": fecha_in, "I": ia_data.get("recibido_asunto", ""),
-        "J": ia_data.get("recibido_resumen", ""), "K": usuario_turno,
-        "L": "", "M": str_unidades, "N": manual_data.get("tipo_doc_salida", ""),
-        "O": "", "P": "", "Q": "", "R": "", "S": estado_s7,
-        "T": es_interno, "U": "", "V": "", "W": "", "X": "", "Y": "", "Z": ""
-    }
-
-    # REGLAS ESTRICTAS DEL DOCUMENTO
-    if tipo == "TRAMITE NORMAL":
-        row["L"] = ""
-        row["O"] = dest_out # Destinatarios del Doc Respuesta
-        row["P"] = cod_out  # Codigo Doc Respuesta
-        row["Q"] = fecha_out
-        row["U"] = str_unidades
-        row["V"] = cod_out
-        row["W"] = fecha_out
-        row["X"] = fecha_out
-
-    elif tipo == "REASIGNADO":
-        row["L"] = "REASIGNADO"
-        # O7: MANUAL (NO IA)
-        row["O"] = manual_data.get("reasignado_a", "")
-        # P7, V7: VACIAS
-        row["P"] = ""; row["V"] = ""
-        # Fechas salida = entrada
-        row["Q"] = fecha_in; row["W"] = fecha_in; row["X"] = fecha_in
-        # U7 = M7
-        row["U"] = str_unidades
-
-    elif tipo == "GENERADO DESDE DESPACHO":
-        row["L"] = "GENERADO DESDE DESPACHO"
-        # D7, E7 VACIAS
-        row["D"] = ""; row["E"] = ""
-        # Datos entrada = Datos salida
-        f_gen = fecha_out if fecha_out else fecha_in
-        c_gen = cod_out if cod_out else cod_in
-        row["C"] = f_gen; row["H"] = f_gen; row["Q"] = f_gen; row["W"] = f_gen; row["X"] = f_gen
-        row["G"] = c_gen; row["P"] = c_gen; row["V"] = c_gen
-        row["F"] = extraer_unidad_f7(c_gen)
-        # O7 = Destinatarios del Doc Generado
-        row["O"] = dest_out
-        row["U"] = str_unidades
-
-    elif tipo == "CONOCIMIENTO":
-        row["L"] = "CONOCIMIENTO"
-        # M, O, P, U, V VACIAS
-        row["M"] = ""; row["O"] = ""; row["P"] = ""; row["U"] = ""; row["V"] = ""
-        row["T"] = "NO"
-        # Fechas salida = entrada
-        row["Q"] = fecha_in; row["W"] = fecha_in; row["X"] = fecha_in
-
-    # Limpieza PENDIENTES
-    if row["S"] == "PENDIENTE":
-        for k in ["O", "P", "Q", "V", "W", "X"]: row[k] = ""
-
-    return row
-
-# --- ESTILOS ---
-st.markdown("""
-    <style>
-    .main-header { background-color: #0E2F44; padding: 20px; border-radius: 10px; color: white; text-align: center; margin-bottom: 20px; border-bottom: 4px solid #D4AF37; }
-    .main-header h1 { margin: 0; font-size: 2.5rem; font-weight: 800; }
-    .main-header h3 { margin: 5px 0 0 0; font-size: 1.2rem; font-style: italic; color: #e0e0e0; }
-    .metric-card { background-color: #f8f9fa !important; border-radius: 10px; padding: 15px; text-align: center; border: 1px solid #dee2e6; }
-    .metric-card h3 { color: #0E2F44 !important; font-size: 2rem; margin: 0; font-weight: 800; }
-    .metric-card p { color: #555555 !important; font-size: 1rem; margin: 0; font-weight: 600; }
-    .login-container { max-width: 400px; margin: auto; padding: 40px; background-color: #ffffff; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); text-align: center; border-top: 5px solid #0E2F44; }
-    .legal-warning { background-color: #fff3cd; border-left: 6px solid #ffc107; padding: 15px; color: #856404; font-weight: bold; margin-bottom: 15px; }
-    div.stButton > button { width: 100%; font-weight: bold; border-radius: 5px; }
-    .admin-badge { background-color: #dc3545; color: white; padding: 10px; border-radius: 5px; text-align: center; font-weight: bold; margin-bottom: 10px; border: 2px solid #b02a37; }
-    </style>
-""", unsafe_allow_html=True)
-
-# --- 6. VARIABLES SESION ---
+# --- 4. VARIABLES DE SESIÓN ---
 if 'logged_in' not in st.session_state: st.session_state.logged_in = False
 if 'user_role' not in st.session_state: st.session_state.user_role = "" 
 if 'usuario_turno' not in st.session_state: st.session_state.usuario_turno = "" 
@@ -301,7 +222,7 @@ if 'genai_model' not in st.session_state: st.session_state.genai_model = None
 if 'active_module' not in st.session_state: st.session_state.active_module = 'secretario'
 if 'th_unlocked' not in st.session_state: st.session_state.th_unlocked = False
 
-# --- 7. CONFIG IA ---
+# --- 5. CONFIGURACIÓN IA ---
 try:
     api_key = st.secrets.get("GEMINI_API_KEY")
     if api_key:
@@ -315,15 +236,145 @@ try:
             except: pass
             st.session_state.genai_model = genai.GenerativeModel(model_name)
         sistema_activo = True
-    else: sistema_activo = False
 except: sistema_activo = False
 
 def invocar_ia_segura(content):
     if not st.session_state.genai_model: raise Exception("IA no configurada")
-    for i in range(3):
+    max_retries = 3
+    for i in range(max_retries):
         try: return st.session_state.genai_model.generate_content(content)
-        except Exception as e: time.sleep(1)
+        except Exception as e:
+            if "429" in str(e): time.sleep(2); continue
+            else: raise e
     raise Exception("Sistema saturado.")
+
+def preservar_bordes(cell, fill_obj):
+    """Aplica formato a la celda sin alterar dimensiones"""
+    from copy import copy
+    from openpyxl.styles import Side, Border, Alignment
+    
+    # Copiar borde existente si hay, sino crear uno fino
+    if cell.border and (cell.border.left.style or cell.border.top.style):
+        new_border = copy(cell.border)
+    else:
+        thin = Side(border_style="thin", color="000000")
+        new_border = Border(top=thin, left=thin, right=thin, bottom=thin)
+    
+    cell.border = new_border
+    cell.fill = fill_obj
+    # Alineacion centrada pero SIN ajuste de texto para no romper filas
+    cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=False)
+
+def generar_html_contrato(datos_usuario, img_b64):
+    fecha_hora = get_hora_ecuador().strftime("%Y-%m-%d %H:%M:%S")
+    logo_b64 = ""
+    if os.path.exists("Captura.JPG"):
+        logo_b64 = get_img_as_base64("Captura.JPG")
+    logo_html_tag = f'<img src="data:image/jpeg;base64,{logo_b64}" style="width:100px; display:block; margin: 0 auto;">' if logo_b64 else ""
+    grado = datos_usuario.get('grado', 'N/A')
+    nombre = datos_usuario.get('nombre', 'Usuario Desconocido')
+
+    html = f"""
+    <div style="font-family: Arial, sans-serif; padding: 40px; border: 2px solid #000; max-width: 800px; margin: auto;">
+        <div style="text-align: center;">{logo_html_tag}<h2>ACTA DE COMPROMISO Y CONFIDENCIALIDAD<br>USO DEL ASESOR INTELIGENTE SIGD-DINIC</h2></div>
+        <br><p><strong>Usuario:</strong> {grado} {nombre}</p>
+        <p><strong>Cédula:</strong> {st.session_state.user_id}</p><p><strong>Fecha:</strong> {fecha_hora}</p><hr>
+        <h3>TÉRMINOS Y CONDICIONES</h3>
+        <p>Yo, el servidor policial arriba identificado, declaro haber leído, entendido y aceptado las siguientes políticas:</p>
+        <ol>
+            <li><strong>Naturaleza de Apoyo:</strong> El Asesor Estratégico es una herramienta de Inteligencia Artificial generativa diseñada exclusivamente como apoyo técnico y de consulta. No sustituye el criterio, mando ni decisión del servidor policial.</li>
+            <li><strong>Carácter Referencial:</strong> Todo contenido, análisis, extracto o redacción generado por este sistema es estrictamente referencial y tentativo. No constituye un documento oficial ni una orden vinculante hasta que sea revisado y firmado por la autoridad competente.</li>
+            <li><strong>Responsabilidad Humana:</strong> El Oficial de Turno o usuario asume la responsabilidad total y exclusiva de verificar, corregir y validar la información antes de plasmarla en sistemas oficiales (Quipux, Partes Web, etc.).</li>
+            <li><strong>Verificación Normativa:</strong> Es obligación del usuario contrastar las sugerencias de la IA con la normativa legal vigente (COIP, COESCOP, Reglamentos) para evitar errores jurídicos o de procedimiento.</li>
+            <li><strong>Prohibición de Datos Sensibles:</strong> Queda estrictamente prohibido ingresar nombres de fuentes humanas, datos de víctimas protegidas o información clasificada como "SECRETA" que ponga en riesgo operaciones en curso.</li>
+            <li><strong>No Vinculante:</strong> Las recomendaciones tácticas (diagnósticos) emitidas por el sistema no tienen validez legal ni administrativa por sí mismas y no eximen de responsabilidad al usuario por acciones tomadas basándose en ellas.</li>
+            <li><strong>Posibilidad de Error:</strong> El usuario reconoce que la IA puede incurrir en "alucinaciones" (datos inexactos) y se compromete a realizar el control de calidad de cada párrafo generado.</li>
+            <li><strong>Trazabilidad de Uso:</strong> El sistema registra la identidad, fecha y hora del acceso para fines de auditoría y control de gestión de la DINIC.</li>
+            <li><strong>Uso Ético:</strong> La herramienta debe utilizarse estrictamente para fines institucionales. Cualquier uso para fines personales o ajenos al servicio será sancionado disciplinariamente.</li>
+            <li><strong>Aceptación de Riesgo:</strong> Al ingresar, el usuario declara entender estas limitaciones y libera a la administración del sistema de cualquier responsabilidad por el mal uso de la información generada.</li>
+        </ol>
+        <div style="border: 1px dashed #333; padding: 15px; width: fit-content; margin-left: auto;">
+            <p style="text-align: center; font-size: 12px;"><strong>EVIDENCIA BIOMÉTRICA</strong></p>
+            <img src="data:image/png;base64,{img_b64}" style="width: 150px; border: 1px solid #ccc;">
+            <p style="font-size: 10px; text-align: center;">{fecha_hora}</p>
+        </div>
+    </div>
+    """
+    return html
+
+# --- GENERADOR DE FILA MATRIZ BLINDADO v43 ---
+def generar_fila_matriz(tipo, ia_data, manual_data, usuario_turno, paths_files):
+    raw_code_in = ia_data.get("recibido_codigo", "")
+    cod_in = limpiar_codigo_prioridad(raw_code_in)
+    unidad_f7 = extraer_unidad_f7(cod_in)
+    
+    dest_out = ia_data.get("respuesta_destinatarios", "")
+    
+    raw_code_out = ia_data.get("respuesta_codigo", "")
+    cod_out = limpiar_codigo_prioridad(raw_code_out)
+    
+    fecha_in = ia_data.get("recibido_fecha", "")
+    fecha_out = ia_data.get("respuesta_fecha", "")
+
+    estado_s7 = "PENDIENTE"
+    has_in = True if (paths_files.get("in") or manual_data.get("G")) else False
+    has_out = True if (paths_files.get("out") or manual_data.get("P")) else False
+    if tipo in ["CONOCIMIENTO", "REASIGNADO", "GENERADO DESDE DESPACHO"]: estado_s7 = "FINALIZADO"
+    elif has_in and has_out: estado_s7 = "FINALIZADO"
+
+    str_unidades = manual_data.get("unidades_str", "")
+    es_interno = determinar_sale_no_sale(str_unidades)
+    if tipo == "CONOCIMIENTO": es_interno = "NO"
+
+    row = {
+        "C": fecha_in, "D": ia_data.get("recibido_remitente_nombre", ""),
+        "E": ia_data.get("recibido_remitente_cargo", ""), "F": unidad_f7,
+        "G": cod_in, "H": fecha_in, "I": ia_data.get("recibido_asunto", ""),
+        "J": ia_data.get("recibido_resumen", ""), "K": usuario_turno,
+        "L": "", "M": str_unidades, "N": manual_data.get("tipo_doc_salida", ""),
+        "O": "", "P": "", "Q": "", "R": "", "S": estado_s7,
+        "T": es_interno, "U": "", "V": "", "W": "", "X": "", "Y": "", "Z": ""
+    }
+
+    if tipo == "TRAMITE NORMAL":
+        row["L"] = ""
+        row["O"] = dest_out 
+        row["P"] = cod_out  
+        row["Q"] = fecha_out
+        row["U"] = str_unidades
+        row["V"] = cod_out
+        row["W"] = fecha_out
+        row["X"] = fecha_out
+
+    elif tipo == "REASIGNADO":
+        row["L"] = "REASIGNADO"
+        row["O"] = manual_data.get("reasignado_a", "")
+        row["P"] = "" 
+        row["V"] = ""
+        row["Q"] = fecha_in; row["W"] = fecha_in; row["X"] = fecha_in
+        row["U"] = str_unidades
+
+    elif tipo == "GENERADO DESDE DESPACHO":
+        row["L"] = "GENERADO DESDE DESPACHO"
+        row["D"] = ""; row["E"] = ""
+        f_gen = fecha_out if fecha_out else fecha_in
+        c_gen = cod_out if cod_out else cod_in
+        row["C"] = f_gen; row["H"] = f_gen; row["Q"] = f_gen; row["W"] = f_gen; row["X"] = f_gen
+        row["G"] = c_gen; row["P"] = c_gen; row["V"] = c_gen
+        row["F"] = extraer_unidad_f7(c_gen)
+        row["O"] = dest_out
+        row["U"] = str_unidades
+
+    elif tipo == "CONOCIMIENTO":
+        row["L"] = "CONOCIMIENTO"
+        row["M"] = ""; row["O"] = ""; row["P"] = ""; row["U"] = ""; row["V"] = ""
+        row["T"] = "NO"
+        row["Q"] = fecha_in; row["W"] = fecha_in; row["X"] = fecha_in
+
+    if row["S"] == "PENDIENTE":
+        for k in ["O", "P", "Q", "V", "W", "X"]: row[k] = ""
+
+    return row
 
 def get_generador_policial_html():
     return """<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Generador</title><script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script><style>body{font-family:'Segoe UI',sans-serif;background:#1e1e1e;margin:0;display:flex;height:100vh;overflow:hidden;color:#eee}.sidebar{width:350px;background:#252526;display:flex;flex-direction:column;border-right:1px solid #333;padding:10px;overflow-y:auto}.group{margin-bottom:15px;background:#333;padding:10px;border-radius:4px}input,select,textarea{width:100%;padding:6px;background:#1e1e1e;border:1px solid #555;color:white;border-radius:3px}.preview-wrapper{flex:1;background:#525659;display:flex;justify-content:center;padding:20px;overflow-y:auto}#hoja-a4{background:white;width:210mm;min-height:296mm;padding:20mm;color:black;font-family:'Arial',sans-serif}.btn-main{width:100%;padding:10px;border:none;border-radius:4px;cursor:pointer;font-weight:bold;color:white;background:#00509e}</style></head><body><div class="sidebar"><h3>Generador Policial</h3><div class="group"><label>Tipo</label><select id="docType" onchange="u()"><option>MEMORANDO</option><option>OFICIO</option></select><label>Num</label><input type="text" id="inpNum" value="PN-DINIC-2026-001" oninput="u()"><label>Fecha</label><input type="text" id="inpFecha" oninput="u()"><label>Asunto</label><input type="text" id="inpAs" value="ASUNTO" oninput="u()"></div><div class="group"><label>Cuerpo</label><div id="editor" contenteditable="true" style="min-height:100px;border:1px solid #555" oninput="u()">Texto...</div></div><div class="group"><label>Firma</label><input type="text" id="inpNom" value="NOMBRE" oninput="u()"><label>Cargo</label><input type="text" id="inpCar" value="CARGO" oninput="u()"></div><button class="btn-main" onclick="p()">PDF</button></div><div class="preview-wrapper"><div id="hoja-a4"><div style="text-align:right"><b><span id="vNum"></span></b><br><span id="vFec"></span></div><br><b>PARA: [DEST]<br>ASUNTO: <span id="vAs"></span></b><br><br><div id="vBody" style="text-align:justify"></div><br><br><br><b><span id="vNom"></span><br><span id="vCar"></span></b></div></div><script>function u(){document.getElementById('vNum').innerText=document.getElementById('inpNum').value;document.getElementById('vFec').innerText=document.getElementById('inpFecha').value;document.getElementById('vAs').innerText=document.getElementById('inpAs').value;document.getElementById('vBody').innerHTML=document.getElementById('editor').innerHTML;document.getElementById('vNom').innerText=document.getElementById('inpNom').value;document.getElementById('vCar').innerText=document.getElementById('inpCar').value}function p(){html2pdf().from(document.getElementById('hoja-a4')).save()}u();</script></body></html>"""
@@ -426,7 +477,7 @@ else:
             with col1:
                 v_tipo = reg_edit['L'] if (is_edit and reg_edit['L']) else "TRAMITE NORMAL"
                 if not v_tipo: v_tipo = "TRAMITE NORMAL"
-                tipo_proceso = st.selectbox("Tipo Gestión:", ["TRAMITE NORMAL", "REASIGNADO", "GENERADO DESDE DESPACHO", "CONOCIMIENTO"], index=["TRAMITE NORMAL", "REASIGNADO", "GENERADO DESDE DESPACHO", "CONOCIMIENTO"].index(v_tipo))
+                tipo_proc = st.selectbox("Tipo Gestión:", ["TRAMITE NORMAL", "REASIGNADO", "GENERADO DESDE DESPACHO", "CONOCIMIENTO"], index=["TRAMITE NORMAL", "REASIGNADO", "GENERADO DESDE DESPACHO", "CONOCIMIENTO"].index(v_tipo))
                 v_sal = reg_edit['N'] if (is_edit and reg_edit['N']) else "QUIPUX ELECTRONICO"
                 tipo_doc = st.selectbox("Formato Salida:", ["QUIPUX ELECTRONICO", "DOCPOL ELECTRONICO", "FISICO", "DIGITAL", "OTRO"], index=["QUIPUX ELECTRONICO", "DOCPOL ELECTRONICO", "FISICO", "DIGITAL", "OTRO"].index(v_sal) if v_sal else 0)
                 
@@ -442,7 +493,7 @@ else:
                 str_u = ", ".join(list_u) if not chk_no else ""
                 
                 dest_reasig = ""
-                if tipo_proceso == "REASIGNADO":
+                if tipo_proc == "REASIGNADO":
                     st.markdown("---"); st.markdown("👤 **DESTINATARIO REASIGNADO**")
                     opts_r = ["SELECCIONAR..."] + sorted(st.session_state.lista_reasignados) + ["✍️ NUEVO"]
                     idx_r = opts_r.index(reg_edit["O"]) if (is_edit and reg_edit.get("O") in opts_r) else 0
@@ -453,24 +504,24 @@ else:
 
             with col2:
                 d_in = None; d_out = None
-                if tipo_proceso == "TRAMITE NORMAL":
+                if tipo_proc == "TRAMITE NORMAL":
                     c_in, c_out = st.columns(2)
                     d_in = c_in.file_uploader("1. Doc RECIBIDO", ['pdf'])
                     d_out = c_out.file_uploader("2. Doc RESPUESTA", ['pdf'])
-                elif tipo_proceso in ["REASIGNADO", "CONOCIMIENTO"]:
+                elif tipo_proc in ["REASIGNADO", "CONOCIMIENTO"]:
                     d_in = st.file_uploader("1. Doc RECIBIDO", ['pdf'])
-                elif tipo_proceso == "GENERADO DESDE DESPACHO":
+                elif tipo_proc == "GENERADO DESDE DESPACHO":
                     d_out = st.file_uploader("2. Doc GENERADO", ['pdf'])
 
             if st.button("🔄 ACTUALIZAR" if is_edit else "➕ AGREGAR", type="primary"):
                 if not os.path.exists("matriz_maestra.xlsx"): st.error("❌ Falta Matriz.")
                 else:
                     process = False
-                    if tipo_proceso == "TRAMITE NORMAL": process = True if (is_edit or d_in or d_out) else False
+                    if tipo_proc == "TRAMITE NORMAL": process = True if (is_edit or d_in or d_out) else False
                     elif d_in or d_out: process = True
                     
                     if process:
-                        with st.spinner("⏳ PROCESANDO..."):
+                        with st.spinner(f"⏳ PROCESANDO... {frases_curiosas()}"):
                             try:
                                 paths = {"in":None, "out":None}
                                 if d_in:
@@ -482,23 +533,24 @@ else:
                                 if paths["in"]: files_ia.append(genai.upload_file(paths["in"], display_name="In"))
                                 if paths["out"]: files_ia.append(genai.upload_file(paths["out"], display_name="Out"))
                                 
-                                # PROMPT V42 - O7 FIX
                                 prompt = """
                                 Eres experto en gestión documental policial. Analiza y extrae JSON ESTRICTO.
                                 
-                                1. CÓDIGO (CRÍTICO): Busca en la esquina superior DERECHA (encabezado). Formato "Oficio Nro. PN-..." o "Memorando...".
+                                1. CÓDIGO (CRÍTICO): Busca en la esquina superior DERECHA (encabezado). Formato "Oficio Nro. PN-..." o "Memorando...". Extrae TODO el código.
                                 
                                 2. DESTINATARIOS (Campo O7):
-                                   - UBICACIÓN CLAVE: Busca "PARA:" en la parte SUPERIOR del documento.
+                                   - UBICACIÓN CLAVE: Busca la sección "PARA:" en la parte SUPERIOR del documento.
                                    - INSTRUCCIÓN: Extrae NOMBRES y GRADOS de esa sección.
                                    - ¡PROHIBIDO!: NO mires la parte inferior (firma/atentamente). NO extraigas Cargos.
                                 
-                                3. REMITENTE: Quien firma al final.
+                                3. REMITENTE (Campo D7):
+                                   - Busca "DE:" en la cabecera O la firma al final. Extrae GRADO y NOMBRE.
+                                   - ¡OJO!: En documentos REASIGNADOS, el remitente es quien ENVIA el documento original, NO quien lo reasigna.
 
                                 JSON:
                                 {
                                     "recibido_fecha": "DD/MM/AAAA",
-                                    "recibido_remitente_nombre": "Texto",
+                                    "recibido_remitente_nombre": "Texto (Grado y Nombre)",
                                     "recibido_remitente_cargo": "Texto",
                                     "recibido_codigo": "Texto",
                                     "recibido_asunto": "Texto",
@@ -508,7 +560,6 @@ else:
                                     "respuesta_fecha": "DD/MM/AAAA"
                                 }
                                 """
-                                
                                 data_ia = {}
                                 if files_ia:
                                     res = invocar_ia_segura([prompt, *files_ia])
@@ -517,7 +568,7 @@ else:
                                 
                                 final_d = reg_edit.copy() if is_edit else {}
                                 man_data = {"unidades_str": str_u, "tipo_doc_salida": tipo_doc, "reasignado_a": dest_reasig, "G": final_d.get("G",""), "P": final_d.get("P","")}
-                                row = generar_fila_matriz(tipo_proceso, data_ia, man_data, st.session_state.usuario_turno, paths)
+                                row = generar_fila_matriz(tipo_proc, data_ia, man_data, st.session_state.usuario_turno, paths)
                                 
                                 if in_ot: guardar_nueva_entrada_lista("unidades", in_ot)
                                 if dest_reasig: guardar_nueva_entrada_lista("reasignados", dest_reasig)
