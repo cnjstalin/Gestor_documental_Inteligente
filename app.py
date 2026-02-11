@@ -16,7 +16,7 @@ from openpyxl.styles import PatternFill, Border, Side, Alignment
 from datetime import datetime, timedelta, timezone
 
 # --- 1. CONFIGURACIÓN Y ESTILOS ---
-VER_SISTEMA = "v40.0"
+VER_SISTEMA = "v41.0"
 ADMIN_USER = "1723623011"
 ADMIN_PASS_MASTER = "9994915010022"
 
@@ -224,276 +224,25 @@ def preservar_bordes(cell, fill_obj):
         thin = Side(border_style="thin", color="000000")
         cell.border = Border(top=thin, left=thin, right=thin, bottom=thin)
 
-def generar_html_contrato(datos_usuario, img_b64):
-    fecha_hora = get_hora_ecuador().strftime("%Y-%m-%d %H:%M:%S")
-    logo_b64 = ""
-    if os.path.exists("Captura.JPG"):
-        logo_b64 = get_img_as_base64("Captura.JPG")
-    logo_html_tag = f'<img src="data:image/jpeg;base64,{logo_b64}" style="width:100px; display:block; margin: 0 auto;">' if logo_b64 else ""
-    grado = datos_usuario.get('grado', 'N/A')
-    nombre = datos_usuario.get('nombre', 'Usuario Desconocido')
-
-    html = f"""
-    <div style="font-family: Arial, sans-serif; padding: 40px; border: 2px solid #000; max-width: 800px; margin: auto;">
-        <div style="text-align: center;">{logo_html_tag}<h2>ACTA DE COMPROMISO Y CONFIDENCIALIDAD<br>USO DEL ASESOR INTELIGENTE SIGD-DINIC</h2></div>
-        <br><p><strong>Usuario:</strong> {grado} {nombre}</p>
-        <p><strong>Cédula:</strong> {st.session_state.user_id}</p><p><strong>Fecha:</strong> {fecha_hora}</p><hr>
-        <h3>TÉRMINOS Y CONDICIONES</h3>
-        <p>Yo, el servidor policial arriba identificado, declaro haber leído, entendido y aceptado las siguientes políticas:</p>
-        <ol>
-            <li><strong>Naturaleza de Apoyo:</strong> El Asesor Estratégico es una herramienta de Inteligencia Artificial generativa diseñada exclusivamente como apoyo técnico y de consulta. No sustituye el criterio, mando ni decisión del servidor policial.</li>
-            <li><strong>Carácter Referencial:</strong> Todo contenido, análisis, extracto o redacción generado por este sistema es estrictamente referencial y tentativo. No constituye un documento oficial ni una orden vinculante hasta que sea revisado y firmado por la autoridad competente.</li>
-            <li><strong>Responsabilidad Humana:</strong> El Oficial de Turno o usuario asume la responsabilidad total y exclusiva de verificar, corregir y validar la información antes de plasmarla en sistemas oficiales (Quipux, Partes Web, etc.).</li>
-            <li><strong>Verificación Normativa:</strong> Es obligación del usuario contrastar las sugerencias de la IA con la normativa legal vigente (COIP, COESCOP, Reglamentos) para evitar errores jurídicos o de procedimiento.</li>
-            <li><strong>Prohibición de Datos Sensibles:</strong> Queda estrictamente prohibido ingresar nombres de fuentes humanas, datos de víctimas protegidas o información clasificada como "SECRETA" que ponga en riesgo operaciones en curso.</li>
-            <li><strong>No Vinculante:</strong> Las recomendaciones tácticas (diagnósticos) emitidas por el sistema no tienen validez legal ni administrativa por sí mismas y no eximen de responsabilidad al usuario por acciones tomadas basándose en ellas.</li>
-            <li><strong>Posibilidad de Error:</strong> El usuario reconoce que la IA puede incurrir en "alucinaciones" (datos inexactos) y se compromete a realizar el control de calidad de cada párrafo generado.</li>
-            <li><strong>Trazabilidad de Uso:</strong> El sistema registra la identidad, fecha y hora del acceso para fines de auditoría y control de gestión de la DINIC.</li>
-            <li><strong>Uso Ético:</strong> La herramienta debe utilizarse estrictamente para fines institucionales. Cualquier uso para fines personales o ajenos al servicio será sancionado disciplinariamente.</li>
-            <li><strong>Aceptación de Riesgo:</strong> Al ingresar, el usuario declara entender estas limitaciones y libera a la administración del sistema de cualquier responsabilidad por el mal uso de la información generada.</li>
-        </ol>
-        <div style="border: 1px dashed #333; padding: 15px; width: fit-content; margin-left: auto;">
-            <p style="text-align: center; font-size: 12px;"><strong>EVIDENCIA BIOMÉTRICA</strong></p>
-            <img src="data:image/png;base64,{img_b64}" style="width: 150px; border: 1px solid #ccc;">
-            <p style="font-size: 10px; text-align: center;">{fecha_hora}</p>
-        </div>
-    </div>
-    """
-    return html
-
-# --- CODIGO DEL GENERADOR POLICIAL (HTML) ---
-def get_generador_policial_html():
-    return """
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <title>Generador Policial</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
-    <style>
-        body { font-family: 'Segoe UI', sans-serif; background: #1e1e1e; margin: 0; display: flex; height: 100vh; overflow: hidden; color: #eee; }
-        .sidebar { width: 350px; background: #252526; display: flex; flex-direction: column; border-right: 1px solid #333; z-index: 100; box-shadow: 2px 0 10px rgba(0,0,0,0.5); padding: 10px; overflow-y: auto; }
-        .header-app { background: linear-gradient(90deg, #003366, #00509e); padding: 10px; text-align: center; border-bottom: 2px solid #00acc1; margin-bottom: 10px; border-radius: 5px; }
-        .header-app h2 { margin: 0; font-size: 14px; color: white; text-transform: uppercase; letter-spacing: 1px; }
-        .group { margin-bottom: 15px; background: #333; padding: 10px; border-radius: 4px; border: 1px solid #444; }
-        .group-title { font-size: 11px; color: #00acc1; font-weight: bold; text-transform: uppercase; margin-bottom: 8px; border-bottom: 1px solid #444; padding-bottom: 4px; }
-        label { display: block; font-size: 11px; margin-bottom: 3px; color: #ccc; }
-        input, select, textarea { width: 100%; padding: 6px; background: #1e1e1e; border: 1px solid #555; color: white; border-radius: 3px; font-size: 12px; box-sizing: border-box; }
-        .preview-wrapper { flex: 1; background: #525659; display: flex; justify-content: center; padding: 20px; overflow-y: auto; }
-        #hoja-a4 { background: white; width: 210mm; min-height: 296mm; padding: 20mm; box-shadow: 0 0 15px rgba(0,0,0,0.5); color: black; font-family: 'Arial', sans-serif; display: flex; flex-direction: column; box-sizing: border-box; }
-        .meta-data { text-align: right; font-weight: bold; font-size: 11pt; margin-bottom: 20px; }
-        .body-text { font-size: 12pt; text-align: justify; line-height: 1.5; margin-bottom: 40px; white-space: pre-wrap; }
-        .firma-section { margin-top: auto; }
-        .btn-main { width: 100%; padding: 10px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; color: white; margin-top: 5px; }
-        .btn-blue { background: #00509e; } 
-    </style>
-</head>
-<body>
-    <div class="sidebar">
-        <div class="header-app"><h2>Generador Policial</h2></div>
-        <div class="group">
-            <div class="group-title">Configuración</div>
-            <label>Tipo Documento</label>
-            <select id="docType" onchange="updateView()">
-                <option value="MEMORANDO">MEMORANDO</option>
-                <option value="OFICIO">OFICIO</option>
-            </select>
-            <label>Numeración</label>
-            <input type="text" id="inpNum" value="PN-DINIC-TH-2026-0048-M" oninput="updateView()">
-            <label>Fecha</label>
-            <input type="text" id="inpFecha" oninput="updateView()">
-            <label>Asunto</label>
-            <input type="text" id="inpAsunto" value="ASUNTO DEL DOCUMENTO" oninput="updateView()">
-        </div>
-        <div class="group">
-            <div class="group-title">Contenido</div>
-            <label>Cuerpo del Documento</label>
-            <div id="editor" contenteditable="true" style="min-height:100px; background:#1e1e1e; border:1px solid #555; padding:5px; font-size:12px;" oninput="updateView()">Escriba aquí el contenido...</div>
-        </div>
-        <div class="group">
-            <div class="group-title">Firmas</div>
-            <label>Nombre Firma</label>
-            <input type="text" id="inpFirmaNombre" value="NOMBRE APELLIDO" oninput="updateView()">
-            <label>Cargo</label>
-            <input type="text" id="inpFirmaCargo" value="CARGO POLICIAL" oninput="updateView()">
-        </div>
-        <button class="btn-main btn-blue" onclick="genPDF()">DESCARGAR PDF</button>
-    </div>
-    <div class="preview-wrapper">
-        <div id="hoja-a4">
-            <div class="meta-data">
-                <div id="view-num">Memorando Nro...</div>
-                <div id="view-fecha">Quito...</div>
-            </div>
-            <div style="font-weight:bold; margin-bottom:20px;">
-                <div>PARA: <span id="view-para">[DESTINATARIO]</span></div>
-                <div>ASUNTO: <span id="view-asunto">...</span></div>
-            </div>
-            <div class="body-text" id="view-cuerpo"></div>
-            <div class="firma-section">
-                <p>Atentamente,</p>
-                <p style="font-weight:bold;">DIOS, PATRIA Y LIBERTAD</p>
-                <br><br><br>
-                <div id="view-firma-nombre" style="font-weight:bold;">NOMBRE</div>
-                <div id="view-firma-cargo">CARGO</div>
-            </div>
-        </div>
-    </div>
-    <script>
-        function getAutoDate() {
-            const meses = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
-            const hoy = new Date();
-            return `Quito, ${hoy.getDate()} de ${meses[hoy.getMonth()]} de ${hoy.getFullYear()}`;
-        }
-        document.getElementById('inpFecha').value = getAutoDate();
-        function updateView() {
-            document.getElementById('view-num').innerText = document.getElementById('inpNum').value;
-            document.getElementById('view-fecha').innerText = document.getElementById('inpFecha').value;
-            document.getElementById('view-asunto').innerText = document.getElementById('inpAsunto').value;
-            document.getElementById('view-cuerpo').innerHTML = document.getElementById('editor').innerHTML;
-            document.getElementById('view-firma-nombre').innerText = document.getElementById('inpFirmaNombre').value;
-            document.getElementById('view-firma-cargo').innerText = document.getElementById('inpFirmaCargo').value;
-        }
-        function genPDF() {
-            const element = document.getElementById('hoja-a4');
-            html2pdf().from(element).save('documento_policial.pdf');
-        }
-        updateView();
-    </script>
-</body>
-</html>
-    """
-
-# --- ESTILOS ---
-st.markdown("""
-    <style>
-    .main-header { background-color: #0E2F44; padding: 20px; border-radius: 10px; color: white; text-align: center; margin-bottom: 20px; border-bottom: 4px solid #D4AF37; }
-    .main-header h1 { margin: 0; font-size: 2.5rem; font-weight: 800; }
-    .main-header h3 { margin: 5px 0 0 0; font-size: 1.2rem; font-style: italic; color: #e0e0e0; }
-    .metric-card { background-color: #f8f9fa !important; border-radius: 10px; padding: 15px; text-align: center; border: 1px solid #dee2e6; }
-    .metric-card h3 { color: #0E2F44 !important; font-size: 2rem; margin: 0; font-weight: 800; }
-    .metric-card p { color: #555555 !important; font-size: 1rem; margin: 0; font-weight: 600; }
-    .login-container { max-width: 400px; margin: auto; padding: 40px; background-color: #ffffff; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); text-align: center; border-top: 5px solid #0E2F44; }
-    .legal-warning { background-color: #fff3cd; border-left: 6px solid #ffc107; padding: 15px; color: #856404; font-weight: bold; margin-bottom: 15px; }
-    div.stButton > button { width: 100%; font-weight: bold; border-radius: 5px; }
-    .admin-badge { background-color: #dc3545; color: white; padding: 10px; border-radius: 5px; text-align: center; font-weight: bold; margin-bottom: 10px; border: 2px solid #b02a37; }
-    </style>
-""", unsafe_allow_html=True)
-
-# --- 4. VARIABLES DE SESIÓN ---
-if 'logged_in' not in st.session_state: st.session_state.logged_in = False
-if 'user_role' not in st.session_state: st.session_state.user_role = "" 
-if 'usuario_turno' not in st.session_state: st.session_state.usuario_turno = "" 
-if 'user_id' not in st.session_state: st.session_state.user_id = ""
-if 'registros' not in st.session_state: st.session_state.registros = [] 
-if 'edit_index' not in st.session_state: st.session_state.edit_index = None 
-if 'docs_procesados_hoy' not in st.session_state: st.session_state.docs_procesados_hoy = 0
-if 'consultas_ia' not in st.session_state: st.session_state.consultas_ia = 0
-if 'genai_model' not in st.session_state: st.session_state.genai_model = None
-if 'active_module' not in st.session_state: st.session_state.active_module = 'secretario'
-if 'th_unlocked' not in st.session_state: st.session_state.th_unlocked = False
-
-# --- 5. CONFIGURACIÓN IA ---
-try:
-    api_key = st.secrets.get("GEMINI_API_KEY")
-    if api_key:
-        genai.configure(api_key=api_key)
-        if not st.session_state.genai_model:
-            model_name = "gemini-1.5-flash"
-            try:
-                listado = genai.list_models()
-                names = [m.name for m in listado if 'generateContent' in m.supported_generation_methods]
-                if any('flash' in n for n in names): model_name = next(n for n in names if 'flash' in n)
-            except: pass
-            st.session_state.genai_model = genai.GenerativeModel(model_name)
-        sistema_activo = True
-    else: sistema_activo = False
-except: sistema_activo = False
-
-def frases_curiosas():
-    frases = ["¿Sabías que? El primer virus se llamó Creeper.", "¿Sabías que? La seguridad es responsabilidad de todos.", "¿Sabías que? Tu contraseña es tu llave digital.", "¿Sabías que? La IA procesa, tú decides.", "¿Sabías que? Un escritorio limpio mejora la productividad."]
-    return random.choice(frases)
-
-# --- FUNCIÓN DE LIMPIEZA DE CÓDIGO ---
-def extract_json_safe(text):
-    try: return json.loads(text)
-    except:
-        match = re.search(r"(\{.*\}|\[.*\])", text, re.DOTALL)
-        if match:
-            try: 
-                data = json.loads(match.group())
-                if isinstance(data, list) and len(data) > 0: return data[0]
-                elif isinstance(data, dict): return data
-            except: return {}
-        return {}
-
-def limpiar_codigo_prioridad(texto):
-    if not texto: return ""
-    match = re.search(r"(PN-[\w\-\(\)\.]+)", str(texto).upper())
-    if match: 
-        codigo = match.group(1).strip()
-        codigo = re.sub(r'-(OF|M|MEM|OFICIO|MEMORANDO)$', '', codigo)
-        return codigo
-    match2 = re.search(r"(?:OFICIO|MEMORANDO).*?(PN-.*)", str(texto), re.IGNORECASE)
-    if match2: return match2.group(1).strip().upper()
-    return str(texto).strip()
-
-def extraer_unidad_f7(texto_codigo):
-    if not texto_codigo: return "DINIC"
-    match = re.search(r"PN-(.+?)-QX", str(texto_codigo), re.IGNORECASE)
-    if match:
-        unidad = match.group(1).strip().upper()
-        unidad = unidad.replace('(', '').replace(')', '')
-        return unidad
-    return "DINIC"
-
-def determinar_sale_no_sale(destinos_str):
-    unidades_externas = ["UCAP", "UNDECOF", "UDAR", "DIGIN", "DNATH", "COMANDO GENERAL", "OTRAS DIRECCIONES"]
-    destinos_upper = destinos_str.upper()
-    for u in unidades_externas:
-        if u in destinos_upper: return "SI"
-    return "NO"
-
-def invocar_ia_segura(content):
-    if not st.session_state.genai_model: raise Exception("IA no configurada")
-    max_retries = 3
-    for i in range(max_retries):
-        try: return st.session_state.genai_model.generate_content(content)
-        except Exception as e:
-            if "429" in str(e): time.sleep(2); continue
-            else: raise e
-    raise Exception("Sistema saturado.")
-
-def preservar_bordes(cell, fill_obj):
-    original_border = copy(cell.border)
-    cell.fill = fill_obj
-    cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=False)
-    if original_border: cell.border = original_border
-    else:
-        thin = Side(border_style="thin", color="000000")
-        cell.border = Border(top=thin, left=thin, right=thin, bottom=thin)
-
-# --- GENERADOR DE FILA MATRIZ BLINDADO v40 ---
+# --- GENERADOR DE FILA MATRIZ BLINDADO v41 ---
 def generar_fila_matriz(tipo, ia_data, manual_data, usuario_turno, paths_files):
-    # ==========================================
-    # === BLOQUE 1: EXTRACCIÓN COMÚN DE IA ===
-    # ==========================================
-    raw_code_in = ia_data.get("codigo_completo_entrada", "")
-    cod_in = limpiar_codigo_prioridad(raw_code_in)
+    # DATOS DOC RECIBIDO (DOC 1)
+    fecha_in = ia_data.get("recibido_fecha", "")
+    remitente_in = ia_data.get("recibido_remitente_nombre", "")
+    cargo_remitente_in = ia_data.get("recibido_remitente_cargo", "")
+    cod_in_raw = ia_data.get("recibido_codigo", "")
+    cod_in = limpiar_codigo_prioridad(cod_in_raw)
     unidad_f7 = extraer_unidad_f7(cod_in)
+    asunto_in = ia_data.get("recibido_asunto", "")
+    resumen_in = ia_data.get("recibido_resumen", "")
     
-    # Destinatarios (Filtrados)
-    dest_ia = ia_data.get("destinatarios_todos", "")
-    
-    raw_code_out = ia_data.get("codigo_completo_salida", "")
-    cod_out = limpiar_codigo_prioridad(raw_code_out)
-    
-    fecha_ia_in = ia_data.get("fecha_recepcion", "")
-    fecha_ia_out = ia_data.get("fecha_salida", "")
-    
-    # Estado (S7)
+    # DATOS DOC RESPUESTA (DOC 2)
+    dest_out = ia_data.get("respuesta_destinatarios", "")
+    cod_out_raw = ia_data.get("respuesta_codigo", "")
+    cod_out = limpiar_codigo_prioridad(cod_out_raw)
+    fecha_out = ia_data.get("respuesta_fecha", "")
+
+    # ESTADO (S7)
     estado_s7 = "PENDIENTE"
     has_in = True if (paths_files.get("in") or manual_data.get("G")) else False
     has_out = True if (paths_files.get("out") or manual_data.get("P")) else False
@@ -504,86 +253,132 @@ def generar_fila_matriz(tipo, ia_data, manual_data, usuario_turno, paths_files):
     es_interno = determinar_sale_no_sale(str_unidades)
     if tipo == "CONOCIMIENTO": es_interno = "NO"
 
-    # ==========================================
-    # === BLOQUE 2: ESTRUCTURA BASE (DICCIONARIO) ===
-    # ==========================================
+    # ESTRUCTURA BASE
     row = {
-        "C": fecha_ia_in, 
-        "D": ia_data.get("remitente_grado_nombre", ""),
-        "E": ia_data.get("remitente_cargo", ""), 
-        "F": unidad_f7,
-        "G": cod_in, 
-        "H": fecha_ia_in, 
-        "I": ia_data.get("asunto_entrada", ""),
-        "J": ia_data.get("resumen_breve", ""), 
+        "A": "", # Se numera despues
+        "B": "",
+        "C": "", "D": "", "E": "", "F": "", "G": "", "H": "", "I": "", "J": "",
         "K": usuario_turno,
-        "L": "", # Se define abajo
-        "M": str_unidades, 
-        "N": manual_data.get("tipo_doc_salida", ""),
-        "O": dest_ia, # Se define abajo
-        "P": cod_out, 
-        "Q": fecha_ia_out, 
-        "R": "", 
-        "S": estado_s7,
-        "T": es_interno, 
-        "U": str_unidades, 
-        "V": cod_out,
-        "W": fecha_ia_out, 
-        "X": fecha_ia_out,
-        "Y": "", "Z": ""
+        "L": "",
+        "M": "", "N": "", "O": "", "P": "", "Q": "", "R": "", "S": estado_s7,
+        "T": es_interno,
+        "U": "", "V": "", "W": "", "X": "", "Y": "", "Z": ""
     }
 
-    # ==========================================
-    # === BLOQUE 3: LÓGICA POR VARIABLE (ENCAPSULADA) ===
-    # ==========================================
-    
-    # --- VARIABLE 1: TRAMITE NORMAL ---
+    # === APLICACION DE REGLAS SEGUN DOCUMENTO ADJUNTO ===
+
     if tipo == "TRAMITE NORMAL":
-        row["L"] = ""
-        # O7 se llena con el destinatario IA (Prompt ya filtró remitente)
-        row["O"] = dest_ia
+        # ENTRADA
+        row["C"] = fecha_in
+        row["D"] = remitente_in
+        row["E"] = cargo_remitente_in
+        row["F"] = unidad_f7
+        row["G"] = cod_in
+        row["H"] = fecha_in
+        row["I"] = asunto_in
+        row["J"] = resumen_in
+        row["L"] = "" # VACIA
+        
+        # GESTION
+        row["M"] = str_unidades
+        row["N"] = manual_data.get("tipo_doc_salida", "")
+        row["O"] = dest_out # Destinatarios del Doc Respuesta
+        row["P"] = cod_out  # Codigo Doc Respuesta
+        row["Q"] = fecha_out
+        
+        # SALIDA
+        row["U"] = str_unidades
+        row["V"] = cod_out
+        row["W"] = fecha_out
+        row["X"] = fecha_out
 
-    # --- VARIABLE 2: REASIGNADO ---
     elif tipo == "REASIGNADO":
+        # ENTRADA
+        row["C"] = fecha_in
+        row["D"] = remitente_in
+        row["E"] = cargo_remitente_in
+        row["F"] = unidad_f7
+        row["G"] = cod_in
+        row["H"] = fecha_in
+        row["I"] = asunto_in
+        row["J"] = resumen_in
         row["L"] = "REASIGNADO"
-        # P7 y V7: VACIAS (Según instrucción)
-        row["P"] = ""
-        row["V"] = ""
-        # O7: Manual
-        if manual_data.get("reasignado_a"): row["O"] = manual_data.get("reasignado_a")
-        else: row["O"] = ""
-        # Fechas salida = entrada
-        row["Q"] = row["H"]; row["W"] = row["H"]; row["X"] = row["H"]
+        
+        # GESTION
+        row["M"] = str_unidades
+        row["N"] = manual_data.get("tipo_doc_salida", "")
+        # O7: MANUAL (Dato del usuario, no IA)
+        row["O"] = manual_data.get("reasignado_a", "")
+        row["P"] = "" # VACIA
+        row["Q"] = fecha_in # Fecha del doc entrada
+        
+        # SALIDA
+        row["U"] = str_unidades
+        row["V"] = "" # VACIA
+        row["W"] = fecha_in # Fecha del doc entrada
+        row["X"] = fecha_in # Fecha del doc entrada
 
-    # --- VARIABLE 3: GENERADO DESDE DESPACHO ---
     elif tipo == "GENERADO DESDE DESPACHO":
+        # La IA puede haber extraido datos del unico doc cargado (salida)
+        # ENTRADA
+        f_gen = fecha_out if fecha_out else fecha_in
+        c_gen = cod_out if cod_out else cod_in
+        u_gen = extraer_unidad_f7(c_gen)
+        
+        row["C"] = f_gen
+        row["D"] = "" # VACIA
+        row["E"] = "" # VACIA
+        row["F"] = u_gen
+        row["G"] = c_gen
+        row["H"] = f_gen
+        row["I"] = asunto_in # Asunto del generado
+        row["J"] = resumen_in # Resumen del generado
         row["L"] = "GENERADO DESDE DESPACHO"
-        # D7 y E7: VACIAS
-        row["D"] = ""; row["E"] = ""
-        # Fechas mandatorias
-        f_gen = fecha_ia_out if fecha_ia_out else fecha_ia_in
-        row["C"] = f_gen; row["H"] = f_gen; row["Q"] = f_gen; row["W"] = f_gen; row["X"] = f_gen
-        # Código único
-        code_final = cod_out if cod_out else cod_in
-        row["G"] = code_final; row["P"] = code_final; row["V"] = code_final
-        row["F"] = extraer_unidad_f7(code_final)
-        # O7 = Destinatario IA
-        row["O"] = dest_ia
+        
+        # GESTION
+        row["M"] = str_unidades
+        row["N"] = manual_data.get("tipo_doc_salida", "")
+        row["O"] = dest_out # Destinatarios del generado
+        row["P"] = c_gen
+        row["Q"] = f_gen
+        
+        # SALIDA
+        row["U"] = str_unidades
+        row["V"] = c_gen
+        row["W"] = f_gen
+        row["X"] = f_gen
 
-    # --- VARIABLE 4: CONOCIMIENTO ---
     elif tipo == "CONOCIMIENTO":
+        # ENTRADA
+        row["C"] = fecha_in
+        row["D"] = remitente_in
+        row["E"] = cargo_remitente_in
+        row["F"] = unidad_f7
+        row["G"] = cod_in
+        row["H"] = fecha_in
+        row["I"] = asunto_in
+        row["J"] = resumen_in
         row["L"] = "CONOCIMIENTO"
-        # Celdas vacias obligatorias
-        row["M"] = ""; row["O"] = ""; row["P"] = ""; row["U"] = ""; row["V"] = ""
+        
+        # GESTION
+        row["M"] = "" # VACIA
+        row["N"] = manual_data.get("tipo_doc_salida", "")
+        row["O"] = "" # VACIA
+        row["P"] = "" # VACIA
+        row["Q"] = fecha_in
+        
+        # SALIDA
         row["T"] = "NO"
-        # Fechas salida = entrada
-        row["Q"] = row["C"]; row["W"] = row["C"]; row["X"] = row["C"]
-
-    # Limpieza final para PENDIENTES
-    if row["S"] == "PENDIENTE":
-        for k in ["O", "P", "Q", "V", "W", "X"]: row[k] = ""
+        row["U"] = "" # VACIA
+        row["V"] = "" # VACIA
+        row["W"] = fecha_in
+        row["X"] = fecha_in
 
     return row
+
+# --- GENERADOR POLICIAL HTML ---
+def get_generador_policial_html():
+    return """<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Generador</title><script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script><style>body{font-family:'Segoe UI',sans-serif;background:#1e1e1e;margin:0;display:flex;height:100vh;overflow:hidden;color:#eee}.sidebar{width:350px;background:#252526;display:flex;flex-direction:column;border-right:1px solid #333;padding:10px;overflow-y:auto}.group{margin-bottom:15px;background:#333;padding:10px;border-radius:4px}input,select,textarea{width:100%;padding:6px;background:#1e1e1e;border:1px solid #555;color:white;border-radius:3px}.preview-wrapper{flex:1;background:#525659;display:flex;justify-content:center;padding:20px;overflow-y:auto}#hoja-a4{background:white;width:210mm;min-height:296mm;padding:20mm;color:black;font-family:'Arial',sans-serif}.btn-main{width:100%;padding:10px;border:none;border-radius:4px;cursor:pointer;font-weight:bold;color:white;background:#00509e}</style></head><body><div class="sidebar"><h3>Generador Policial</h3><div class="group"><label>Tipo</label><select id="docType" onchange="u()"><option>MEMORANDO</option><option>OFICIO</option></select><label>Num</label><input type="text" id="inpNum" value="PN-DINIC-2026-001" oninput="u()"><label>Fecha</label><input type="text" id="inpFecha" oninput="u()"><label>Asunto</label><input type="text" id="inpAs" value="ASUNTO" oninput="u()"></div><div class="group"><label>Cuerpo</label><div id="editor" contenteditable="true" style="min-height:100px;border:1px solid #555" oninput="u()">Texto...</div></div><div class="group"><label>Firma</label><input type="text" id="inpNom" value="NOMBRE" oninput="u()"><label>Cargo</label><input type="text" id="inpCar" value="CARGO" oninput="u()"></div><button class="btn-main" onclick="p()">PDF</button></div><div class="preview-wrapper"><div id="hoja-a4"><div style="text-align:right"><b><span id="vNum"></span></b><br><span id="vFec"></span></div><br><b>PARA: [DEST]<br>ASUNTO: <span id="vAs"></span></b><br><br><div id="vBody" style="text-align:justify"></div><br><br><br><b><span id="vNom"></span><br><span id="vCar"></span></b></div></div><script>function u(){document.getElementById('vNum').innerText=document.getElementById('inpNum').value;document.getElementById('vFec').innerText=document.getElementById('inpFecha').value;document.getElementById('vAs').innerText=document.getElementById('inpAs').value;document.getElementById('vBody').innerHTML=document.getElementById('editor').innerHTML;document.getElementById('vNom').innerText=document.getElementById('inpNom').value;document.getElementById('vCar').innerText=document.getElementById('inpCar').value}function p(){html2pdf().from(document.getElementById('hoja-a4')).save()}u();</script></body></html>"""
 
 # ==============================================================================
 #  LOGIN
@@ -641,7 +436,6 @@ else:
         st.markdown("---")
         if st.button("🔒 CERRAR SESIÓN"): st.session_state.logged_in = False; st.rerun()
 
-    # SECRETARIO/A
     if st.session_state.active_module == 'secretario':
         st.markdown(f'''<div class="main-header"><h1>SIGD DINIC</h1><h3>Módulo Secretario/a - Gestión Documental</h3></div>''', unsafe_allow_html=True)
         base_h = config_sistema.get("base_historica", 1258)
@@ -740,37 +534,31 @@ else:
                                 if paths["in"]: files_ia.append(genai.upload_file(paths["in"], display_name="In"))
                                 if paths["out"]: files_ia.append(genai.upload_file(paths["out"], display_name="Out"))
                                 
-                                # PROMPT BLINDADO - O7 CORREGIDO
                                 prompt = """
-                                Eres experto en gestión documental policial. Analiza y extrae JSON ESTRICTO.
+                                Eres un asistente policial de gestión documental experto.
+                                Tienes DOS documentos (Entrada y Respuesta) o UNO.
                                 
-                                SI HAY DOCUMENTO DE RESPUESTA (SALIDA):
-                                1. DESTINATARIOS (Campo 'O'):
-                                   - UBICACIÓN CLAVE: Busca la sección "PARA:" o bajo "ASUNTO:" del documento generado.
-                                   - INSTRUCCIÓN: Extrae TODOS los Grados y Nombres.
-                                   - ¡PROHIBIDO!: NO incluyas al firmante (quien dice "Atentamente"). 
-                                   - ¡PROHIBIDO!: NO incluyas cargos (Jefe, Director, etc).
-                                   - IMPORTANTE: Si ves "Atentamente, [Nombre]", ese nombre NO va aquí.
-                                
-                                2. CÓDIGO SALIDA (Campo P): Esquina superior derecha.
-
-                                SI HAY DOCUMENTO DE ENTRADA:
-                                3. CÓDIGO ENTRADA (Campo G): Esquina superior derecha.
-                                4. REMITENTE (Campo D): Quien firma al final.
-
-                                JSON:
+                                TU TAREA PRINCIPAL ES EXTRAER DATOS EN ESTE JSON ESTRICTO:
                                 {
-                                    "fecha_recepcion": "DD/MM/AAAA",
-                                    "remitente_grado_nombre": "Texto",
-                                    "remitente_cargo": "Texto",
-                                    "codigo_completo_entrada": "Texto",
-                                    "asunto_entrada": "Texto",
-                                    "resumen_breve": "Texto",
-                                    "destinatarios_todos": "Texto (Destinatarios Doc Salida, SIN remitente)",
-                                    "codigo_completo_salida": "Texto",
-                                    "fecha_salida": "DD/MM/AAAA"
+                                    "recibido_fecha": "DD/MM/AAAA",
+                                    "recibido_remitente_nombre": "Texto (Nombre y Grado)",
+                                    "recibido_remitente_cargo": "Texto (Cargo)",
+                                    "recibido_codigo": "Texto (Codigo superior derecha del doc entrada)",
+                                    "recibido_asunto": "Texto",
+                                    "recibido_resumen": "Texto",
+                                    "respuesta_destinatarios": "Texto (Nombres y Grados de PARA/DESTINATARIO. ¡NO REMITENTE! ¡NO CARGOS!)",
+                                    "respuesta_codigo": "Texto (Codigo superior derecha del doc respuesta)",
+                                    "respuesta_fecha": "DD/MM/AAAA"
                                 }
+
+                                REGLAS DE ORO:
+                                1. Para 'respuesta_destinatarios' (Celda O7): Busca la palabra "PARA:" o "DESTINATARIO:" en la parte superior del documento de RESPUESTA.
+                                   - Extrae SOLO Grados y Nombres.
+                                   - NUNCA extraigas el nombre de la persona que firma "Atentamente" al final.
+                                   - Si ves "Atentamente", ¡DETENTE! No leas esa parte para este campo.
+                                2. Codigos: Busca siempre arriba a la derecha. Ignora referencias en el texto.
                                 """
+                                
                                 data_ia = {}
                                 if files_ia:
                                     res = invocar_ia_segura([prompt, *files_ia])
