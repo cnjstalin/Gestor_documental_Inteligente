@@ -15,19 +15,14 @@ from openpyxl import load_workbook
 from openpyxl.styles import PatternFill, Border, Side, Alignment
 from datetime import datetime, timedelta, timezone
 
-# --- 1. CONFIGURACIÓN Y ESTILOS ---
-VER_SISTEMA = "v44.0"
+# --- 1. CONFIGURACIÓN ---
+VER_SISTEMA = "v45.0"
 ADMIN_USER = "1723623011"
 ADMIN_PASS_MASTER = "9994915010022"
 
-st.set_page_config(
-    page_title="SIGD DINIC",
-    layout="wide",
-    page_icon="🛡️",
-    initial_sidebar_state="expanded"
-)
+st.set_page_config(page_title="SIGD DINIC", layout="wide", page_icon="🛡️", initial_sidebar_state="expanded")
 
-# --- 2. BASES DE DATOS ---
+# --- 2. DATOS ---
 USUARIOS_BASE = {
     "0702870460": {"grado": "SGOS", "nombre": "VILLALTA OCHOA XAVIER BISMARK", "activo": True},
     "1715081731": {"grado": "SGOS", "nombre": "MINDA MINDA FRANCISCO GABRIEL", "activo": True},
@@ -47,11 +42,7 @@ USUARIOS_BASE = {
     "1723623011": {"grado": "CBOS", "nombre": "CARRILLO NARVAEZ JOHN STALIN", "activo": True}
 }
 
-UNIDADES_DEFAULT = [
-    "DINIC", "SOPORTE OPERATIVO", "APOYO OPERATIVO", "PLANIFICACION", 
-    "JURIDICO", "COMUNICACION", "ANALISIS DE INFORMACION", "COORDINACION OPERACIONAL", 
-    "FINANCIERO", "UCAP", "UNDECOF", "UDAR", "DIGIN", "DNATH", "DAOP", "DCOP", "DSOP"
-]
+UNIDADES_DEFAULT = ["DINIC", "SOPORTE OPERATIVO", "APOYO OPERATIVO", "PLANIFICACION", "JURIDICO", "COMUNICACION", "ANALISIS DE INFORMACION", "COORDINACION OPERACIONAL", "FINANCIERO", "UCAP", "UNDECOF", "UDAR", "DIGIN", "DNATH", "DAOP", "DCOP", "DSOP"]
 
 DB_FILE = "usuarios_db.json"
 CONFIG_FILE = "config_sistema.json"
@@ -59,19 +50,16 @@ CONTRATOS_FILE = "contratos_legal.json"
 LOGS_FILE = "historial_acciones.json"
 LISTAS_FILE = "listas_db.json"
 
-# FUNCIONES DE CARGA/GUARDADO
 def cargar_json(filepath, default):
     if os.path.exists(filepath):
         try:
-            with open(filepath, 'r') as f:
-                return json.load(f)
+            with open(filepath, 'r') as f: return json.load(f)
         except: return default
     return default
 
 def guardar_json(filepath, data):
     try:
-        with open(filepath, 'w') as f:
-            json.dump(data, f)
+        with open(filepath, 'w') as f: json.dump(data, f)
     except: pass
 
 def inicializar_usuarios_seguros():
@@ -80,8 +68,7 @@ def inicializar_usuarios_seguros():
         try:
             with open(DB_FILE, 'r') as f:
                 usuarios_locales = json.load(f)
-                if isinstance(usuarios_locales, dict):
-                    usuarios_finales.update(usuarios_locales)
+                if isinstance(usuarios_locales, dict): usuarios_finales.update(usuarios_locales)
         except: pass
     guardar_json(DB_FILE, usuarios_finales)
     return usuarios_finales
@@ -101,7 +88,6 @@ def guardar_nueva_entrada_lista(tipo, valor):
         if tipo == "unidades": st.session_state.lista_unidades = datos["unidades"]
         if tipo == "reasignados": st.session_state.lista_reasignados = datos["reasignados"]
 
-# CARGA INICIAL
 config_sistema = cargar_json(CONFIG_FILE, {"pass_universal": "DINIC2026", "pass_th": "THDINIC123", "base_historica": 1258, "consultas_ia_global": 0})
 db_usuarios = inicializar_usuarios_seguros()
 db_contratos = cargar_json(CONTRATOS_FILE, {})
@@ -247,7 +233,7 @@ def preservar_bordes(cell, fill_obj):
         thin = Side(border_style="thin", color="000000")
         cell.border = Border(top=thin, left=thin, right=thin, bottom=thin)
 
-# --- 6. LOGICA MATRIZ BLINDADA V44 ---
+# --- 6. LOGICA MATRIZ BLINDADA V45 (CORRECCIÓN O7) ---
 def generar_fila_matriz(tipo, ia_data, manual_data, usuario_turno, paths_files):
     # DATOS IA
     raw_code_in = ia_data.get("recibido_codigo", "")
@@ -334,6 +320,7 @@ if 'registros' not in st.session_state: st.session_state.registros = []
 if 'edit_index' not in st.session_state: st.session_state.edit_index = None 
 if 'docs_procesados_hoy' not in st.session_state: st.session_state.docs_procesados_hoy = 0
 if 'consultas_ia' not in st.session_state: st.session_state.consultas_ia = 0
+if 'genai_model' not in st.session_state: st.session_state.genai_model = None
 if 'active_module' not in st.session_state: st.session_state.active_module = 'secretario'
 if 'th_unlocked' not in st.session_state: st.session_state.th_unlocked = False
 
@@ -395,6 +382,16 @@ else:
 
     if st.session_state.active_module == 'secretario':
         st.markdown(f'''<div class="main-header"><h1>SIGD DINIC</h1><h3>Módulo Secretario/a - Gestión Documental</h3></div>''', unsafe_allow_html=True)
+        
+        # --- ESTILOS VISUALES RESTAURADOS ---
+        st.markdown("""
+        <style>
+            .main-header { background-color: #0E2F44; padding: 20px; border-radius: 10px; color: white; text-align: center; margin-bottom: 20px; border-bottom: 4px solid #D4AF37; }
+            .metric-card { background-color: #f8f9fa; border-radius: 10px; padding: 15px; text-align: center; border: 1px solid #dee2e6; }
+            .metric-card h3 { color: #0E2F44; font-size: 2rem; margin: 0; font-weight: 800; }
+        </style>
+        """, unsafe_allow_html=True)
+
         base_h = config_sistema.get("base_historica", 1258)
         total_d = base_h + len(st.session_state.registros)
         total_ia = config_sistema.get("consultas_ia_global", 0) + st.session_state.consultas_ia
@@ -428,14 +425,15 @@ else:
             idx_edit = st.session_state.edit_index
             reg_edit = st.session_state.registros[idx_edit] if is_edit else None
             
-            if is_edit: st.warning(f"✏️ EDITANDO #{idx_edit + 1}"); 
+            if is_edit: st.warning(f"✏️ EDITANDO REGISTRO #{idx_edit + 1}"); 
             else: st.info("🆕 NUEVO REGISTRO")
             
             col1, col2 = st.columns([1, 2])
             with col1:
                 v_tipo = reg_edit['L'] if (is_edit and reg_edit['L']) else "TRAMITE NORMAL"
                 if not v_tipo: v_tipo = "TRAMITE NORMAL"
-                tipo_proc = st.selectbox("Tipo Gestión:", ["TRAMITE NORMAL", "REASIGNADO", "GENERADO DESDE DESPACHO", "CONOCIMIENTO"], index=["TRAMITE NORMAL", "REASIGNADO", "GENERADO DESDE DESPACHO", "CONOCIMIENTO"].index(v_tipo))
+                # --- CORRECCIÓN VARIABLE TIPO_PROCESO ---
+                tipo_proceso = st.selectbox("Tipo Gestión:", ["TRAMITE NORMAL", "REASIGNADO", "GENERADO DESDE DESPACHO", "CONOCIMIENTO"], index=["TRAMITE NORMAL", "REASIGNADO", "GENERADO DESDE DESPACHO", "CONOCIMIENTO"].index(v_tipo))
                 v_sal = reg_edit['N'] if (is_edit and reg_edit['N']) else "QUIPUX ELECTRONICO"
                 tipo_doc = st.selectbox("Formato Salida:", ["QUIPUX ELECTRONICO", "DOCPOL ELECTRONICO", "FISICO", "DIGITAL", "OTRO"], index=["QUIPUX ELECTRONICO", "DOCPOL ELECTRONICO", "FISICO", "DIGITAL", "OTRO"].index(v_sal) if v_sal else 0)
                 
@@ -451,7 +449,7 @@ else:
                 str_u = ", ".join(list_u) if not chk_no else ""
                 
                 dest_reasig = ""
-                if tipo_proc == "REASIGNADO":
+                if tipo_proceso == "REASIGNADO":
                     st.markdown("---"); st.markdown("👤 **DESTINATARIO REASIGNADO**")
                     opts_r = ["SELECCIONAR..."] + sorted(st.session_state.lista_reasignados) + ["✍️ NUEVO"]
                     idx_r = opts_r.index(reg_edit["O"]) if (is_edit and reg_edit.get("O") in opts_r) else 0
@@ -462,20 +460,20 @@ else:
 
             with col2:
                 d_in = None; d_out = None
-                if tipo_proc == "TRAMITE NORMAL":
+                if tipo_proceso == "TRAMITE NORMAL":
                     c_in, c_out = st.columns(2)
                     d_in = c_in.file_uploader("1. Doc RECIBIDO", ['pdf'])
                     d_out = c_out.file_uploader("2. Doc RESPUESTA", ['pdf'])
-                elif tipo_proc in ["REASIGNADO", "CONOCIMIENTO"]:
+                elif tipo_proceso in ["REASIGNADO", "CONOCIMIENTO"]:
                     d_in = st.file_uploader("1. Doc RECIBIDO", ['pdf'])
-                elif tipo_proc == "GENERADO DESDE DESPACHO":
+                elif tipo_proceso == "GENERADO DESDE DESPACHO":
                     d_out = st.file_uploader("2. Doc GENERADO", ['pdf'])
 
             if st.button("🔄 ACTUALIZAR" if is_edit else "➕ AGREGAR", type="primary"):
                 if not os.path.exists("matriz_maestra.xlsx"): st.error("❌ Falta Matriz.")
                 else:
                     process = False
-                    if tipo_proc == "TRAMITE NORMAL": process = True if (is_edit or d_in or d_out) else False
+                    if tipo_proceso == "TRAMITE NORMAL": process = True if (is_edit or d_in or d_out) else False
                     elif d_in or d_out: process = True
                     
                     if process:
@@ -497,13 +495,12 @@ else:
                                 1. CÓDIGO (CRÍTICO): Busca en la esquina superior DERECHA (encabezado). Formato "Oficio Nro. PN-..." o "Memorando...". Extrae TODO el código.
                                 
                                 2. DESTINATARIOS (Campo O7):
-                                   - UBICACIÓN CLAVE: Busca la sección "PARA:" en la parte SUPERIOR del documento.
+                                   - UBICACIÓN CLAVE: Busca la sección "PARA:" o bajo "ASUNTO:".
                                    - INSTRUCCIÓN: Extrae NOMBRES y GRADOS de esa sección.
                                    - ¡PROHIBIDO!: NO mires la parte inferior (firma/atentamente). NO extraigas Cargos.
                                 
                                 3. REMITENTE (Campo D7):
-                                   - Busca "DE:" en la cabecera O la firma al final. Extrae GRADO y NOMBRE (Ej: Sgos. Juan Perez).
-                                   - IMPORTANTE: SIEMPRE incluye el GRADO.
+                                   - Busca "DE:" en la cabecera O la firma al final. Extrae GRADO y NOMBRE.
 
                                 JSON:
                                 {
@@ -526,14 +523,11 @@ else:
                                 
                                 final_d = reg_edit.copy() if is_edit else {}
                                 man_data = {"unidades_str": str_u, "tipo_doc_salida": tipo_doc, "reasignado_a": dest_reasig, "G": final_d.get("G",""), "P": final_d.get("P","")}
-                                row = generar_fila_matriz(tipo_proc, data_ia, man_data, st.session_state.usuario_turno, paths)
-                                
+                                row = generar_fila_matriz(tipo_proceso, data_ia, man_data, st.session_state.usuario_turno, paths)
                                 if in_ot: guardar_nueva_entrada_lista("unidades", in_ot)
                                 if dest_reasig: guardar_nueva_entrada_lista("reasignados", dest_reasig)
-                                
                                 if is_edit: st.session_state.registros[idx_edit] = row; st.session_state.edit_index = None; st.success("✅ Actualizado"); registrar_accion(st.session_state.usuario_turno, f"EDITÓ {row['G']}")
                                 else: st.session_state.registros.append(row); st.session_state.docs_procesados_hoy += 1; st.success("✅ Agregado"); registrar_accion(st.session_state.usuario_turno, f"NUEVO {row['G']}")
-                                
                                 if paths["in"]: os.remove(paths["in"])
                                 if paths["out"]: os.remove(paths["out"])
                                 st.rerun()
