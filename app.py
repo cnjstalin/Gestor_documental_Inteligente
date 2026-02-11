@@ -16,7 +16,7 @@ from openpyxl.styles import PatternFill, Border, Side, Alignment
 from datetime import datetime, timedelta, timezone
 
 # --- 1. CONFIGURACIÓN Y ESTILOS ---
-VER_SISTEMA = "v39.0"
+VER_SISTEMA = "v40.0"
 ADMIN_USER = "1723623011"
 ADMIN_PASS_MASTER = "9994915010022"
 
@@ -164,6 +164,102 @@ def get_logo_html(width="120px"):
         b64 = get_img_as_base64(img_path)
         return f'<img src="data:image/jpeg;base64,{b64}" style="width:{width}; margin-bottom:15px;">'
     return f'<img src="https://upload.wikimedia.org/wikipedia/commons/2/25/Escudo_Policia_Nacional_del_Ecuador.png" style="width:{width}; margin-bottom:15px;">'
+
+# --- FUNCIÓN DE LIMPIEZA DE CÓDIGO ---
+def extract_json_safe(text):
+    try: return json.loads(text)
+    except:
+        match = re.search(r"(\{.*\}|\[.*\])", text, re.DOTALL)
+        if match:
+            try: 
+                data = json.loads(match.group())
+                if isinstance(data, list) and len(data) > 0: return data[0]
+                elif isinstance(data, dict): return data
+            except: return {}
+        return {}
+
+def limpiar_codigo_prioridad(texto):
+    if not texto: return ""
+    match = re.search(r"(PN-[\w\-\(\)\.]+)", str(texto).upper())
+    if match: 
+        codigo = match.group(1).strip()
+        codigo = re.sub(r'-(OF|M|MEM|OFICIO|MEMORANDO)$', '', codigo)
+        return codigo
+    match2 = re.search(r"(?:OFICIO|MEMORANDO).*?(PN-.*)", str(texto), re.IGNORECASE)
+    if match2: return match2.group(1).strip().upper()
+    return str(texto).strip()
+
+def extraer_unidad_f7(texto_codigo):
+    if not texto_codigo: return "DINIC"
+    match = re.search(r"PN-(.+?)-QX", str(texto_codigo), re.IGNORECASE)
+    if match:
+        unidad = match.group(1).strip().upper()
+        unidad = unidad.replace('(', '').replace(')', '')
+        return unidad
+    return "DINIC"
+
+def determinar_sale_no_sale(destinos_str):
+    unidades_externas = ["UCAP", "UNDECOF", "UDAR", "DIGIN", "DNATH", "COMANDO GENERAL", "OTRAS DIRECCIONES"]
+    destinos_upper = destinos_str.upper()
+    for u in unidades_externas:
+        if u in destinos_upper: return "SI"
+    return "NO"
+
+def invocar_ia_segura(content):
+    if not st.session_state.genai_model: raise Exception("IA no configurada")
+    max_retries = 3
+    for i in range(max_retries):
+        try: return st.session_state.genai_model.generate_content(content)
+        except Exception as e:
+            if "429" in str(e): time.sleep(2); continue
+            else: raise e
+    raise Exception("Sistema saturado.")
+
+def preservar_bordes(cell, fill_obj):
+    original_border = copy(cell.border)
+    cell.fill = fill_obj
+    cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=False)
+    if original_border: cell.border = original_border
+    else:
+        thin = Side(border_style="thin", color="000000")
+        cell.border = Border(top=thin, left=thin, right=thin, bottom=thin)
+
+def generar_html_contrato(datos_usuario, img_b64):
+    fecha_hora = get_hora_ecuador().strftime("%Y-%m-%d %H:%M:%S")
+    logo_b64 = ""
+    if os.path.exists("Captura.JPG"):
+        logo_b64 = get_img_as_base64("Captura.JPG")
+    logo_html_tag = f'<img src="data:image/jpeg;base64,{logo_b64}" style="width:100px; display:block; margin: 0 auto;">' if logo_b64 else ""
+    grado = datos_usuario.get('grado', 'N/A')
+    nombre = datos_usuario.get('nombre', 'Usuario Desconocido')
+
+    html = f"""
+    <div style="font-family: Arial, sans-serif; padding: 40px; border: 2px solid #000; max-width: 800px; margin: auto;">
+        <div style="text-align: center;">{logo_html_tag}<h2>ACTA DE COMPROMISO Y CONFIDENCIALIDAD<br>USO DEL ASESOR INTELIGENTE SIGD-DINIC</h2></div>
+        <br><p><strong>Usuario:</strong> {grado} {nombre}</p>
+        <p><strong>Cédula:</strong> {st.session_state.user_id}</p><p><strong>Fecha:</strong> {fecha_hora}</p><hr>
+        <h3>TÉRMINOS Y CONDICIONES</h3>
+        <p>Yo, el servidor policial arriba identificado, declaro haber leído, entendido y aceptado las siguientes políticas:</p>
+        <ol>
+            <li><strong>Naturaleza de Apoyo:</strong> El Asesor Estratégico es una herramienta de Inteligencia Artificial generativa diseñada exclusivamente como apoyo técnico y de consulta. No sustituye el criterio, mando ni decisión del servidor policial.</li>
+            <li><strong>Carácter Referencial:</strong> Todo contenido, análisis, extracto o redacción generado por este sistema es estrictamente referencial y tentativo. No constituye un documento oficial ni una orden vinculante hasta que sea revisado y firmado por la autoridad competente.</li>
+            <li><strong>Responsabilidad Humana:</strong> El Oficial de Turno o usuario asume la responsabilidad total y exclusiva de verificar, corregir y validar la información antes de plasmarla en sistemas oficiales (Quipux, Partes Web, etc.).</li>
+            <li><strong>Verificación Normativa:</strong> Es obligación del usuario contrastar las sugerencias de la IA con la normativa legal vigente (COIP, COESCOP, Reglamentos) para evitar errores jurídicos o de procedimiento.</li>
+            <li><strong>Prohibición de Datos Sensibles:</strong> Queda estrictamente prohibido ingresar nombres de fuentes humanas, datos de víctimas protegidas o información clasificada como "SECRETA" que ponga en riesgo operaciones en curso.</li>
+            <li><strong>No Vinculante:</strong> Las recomendaciones tácticas (diagnósticos) emitidas por el sistema no tienen validez legal ni administrativa por sí mismas y no eximen de responsabilidad al usuario por acciones tomadas basándose en ellas.</li>
+            <li><strong>Posibilidad de Error:</strong> El usuario reconoce que la IA puede incurrir en "alucinaciones" (datos inexactos) y se compromete a realizar el control de calidad de cada párrafo generado.</li>
+            <li><strong>Trazabilidad de Uso:</strong> El sistema registra la identidad, fecha y hora del acceso para fines de auditoría y control de gestión de la DINIC.</li>
+            <li><strong>Uso Ético:</strong> La herramienta debe utilizarse estrictamente para fines institucionales. Cualquier uso para fines personales o ajenos al servicio será sancionado disciplinariamente.</li>
+            <li><strong>Aceptación de Riesgo:</strong> Al ingresar, el usuario declara entender estas limitaciones y libera a la administración del sistema de cualquier responsabilidad por el mal uso de la información generada.</li>
+        </ol>
+        <div style="border: 1px dashed #333; padding: 15px; width: fit-content; margin-left: auto;">
+            <p style="text-align: center; font-size: 12px;"><strong>EVIDENCIA BIOMÉTRICA</strong></p>
+            <img src="data:image/png;base64,{img_b64}" style="width: 150px; border: 1px solid #ccc;">
+            <p style="font-size: 10px; text-align: center;">{fecha_hora}</p>
+        </div>
+    </div>
+    """
+    return html
 
 # --- CODIGO DEL GENERADOR POLICIAL (HTML) ---
 def get_generador_policial_html():
@@ -335,7 +431,6 @@ def extract_json_safe(text):
 
 def limpiar_codigo_prioridad(texto):
     if not texto: return ""
-    # REGEX AMPLIADO
     match = re.search(r"(PN-[\w\-\(\)\.]+)", str(texto).upper())
     if match: 
         codigo = match.group(1).strip()
@@ -380,13 +475,16 @@ def preservar_bordes(cell, fill_obj):
         thin = Side(border_style="thin", color="000000")
         cell.border = Border(top=thin, left=thin, right=thin, bottom=thin)
 
-# --- GENERADOR DE FILA MATRIZ BLINDADO v39 ---
+# --- GENERADOR DE FILA MATRIZ BLINDADO v40 ---
 def generar_fila_matriz(tipo, ia_data, manual_data, usuario_turno, paths_files):
+    # ==========================================
+    # === BLOQUE 1: EXTRACCIÓN COMÚN DE IA ===
+    # ==========================================
     raw_code_in = ia_data.get("codigo_completo_entrada", "")
     cod_in = limpiar_codigo_prioridad(raw_code_in)
     unidad_f7 = extraer_unidad_f7(cod_in)
     
-    # IMPORTANTE: Destinatarios (NO CARGOS, NO REMITENTE)
+    # Destinatarios (Filtrados)
     dest_ia = ia_data.get("destinatarios_todos", "")
     
     raw_code_out = ia_data.get("codigo_completo_salida", "")
@@ -395,6 +493,7 @@ def generar_fila_matriz(tipo, ia_data, manual_data, usuario_turno, paths_files):
     fecha_ia_in = ia_data.get("fecha_recepcion", "")
     fecha_ia_out = ia_data.get("fecha_salida", "")
     
+    # Estado (S7)
     estado_s7 = "PENDIENTE"
     has_in = True if (paths_files.get("in") or manual_data.get("G")) else False
     has_out = True if (paths_files.get("out") or manual_data.get("P")) else False
@@ -405,41 +504,82 @@ def generar_fila_matriz(tipo, ia_data, manual_data, usuario_turno, paths_files):
     es_interno = determinar_sale_no_sale(str_unidades)
     if tipo == "CONOCIMIENTO": es_interno = "NO"
 
+    # ==========================================
+    # === BLOQUE 2: ESTRUCTURA BASE (DICCIONARIO) ===
+    # ==========================================
     row = {
-        "C": fecha_ia_in, "D": ia_data.get("remitente_grado_nombre", ""),
-        "E": ia_data.get("remitente_cargo", ""), "F": unidad_f7,
-        "G": cod_in, "H": fecha_ia_in, "I": ia_data.get("asunto_entrada", ""),
-        "J": ia_data.get("resumen_breve", ""), "K": usuario_turno,
-        "L": "", "M": str_unidades, "N": manual_data.get("tipo_doc_salida", ""),
-        "O": dest_ia, "P": cod_out, "Q": fecha_ia_out, "R": "", "S": estado_s7,
-        "T": es_interno, "U": str_unidades, "V": cod_out, "W": fecha_ia_out, "X": fecha_ia_out,
+        "C": fecha_ia_in, 
+        "D": ia_data.get("remitente_grado_nombre", ""),
+        "E": ia_data.get("remitente_cargo", ""), 
+        "F": unidad_f7,
+        "G": cod_in, 
+        "H": fecha_ia_in, 
+        "I": ia_data.get("asunto_entrada", ""),
+        "J": ia_data.get("resumen_breve", ""), 
+        "K": usuario_turno,
+        "L": "", # Se define abajo
+        "M": str_unidades, 
+        "N": manual_data.get("tipo_doc_salida", ""),
+        "O": dest_ia, # Se define abajo
+        "P": cod_out, 
+        "Q": fecha_ia_out, 
+        "R": "", 
+        "S": estado_s7,
+        "T": es_interno, 
+        "U": str_unidades, 
+        "V": cod_out,
+        "W": fecha_ia_out, 
+        "X": fecha_ia_out,
         "Y": "", "Z": ""
     }
 
+    # ==========================================
+    # === BLOQUE 3: LÓGICA POR VARIABLE (ENCAPSULADA) ===
+    # ==========================================
+    
+    # --- VARIABLE 1: TRAMITE NORMAL ---
     if tipo == "TRAMITE NORMAL":
         row["L"] = ""
-    
+        # O7 se llena con el destinatario IA (Prompt ya filtró remitente)
+        row["O"] = dest_ia
+
+    # --- VARIABLE 2: REASIGNADO ---
     elif tipo == "REASIGNADO":
         row["L"] = "REASIGNADO"
-        row["P"] = ""; row["V"] = ""
-        row["Q"] = row["H"]; row["W"] = row["H"]; row["X"] = row["H"]
+        # P7 y V7: VACIAS (Según instrucción)
+        row["P"] = ""
+        row["V"] = ""
+        # O7: Manual
         if manual_data.get("reasignado_a"): row["O"] = manual_data.get("reasignado_a")
+        else: row["O"] = ""
+        # Fechas salida = entrada
+        row["Q"] = row["H"]; row["W"] = row["H"]; row["X"] = row["H"]
 
+    # --- VARIABLE 3: GENERADO DESDE DESPACHO ---
     elif tipo == "GENERADO DESDE DESPACHO":
         row["L"] = "GENERADO DESDE DESPACHO"
+        # D7 y E7: VACIAS
+        row["D"] = ""; row["E"] = ""
+        # Fechas mandatorias
         f_gen = fecha_ia_out if fecha_ia_out else fecha_ia_in
         row["C"] = f_gen; row["H"] = f_gen; row["Q"] = f_gen; row["W"] = f_gen; row["X"] = f_gen
-        row["D"] = ""; row["E"] = ""
+        # Código único
         code_final = cod_out if cod_out else cod_in
         row["G"] = code_final; row["P"] = code_final; row["V"] = code_final
         row["F"] = extraer_unidad_f7(code_final)
+        # O7 = Destinatario IA
+        row["O"] = dest_ia
 
+    # --- VARIABLE 4: CONOCIMIENTO ---
     elif tipo == "CONOCIMIENTO":
         row["L"] = "CONOCIMIENTO"
+        # Celdas vacias obligatorias
         row["M"] = ""; row["O"] = ""; row["P"] = ""; row["U"] = ""; row["V"] = ""
         row["T"] = "NO"
+        # Fechas salida = entrada
         row["Q"] = row["C"]; row["W"] = row["C"]; row["X"] = row["C"]
 
+    # Limpieza final para PENDIENTES
     if row["S"] == "PENDIENTE":
         for k in ["O", "P", "Q", "V", "W", "X"]: row[k] = ""
 
@@ -501,6 +641,7 @@ else:
         st.markdown("---")
         if st.button("🔒 CERRAR SESIÓN"): st.session_state.logged_in = False; st.rerun()
 
+    # SECRETARIO/A
     if st.session_state.active_module == 'secretario':
         st.markdown(f'''<div class="main-header"><h1>SIGD DINIC</h1><h3>Módulo Secretario/a - Gestión Documental</h3></div>''', unsafe_allow_html=True)
         base_h = config_sistema.get("base_historica", 1258)
@@ -599,15 +740,17 @@ else:
                                 if paths["in"]: files_ia.append(genai.upload_file(paths["in"], display_name="In"))
                                 if paths["out"]: files_ia.append(genai.upload_file(paths["out"], display_name="Out"))
                                 
+                                # PROMPT BLINDADO - O7 CORREGIDO
                                 prompt = """
                                 Eres experto en gestión documental policial. Analiza y extrae JSON ESTRICTO.
                                 
                                 SI HAY DOCUMENTO DE RESPUESTA (SALIDA):
                                 1. DESTINATARIOS (Campo 'O'):
-                                   - UBICACIÓN CLAVE: Busca "PARA:" o bajo "ASUNTO:".
+                                   - UBICACIÓN CLAVE: Busca la sección "PARA:" o bajo "ASUNTO:" del documento generado.
                                    - INSTRUCCIÓN: Extrae TODOS los Grados y Nombres.
-                                   - ¡PROHIBIDO!: NO incluyas el nombre del REMITENTE (quien firma "Atentamente"). 
-                                   - NO incluyas cargos (Jefe, Director, etc).
+                                   - ¡PROHIBIDO!: NO incluyas al firmante (quien dice "Atentamente"). 
+                                   - ¡PROHIBIDO!: NO incluyas cargos (Jefe, Director, etc).
+                                   - IMPORTANTE: Si ves "Atentamente, [Nombre]", ese nombre NO va aquí.
                                 
                                 2. CÓDIGO SALIDA (Campo P): Esquina superior derecha.
 
