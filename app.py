@@ -16,7 +16,7 @@ from openpyxl.styles import PatternFill, Border, Side, Alignment
 from datetime import datetime, timedelta, timezone
 
 # --- 1. CONFIGURACIÓN Y ESTILOS ---
-VER_SISTEMA = "v43.0"
+VER_SISTEMA = "v44.0"
 ADMIN_USER = "1723623011"
 ADMIN_PASS_MASTER = "9994915010022"
 
@@ -112,7 +112,7 @@ db_listas = cargar_listas_desplegables()
 if 'lista_unidades' not in st.session_state: st.session_state.lista_unidades = db_listas["unidades"]
 if 'lista_reasignados' not in st.session_state: st.session_state.lista_reasignados = db_listas["reasignados"]
 
-# --- 3. FUNCIONES ---
+# --- 3. FUNCIONES AUXILIARES ---
 def get_hora_ecuador(): return datetime.now(timezone(timedelta(hours=-5)))
 
 def registrar_accion(usuario, accion, detalle=""):
@@ -147,25 +147,31 @@ def get_ultima_accion_usuario(nombre_usuario):
     if not isinstance(db_logs, list): return "---"
     for log in db_logs:
         if log.get('usuario') == nombre_usuario:
-            fecha = log.get('fecha', '').split(' ')
-            hora = fecha[1] if len(fecha) > 1 else ""
-            return f"{log.get('accion')} ({hora})"
+            return f"{log.get('accion')} ({log.get('fecha','').split(' ')[1]})"
     return "---"
 
 def get_img_as_base64(file_path):
     try:
-        with open(file_path, "rb") as f: data = f.read()
-        return base64.b64encode(data).decode()
+        with open(file_path, "rb") as f: return base64.b64encode(f.read()).decode()
     except: return ""
 
 def get_logo_html(width="120px"):
     img_path = "Captura.JPG"
-    if os.path.exists(img_path):
-        b64 = get_img_as_base64(img_path)
-        return f'<img src="data:image/jpeg;base64,{b64}" style="width:{width}; margin-bottom:15px;">'
+    b64 = get_img_as_base64(img_path)
+    if b64: return f'<img src="data:image/jpeg;base64,{b64}" style="width:{width}; margin-bottom:15px;">'
     return f'<img src="https://upload.wikimedia.org/wikipedia/commons/2/25/Escudo_Policia_Nacional_del_Ecuador.png" style="width:{width}; margin-bottom:15px;">'
 
-# --- FUNCIÓN DE LIMPIEZA DE CÓDIGO ---
+def frases_curiosas():
+    frases = [
+        "¿Sabías que? El primer virus se llamó Creeper.",
+        "¿Sabías que? La seguridad es responsabilidad de todos.",
+        "¿Sabías que? Tu contraseña es tu llave digital.",
+        "¿Sabías que? La IA procesa, tú decides.",
+        "¿Sabías que? Un escritorio limpio mejora la productividad."
+    ]
+    return random.choice(frases)
+
+# --- 4. EXTRACCIÓN Y LIMPIEZA ---
 def extract_json_safe(text):
     try: return json.loads(text)
     except:
@@ -180,12 +186,8 @@ def extract_json_safe(text):
 
 def limpiar_codigo_prioridad(texto):
     if not texto: return ""
-    # REGEX AMPLIADO
     match = re.search(r"(PN-[\w\-\(\)\.]+)", str(texto).upper())
-    if match: 
-        codigo = match.group(1).strip()
-        codigo = re.sub(r'-(OF|M|MEM|OFICIO|MEMORANDO)$', '', codigo)
-        return codigo
+    if match: return match.group(1).strip()
     match2 = re.search(r"(?:OFICIO|MEMORANDO).*?(PN-.*)", str(texto), re.IGNORECASE)
     if match2: return match2.group(1).strip().upper()
     return str(texto).strip()
@@ -206,28 +208,15 @@ def determinar_sale_no_sale(destinos_str):
         if u in destinos_upper: return "SI"
     return "NO"
 
-# DEFINICIÓN GLOBAL SEGURA
+# VARIABLE GLOBAL SISTEMA
 sistema_activo = False
-
-# --- 4. VARIABLES DE SESIÓN ---
-if 'logged_in' not in st.session_state: st.session_state.logged_in = False
-if 'user_role' not in st.session_state: st.session_state.user_role = "" 
-if 'usuario_turno' not in st.session_state: st.session_state.usuario_turno = "" 
-if 'user_id' not in st.session_state: st.session_state.user_id = ""
-if 'registros' not in st.session_state: st.session_state.registros = [] 
-if 'edit_index' not in st.session_state: st.session_state.edit_index = None 
-if 'docs_procesados_hoy' not in st.session_state: st.session_state.docs_procesados_hoy = 0
-if 'consultas_ia' not in st.session_state: st.session_state.consultas_ia = 0
-if 'genai_model' not in st.session_state: st.session_state.genai_model = None
-if 'active_module' not in st.session_state: st.session_state.active_module = 'secretario'
-if 'th_unlocked' not in st.session_state: st.session_state.th_unlocked = False
 
 # --- 5. CONFIGURACIÓN IA ---
 try:
     api_key = st.secrets.get("GEMINI_API_KEY")
     if api_key:
         genai.configure(api_key=api_key)
-        if not st.session_state.genai_model:
+        if 'genai_model' not in st.session_state or not st.session_state.genai_model:
             model_name = "gemini-1.5-flash"
             try:
                 listado = genai.list_models()
@@ -249,61 +238,18 @@ def invocar_ia_segura(content):
     raise Exception("Sistema saturado.")
 
 def preservar_bordes(cell, fill_obj):
-    """Aplica formato a la celda sin alterar dimensiones"""
-    from copy import copy
-    from openpyxl.styles import Side, Border, Alignment
-    
-    # Copiar borde existente si hay, sino crear uno fino
-    if cell.border and (cell.border.left.style or cell.border.top.style):
-        new_border = copy(cell.border)
+    original_border = copy(cell.border)
+    cell.fill = fill_obj
+    cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=False)
+    if original_border and (original_border.left.style or original_border.top.style): 
+        cell.border = original_border
     else:
         thin = Side(border_style="thin", color="000000")
-        new_border = Border(top=thin, left=thin, right=thin, bottom=thin)
-    
-    cell.border = new_border
-    cell.fill = fill_obj
-    # Alineacion centrada pero SIN ajuste de texto para no romper filas
-    cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=False)
+        cell.border = Border(top=thin, left=thin, right=thin, bottom=thin)
 
-def generar_html_contrato(datos_usuario, img_b64):
-    fecha_hora = get_hora_ecuador().strftime("%Y-%m-%d %H:%M:%S")
-    logo_b64 = ""
-    if os.path.exists("Captura.JPG"):
-        logo_b64 = get_img_as_base64("Captura.JPG")
-    logo_html_tag = f'<img src="data:image/jpeg;base64,{logo_b64}" style="width:100px; display:block; margin: 0 auto;">' if logo_b64 else ""
-    grado = datos_usuario.get('grado', 'N/A')
-    nombre = datos_usuario.get('nombre', 'Usuario Desconocido')
-
-    html = f"""
-    <div style="font-family: Arial, sans-serif; padding: 40px; border: 2px solid #000; max-width: 800px; margin: auto;">
-        <div style="text-align: center;">{logo_html_tag}<h2>ACTA DE COMPROMISO Y CONFIDENCIALIDAD<br>USO DEL ASESOR INTELIGENTE SIGD-DINIC</h2></div>
-        <br><p><strong>Usuario:</strong> {grado} {nombre}</p>
-        <p><strong>Cédula:</strong> {st.session_state.user_id}</p><p><strong>Fecha:</strong> {fecha_hora}</p><hr>
-        <h3>TÉRMINOS Y CONDICIONES</h3>
-        <p>Yo, el servidor policial arriba identificado, declaro haber leído, entendido y aceptado las siguientes políticas:</p>
-        <ol>
-            <li><strong>Naturaleza de Apoyo:</strong> El Asesor Estratégico es una herramienta de Inteligencia Artificial generativa diseñada exclusivamente como apoyo técnico y de consulta. No sustituye el criterio, mando ni decisión del servidor policial.</li>
-            <li><strong>Carácter Referencial:</strong> Todo contenido, análisis, extracto o redacción generado por este sistema es estrictamente referencial y tentativo. No constituye un documento oficial ni una orden vinculante hasta que sea revisado y firmado por la autoridad competente.</li>
-            <li><strong>Responsabilidad Humana:</strong> El Oficial de Turno o usuario asume la responsabilidad total y exclusiva de verificar, corregir y validar la información antes de plasmarla en sistemas oficiales (Quipux, Partes Web, etc.).</li>
-            <li><strong>Verificación Normativa:</strong> Es obligación del usuario contrastar las sugerencias de la IA con la normativa legal vigente (COIP, COESCOP, Reglamentos) para evitar errores jurídicos o de procedimiento.</li>
-            <li><strong>Prohibición de Datos Sensibles:</strong> Queda estrictamente prohibido ingresar nombres de fuentes humanas, datos de víctimas protegidas o información clasificada como "SECRETA" que ponga en riesgo operaciones en curso.</li>
-            <li><strong>No Vinculante:</strong> Las recomendaciones tácticas (diagnósticos) emitidas por el sistema no tienen validez legal ni administrativa por sí mismas y no eximen de responsabilidad al usuario por acciones tomadas basándose en ellas.</li>
-            <li><strong>Posibilidad de Error:</strong> El usuario reconoce que la IA puede incurrir en "alucinaciones" (datos inexactos) y se compromete a realizar el control de calidad de cada párrafo generado.</li>
-            <li><strong>Trazabilidad de Uso:</strong> El sistema registra la identidad, fecha y hora del acceso para fines de auditoría y control de gestión de la DINIC.</li>
-            <li><strong>Uso Ético:</strong> La herramienta debe utilizarse estrictamente para fines institucionales. Cualquier uso para fines personales o ajenos al servicio será sancionado disciplinariamente.</li>
-            <li><strong>Aceptación de Riesgo:</strong> Al ingresar, el usuario declara entender estas limitaciones y libera a la administración del sistema de cualquier responsabilidad por el mal uso de la información generada.</li>
-        </ol>
-        <div style="border: 1px dashed #333; padding: 15px; width: fit-content; margin-left: auto;">
-            <p style="text-align: center; font-size: 12px;"><strong>EVIDENCIA BIOMÉTRICA</strong></p>
-            <img src="data:image/png;base64,{img_b64}" style="width: 150px; border: 1px solid #ccc;">
-            <p style="font-size: 10px; text-align: center;">{fecha_hora}</p>
-        </div>
-    </div>
-    """
-    return html
-
-# --- GENERADOR DE FILA MATRIZ BLINDADO v43 ---
+# --- 6. LOGICA MATRIZ BLINDADA V44 ---
 def generar_fila_matriz(tipo, ia_data, manual_data, usuario_turno, paths_files):
+    # DATOS IA
     raw_code_in = ia_data.get("recibido_codigo", "")
     cod_in = limpiar_codigo_prioridad(raw_code_in)
     unidad_f7 = extraer_unidad_f7(cod_in)
@@ -378,6 +324,18 @@ def generar_fila_matriz(tipo, ia_data, manual_data, usuario_turno, paths_files):
 
 def get_generador_policial_html():
     return """<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Generador</title><script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script><style>body{font-family:'Segoe UI',sans-serif;background:#1e1e1e;margin:0;display:flex;height:100vh;overflow:hidden;color:#eee}.sidebar{width:350px;background:#252526;display:flex;flex-direction:column;border-right:1px solid #333;padding:10px;overflow-y:auto}.group{margin-bottom:15px;background:#333;padding:10px;border-radius:4px}input,select,textarea{width:100%;padding:6px;background:#1e1e1e;border:1px solid #555;color:white;border-radius:3px}.preview-wrapper{flex:1;background:#525659;display:flex;justify-content:center;padding:20px;overflow-y:auto}#hoja-a4{background:white;width:210mm;min-height:296mm;padding:20mm;color:black;font-family:'Arial',sans-serif}.btn-main{width:100%;padding:10px;border:none;border-radius:4px;cursor:pointer;font-weight:bold;color:white;background:#00509e}</style></head><body><div class="sidebar"><h3>Generador Policial</h3><div class="group"><label>Tipo</label><select id="docType" onchange="u()"><option>MEMORANDO</option><option>OFICIO</option></select><label>Num</label><input type="text" id="inpNum" value="PN-DINIC-2026-001" oninput="u()"><label>Fecha</label><input type="text" id="inpFecha" oninput="u()"><label>Asunto</label><input type="text" id="inpAs" value="ASUNTO" oninput="u()"></div><div class="group"><label>Cuerpo</label><div id="editor" contenteditable="true" style="min-height:100px;border:1px solid #555" oninput="u()">Texto...</div></div><div class="group"><label>Firma</label><input type="text" id="inpNom" value="NOMBRE" oninput="u()"><label>Cargo</label><input type="text" id="inpCar" value="CARGO" oninput="u()"></div><button class="btn-main" onclick="p()">PDF</button></div><div class="preview-wrapper"><div id="hoja-a4"><div style="text-align:right"><b><span id="vNum"></span></b><br><span id="vFec"></span></div><br><b>PARA: [DEST]<br>ASUNTO: <span id="vAs"></span></b><br><br><div id="vBody" style="text-align:justify"></div><br><br><br><b><span id="vNom"></span><br><span id="vCar"></span></b></div></div><script>function u(){document.getElementById('vNum').innerText=document.getElementById('inpNum').value;document.getElementById('vFec').innerText=document.getElementById('inpFecha').value;document.getElementById('vAs').innerText=document.getElementById('inpAs').value;document.getElementById('vBody').innerHTML=document.getElementById('editor').innerHTML;document.getElementById('vNom').innerText=document.getElementById('inpNom').value;document.getElementById('vCar').innerText=document.getElementById('inpCar').value}function p(){html2pdf().from(document.getElementById('hoja-a4')).save()}u();</script></body></html>"""
+
+# --- 7. VARIABLES DE SESIÓN ---
+if 'logged_in' not in st.session_state: st.session_state.logged_in = False
+if 'user_role' not in st.session_state: st.session_state.user_role = "" 
+if 'usuario_turno' not in st.session_state: st.session_state.usuario_turno = "" 
+if 'user_id' not in st.session_state: st.session_state.user_id = ""
+if 'registros' not in st.session_state: st.session_state.registros = [] 
+if 'edit_index' not in st.session_state: st.session_state.edit_index = None 
+if 'docs_procesados_hoy' not in st.session_state: st.session_state.docs_procesados_hoy = 0
+if 'consultas_ia' not in st.session_state: st.session_state.consultas_ia = 0
+if 'active_module' not in st.session_state: st.session_state.active_module = 'secretario'
+if 'th_unlocked' not in st.session_state: st.session_state.th_unlocked = False
 
 # ==============================================================================
 #  LOGIN
@@ -544,8 +502,8 @@ else:
                                    - ¡PROHIBIDO!: NO mires la parte inferior (firma/atentamente). NO extraigas Cargos.
                                 
                                 3. REMITENTE (Campo D7):
-                                   - Busca "DE:" en la cabecera O la firma al final. Extrae GRADO y NOMBRE.
-                                   - ¡OJO!: En documentos REASIGNADOS, el remitente es quien ENVIA el documento original, NO quien lo reasigna.
+                                   - Busca "DE:" en la cabecera O la firma al final. Extrae GRADO y NOMBRE (Ej: Sgos. Juan Perez).
+                                   - IMPORTANTE: SIEMPRE incluye el GRADO.
 
                                 JSON:
                                 {
