@@ -16,7 +16,7 @@ from openpyxl.styles import PatternFill, Border, Side, Alignment
 from datetime import datetime, timedelta, timezone
 
 # --- 1. CONFIGURACIÓN Y ESTILOS ---
-VER_SISTEMA = "v35.0"
+VER_SISTEMA = "v35.1"
 ADMIN_USER = "1723623011"
 ADMIN_PASS_MASTER = "9994915010022"
 
@@ -321,44 +321,38 @@ def frases_curiosas():
     frases = ["¿Sabías que? El primer virus se llamó Creeper.", "¿Sabías que? La seguridad es responsabilidad de todos.", "¿Sabías que? Tu contraseña es tu llave digital.", "¿Sabías que? La IA procesa, tú decides.", "¿Sabías que? Un escritorio limpio mejora la productividad."]
     return random.choice(frases)
 
-# --- NUEVA FUNCIÓN ROBUSTA DE EXTRACCIÓN DE JSON ---
+# --- NUEVA FUNCIÓN ROBUSTA DE EXTRACCIÓN DE JSON (SOLUCIÓN ERROR LIST) ---
 def extract_json_safe(text):
-    """Intenta extraer un bloque JSON válido de un texto con ruido."""
     try:
-        # Intento 1: Parseo directo
-        return json.loads(text)
-    except json.JSONDecodeError:
-        try:
-            # Intento 2: Buscar entre llaves { ... }
-            match = re.search(r"\{.*\}", text, re.DOTALL)
-            if match:
-                return json.loads(match.group())
-            else:
-                return {} # Retorna vacío si falla
-        except:
-            return {}
+        # Intentar parseo directo
+        data = json.loads(text)
+    except:
+        # Buscar primer bloque JSON válido
+        match = re.search(r"(\{.*\}|\[.*\])", text, re.DOTALL)
+        if match:
+            try: data = json.loads(match.group())
+            except: data = {}
+        else: data = {}
+    
+    # *** BLINDAJE CONTRA LISTAS ***
+    if isinstance(data, list):
+        if len(data) > 0: return data[0] # Toma el primer objeto si es lista
+        else: return {}
+    return data
 
 def limpiar_codigo_prioridad(texto):
     if not texto: return ""
-    # REGEX AMPLIADO: Captura todo desde PN- hasta que encuentre un salto de línea
-    # Se elimina la parte final que indica el tipo de documento si está pegada
     match = re.search(r"(PN-[\w\-\(\)\.]+)", str(texto).upper())
     if match: 
         codigo = match.group(1).strip()
-        # Limpieza adicional de sufijos comunes si el usuario lo pidió, 
-        # pero la orden dice "SIN EL TIPO DE DOCUMENTO NI NRO"
-        # Ej: PN-DINIC-QX-2025-001-OF -> PN-DINIC-QX-2025-001
-        codigo = re.sub(r'-(OF|M|MEM|OFICIO|MEMORANDO)$', '', codigo)
+        codigo = re.sub(r'-(OF|M|MEM|OFICIO|MEMORANDO)$', '', codigo) # Limpieza extra si se pega
         return codigo
-    
-    # Fallback
     match2 = re.search(r"(?:OFICIO|MEMORANDO).*?(PN-.*)", str(texto), re.IGNORECASE)
     if match2: return match2.group(1).strip().upper()
     return str(texto).strip()
 
 def extraer_unidad_f7(texto_codigo):
     if not texto_codigo: return "DINIC"
-    # REGEX: Entre PN- y -QX (o solo QX)
     match = re.search(r"PN-(.+?)-QX", str(texto_codigo), re.IGNORECASE)
     if match:
         unidad = match.group(1).strip().upper()
@@ -429,12 +423,12 @@ def generar_html_contrato(datos_usuario, img_b64):
     """
     return html
 
-# --- LÓGICA DE MATRIZ BLINDADA CON REGLAS ESTRICTAS DEL DOC ---
+# --- LÓGICA DE MATRIZ BLINDADA CON ENCAPSULAMIENTO ESTRICTO ---
 def generar_fila_matriz(tipo, ia_data, manual_data, usuario_turno, paths_files):
     # 1. EXTRACCIÓN Y LIMPIEZA
     raw_code_in = ia_data.get("codigo_completo_entrada", "")
     cod_in = limpiar_codigo_prioridad(raw_code_in)
-    unidad_f7 = extraer_unidad_f7(cod_in) # F7: Entre PN y QX 
+    unidad_f7 = extraer_unidad_f7(cod_in) # F7: Entre PN y QX
     
     # IMPORTANTE: Destinatarios (NO CARGOS)
     dest_ia = ia_data.get("destinatarios_todos", "")
@@ -445,7 +439,7 @@ def generar_fila_matriz(tipo, ia_data, manual_data, usuario_turno, paths_files):
     fecha_ia_in = ia_data.get("fecha_recepcion", "")
     fecha_ia_out = ia_data.get("fecha_salida", "")
     
-    # Estado (S7)
+    # Estado (S7) 
     estado_s7 = "PENDIENTE"
     has_in = True if (paths_files.get("in") or manual_data.get("G")) else False
     has_out = True if (paths_files.get("out") or manual_data.get("P")) else False
@@ -457,25 +451,38 @@ def generar_fila_matriz(tipo, ia_data, manual_data, usuario_turno, paths_files):
     
     # ROW INICIAL (Base)
     row = {
-        "C": fecha_ia_in, "D": ia_data.get("remitente_grado_nombre", ""),
-        "E": ia_data.get("remitente_cargo", ""), "F": unidad_f7,
-        "G": cod_in, "H": fecha_ia_in, "I": ia_data.get("asunto_entrada", ""),
-        "J": ia_data.get("resumen_breve", ""), "K": usuario_turno,
-        "L": "", "M": str_unidades, "N": manual_data.get("tipo_doc_salida", ""),
-        "O": dest_ia, "P": cod_out, "Q": fecha_ia_out, "R": "", "S": estado_s7,
-        "T": es_interno, "U": str_unidades, "V": cod_out, "W": fecha_ia_out, "X": fecha_ia_out,
+        "C": fecha_ia_in, # C7 [cite: 1]
+        "D": ia_data.get("remitente_grado_nombre", ""), # D7 [cite: 1]
+        "E": ia_data.get("remitente_cargo", ""), # E7 [cite: 1]
+        "F": unidad_f7, # F7 [cite: 1]
+        "G": cod_in,    # G7 [cite: 1]
+        "H": fecha_ia_in, # H7 [cite: 1]
+        "I": ia_data.get("asunto_entrada", ""), # I7 [cite: 1]
+        "J": ia_data.get("resumen_breve", ""), # J7 [cite: 1]
+        "K": usuario_turno, # K7 [cite: 1]
+        "L": "", # L7
+        "M": str_unidades, # M7 [cite: 1]
+        "N": manual_data.get("tipo_doc_salida", ""), # N7 [cite: 1]
+        "O": dest_ia, # O7 [cite: 2]
+        "P": cod_out, # P7 [cite: 2]
+        "Q": fecha_ia_out, # Q7 [cite: 2]
+        "R": "", # R7 [cite: 1]
+        "S": estado_s7, # S7 [cite: 1]
+        "T": es_interno, # T7 [cite: 2]
+        "U": str_unidades, # U7 [cite: 2]
+        "V": cod_out, # V7 [cite: 2]
+        "W": fecha_ia_out, # W7 [cite: 2]
+        "X": fecha_ia_out, # X7 [cite: 2]
         "Y": "", "Z": ""
     }
 
-    # REGLAS DEL DOCUMENTO ADJUNTO [cite: 1,2,3,4,5]
+    # REGLAS DEL DOCUMENTO ADJUNTO 
     if tipo == "TRAMITE NORMAL":
-        row["L"] = "" # L7 Vacia 
-        # O7: Destinatarios respuesta (NO el remitente) 
+        row["L"] = "" # L7 Vacia [cite: 1]
     
     elif tipo == "REASIGNADO":
-        row["L"] = "REASIGNADO"
-        # SEGUN DOC[cite: 3]:
-        # P7, V7: VACIAS
+        row["L"] = "REASIGNADO" # L7 [cite: 3]
+        # SEGUN DOC[cite: 3]: P7 y V7 VACÍAS
         row["P"] = ""
         row["V"] = ""
         # O7: Destinatario Reasignado
@@ -484,7 +491,7 @@ def generar_fila_matriz(tipo, ia_data, manual_data, usuario_turno, paths_files):
         row["Q"] = row["H"]; row["W"] = row["H"]; row["X"] = row["H"]
 
     elif tipo == "GENERADO DESDE DESPACHO":
-        row["L"] = "GENERADO DESDE DESPACHO"
+        row["L"] = "GENERADO DESDE DESPACHO" # L7 [cite: 4]
         # D7, E7 VACIAS [cite: 4]
         row["D"] = ""; row["E"] = ""
         f_gen = fecha_ia_out if fecha_ia_out else fecha_ia_in
@@ -495,7 +502,7 @@ def generar_fila_matriz(tipo, ia_data, manual_data, usuario_turno, paths_files):
         row["F"] = extraer_unidad_f7(code_final)
 
     elif tipo == "CONOCIMIENTO":
-        row["L"] = "CONOCIMIENTO"
+        row["L"] = "CONOCIMIENTO" # L7 [cite: 5]
         # M,N,O,P,U,V VACIAS [cite: 5]
         row["M"] = ""; row["O"] = ""; row["P"] = ""; row["U"] = ""; row["V"] = ""
         # T: NO [cite: 5]
@@ -527,7 +534,10 @@ if not st.session_state.logged_in:
                     st.session_state.user_id = usuario_input
                     admin_data = db_usuarios.get(ADMIN_USER, {"grado": "CBOS.", "nombre": "CARRILLO NARVAEZ JOHN STALIN"})
                     st.session_state.usuario_turno = f"{admin_data['grado']} {admin_data['nombre']}"
-                    st.success("✅ Acceso ADMIN"); registrar_accion(st.session_state.usuario_turno, "INICIO SESIÓN ADMIN"); actualizar_presencia(usuario_input); st.rerun()
+                    st.success("✅ Acceso Concedido: ADMINISTRADOR")
+                    registrar_accion(st.session_state.usuario_turno, "INICIO SESIÓN ADMIN")
+                    actualizar_presencia(usuario_input)
+                    st.rerun()
                 elif usuario_input in db_usuarios:
                     user_data = db_usuarios[usuario_input]
                     if pass_input == config_sistema["pass_universal"]:
@@ -536,8 +546,11 @@ if not st.session_state.logged_in:
                             st.session_state.user_role = "user"
                             st.session_state.user_id = usuario_input
                             st.session_state.usuario_turno = f"{user_data['grado']} {user_data['nombre']}"
-                            st.success(f"✅ Bienvenido"); registrar_accion(st.session_state.usuario_turno, "INICIO SESIÓN"); actualizar_presencia(usuario_input); st.rerun()
-                        else: st.error("🚫 Inactivo.")
+                            st.success(f"✅ Bienvenido: {st.session_state.usuario_turno}")
+                            registrar_accion(st.session_state.usuario_turno, "INICIO SESIÓN USUARIO")
+                            actualizar_presencia(usuario_input)
+                            st.rerun()
+                        else: st.error("🚫 Usuario inactivo.")
                     else: st.error("🚫 Contraseña incorrecta.")
                 else: st.error("🚫 Usuario no autorizado.")
 
@@ -558,17 +571,15 @@ else:
         st.markdown("---")
         if st.button("🔒 CERRAR SESIÓN"): st.session_state.logged_in = False; st.rerun()
 
-    # MODULOS
     if st.session_state.active_module == 'secretario':
-        st.markdown(f'''<div class="main-header"><h1>SIGD DINIC</h1><h3>Módulo Secretario/a</h3></div>''', unsafe_allow_html=True)
-        
+        st.markdown(f'''<div class="main-header"><h1>SIGD DINIC</h1><h3>Módulo Secretario/a - Gestión Documental</h3></div>''', unsafe_allow_html=True)
         base_h = config_sistema.get("base_historica", 1258)
         total_d = base_h + len(st.session_state.registros)
         total_ia = config_sistema.get("consultas_ia_global", 0) + st.session_state.consultas_ia
         c1, c2, c3 = st.columns(3)
-        c1.markdown(f"<div class='metric-card'><h3>📥 {st.session_state.docs_procesados_hoy}</h3><p>Docs Turno</p></div>", unsafe_allow_html=True)
+        c1.markdown(f"<div class='metric-card'><h3>📥 {st.session_state.docs_procesados_hoy}</h3><p>Docs Turno Actual</p></div>", unsafe_allow_html=True)
         c2.markdown(f"<div class='metric-card'><h3>📈 {total_d}</h3><p>Total Histórico</p></div>", unsafe_allow_html=True)
-        c3.markdown(f"<div class='metric-card'><h3>🧠 {total_ia}</h3><p>Consultas IA</p></div>", unsafe_allow_html=True)
+        c3.markdown(f"<div class='metric-card'><h3>🧠 {total_ia}</h3><p>Consultas IA (Global)</p></div>", unsafe_allow_html=True)
         
         with st.expander("⚙️ CONFIGURACIÓN Y RESPALDO RÁPIDO"):
             c_conf1, c_conf2 = st.columns(2)
@@ -640,7 +651,6 @@ else:
 
             if st.button("🔄 ACTUALIZAR" if is_edit else "➕ AGREGAR", type="primary"):
                 if not os.path.exists("matriz_maestra.xlsx"): st.error("❌ Falta Matriz.")
-                elif tipo_proc != "CONOCIMIENTO" and not str_u and not chk_no: st.warning("⚠️ Seleccione Destino.")
                 else:
                     process = False
                     if tipo_proc == "TRAMITE NORMAL": process = True if (is_edit or d_in or d_out) else False
@@ -659,32 +669,18 @@ else:
                                 if paths["in"]: files_ia.append(genai.upload_file(paths["in"], display_name="In"))
                                 if paths["out"]: files_ia.append(genai.upload_file(paths["out"], display_name="Out"))
                                 
-                                # PROMPT MEJORADO SEGUN INSTRUCCIONES
                                 prompt = """
                                 Eres experto en gestión documental policial. Analiza y extrae JSON ESTRICTO.
-                                
                                 1. CÓDIGO (CRÍTICO): Busca en la esquina superior DERECHA (encabezado). Formato "Oficio Nro. PN-..." o "Memorando...". Extrae TODO el código. Ignora códigos en el cuerpo.
-                                2. DESTINATARIOS: Busca "PARA:" en el encabezado. Extrae Nombres y Grados. (NO CARGOS).
-                                3. REMITENTE: Quien firma al final ("Atentamente").
-                                
-                                JSON:
-                                {
-                                    "fecha_recepcion": "DD/MM/AAAA",
-                                    "remitente_grado_nombre": "Texto",
-                                    "remitente_cargo": "Texto",
-                                    "codigo_completo_entrada": "Texto (El de arriba a la derecha)",
-                                    "asunto_entrada": "Texto",
-                                    "resumen_breve": "Texto",
-                                    "destinatarios_todos": "Texto (Nombres de PARA, sin cargos)",
-                                    "codigo_completo_salida": "Texto (Si hay doc respuesta)",
-                                    "fecha_salida": "DD/MM/AAAA"
-                                }
+                                2. DESTINATARIOS (PARA): Busca "PARA:" en el encabezado. Extrae Nombres y Grados. (NO CARGOS).
+                                3. REMITENTE (DE): Quien firma al final ("Atentamente").
+                                JSON: { "fecha_recepcion": "DD/MM/AAAA", "remitente_grado_nombre": "Texto", "remitente_cargo": "Texto", "codigo_completo_entrada": "Texto (El de arriba a la derecha)", "asunto_entrada": "Texto", "resumen_breve": "Texto", "destinatarios_todos": "Texto (Nombres de PARA, sin cargos)", "codigo_completo_salida": "Texto (Si hay doc respuesta)", "fecha_salida": "DD/MM/AAAA" }
                                 """
                                 data_ia = {}
                                 if files_ia:
                                     res = invocar_ia_segura([prompt, *files_ia])
                                     txt_clean = res.text.replace("```json", "").replace("```", "")
-                                    data_ia = extract_json_safe(txt_clean)
+                                    data_ia = extract_json_safe(txt_clean) # SAFE EXTRACTOR
                                 
                                 final_d = reg_edit.copy() if is_edit else {}
                                 man_data = {"unidades_str": str_u, "tipo_doc_salida": tipo_doc, "reasignado_a": dest_reasig, "G": final_d.get("G",""), "P": final_d.get("P","")}
@@ -725,7 +721,6 @@ else:
                         while ws.cell(row=start_row, column=1).value is not None: start_row += 1
                         gf = PatternFill(start_color="92D050", end_color="92D050", fill_type="solid")
                         rf = PatternFill(start_color="FF0000", end_color="FF0000", fill_type="solid")
-                        
                         for i, r in enumerate(st.session_state.registros):
                             rw = start_row + i
                             def w(c,v): ws.cell(row=rw, column=c).value = v
@@ -737,20 +732,17 @@ else:
                             for c_idx in range(1, 27): 
                                 cell = ws.cell(row=rw, column=c_idx)
                                 if c_idx != 19: preservar_bordes(cell, PatternFill(fill_type=None))
-                        
                         out = io.BytesIO(); wb.save(out); out.seek(0)
                         fn = f"TURNO {fecha_turno.strftime('%d-%m-%y')} {st.session_state.usuario_turno.upper()}.xlsx"
                         st.download_button("📥 DESCARGAR MATRIZ FINAL", out, fn, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", type="primary")
                     except Exception as e: st.error(f"Error Excel: {e}")
 
-    # 2. ASESOR
     elif st.session_state.active_module == 'asesor':
         st.markdown("### 🧠 Asesor Inteligente")
         if st.session_state.user_id not in db_contratos:
             st.warning("⚠️ Acepte los términos.")
             with st.expander("📜 TÉRMINOS Y CONDICIONES"):
                 if st.button("✅ ACEPTAR Y FIRMAR"):
-                    # Simular firma simple para demo (en prod usar camara)
                     db_contratos[st.session_state.user_id] = {"fecha": get_hora_ecuador().strftime("%Y-%m-%d %H:%M:%S"), "foto": "", "usuario": st.session_state.usuario_turno}
                     guardar_json(CONTRATOS_FILE, db_contratos); st.rerun()
         else:
@@ -769,7 +761,6 @@ else:
                         os.remove(p)
                     except Exception as e: st.error(str(e))
 
-    # 3. TH
     elif st.session_state.active_module == 'th':
         if not st.session_state.th_unlocked:
             st.markdown("### 👤 Talento Humano"); pwd = st.text_input("Contraseña:", type="password")
@@ -780,7 +771,6 @@ else:
             components.html(get_generador_policial_html(), height=800, scrolling=True)
             if st.button("Cerrar"): st.session_state.th_unlocked = False; st.rerun()
 
-    # 4. ADMIN
     elif st.session_state.active_module == 'admin':
         st.markdown("### 🛡️ ADMINISTRADOR"); pwd = st.text_input("Contraseña Maestra:", type="password")
         if st.session_state.user_role == "admin" and pwd == ADMIN_PASS_MASTER:
