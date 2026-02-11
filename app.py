@@ -16,7 +16,7 @@ from openpyxl.styles import PatternFill, Border, Side, Alignment
 from datetime import datetime, timedelta, timezone
 
 # --- 1. CONFIGURACIÓN Y ESTILOS ---
-VER_SISTEMA = "v37.0"
+VER_SISTEMA = "v36.1"
 ADMIN_USER = "1723623011"
 ADMIN_PASS_MASTER = "9994915010022"
 
@@ -335,6 +335,8 @@ def extract_json_safe(text):
 
 def limpiar_codigo_prioridad(texto):
     if not texto: return ""
+    # REGEX AMPLIADO: Captura todo desde PN- hasta que encuentre un salto de línea
+    # Se elimina la parte final que indica el tipo de documento si está pegada
     match = re.search(r"(PN-[\w\-\(\)\.]+)", str(texto).upper())
     if match: 
         codigo = match.group(1).strip()
@@ -346,6 +348,7 @@ def limpiar_codigo_prioridad(texto):
 
 def extraer_unidad_f7(texto_codigo):
     if not texto_codigo: return "DINIC"
+    # REGEX: Entre PN- y -QX (o solo QX)
     match = re.search(r"PN-(.+?)-QX", str(texto_codigo), re.IGNORECASE)
     if match:
         unidad = match.group(1).strip().upper()
@@ -379,13 +382,12 @@ def preservar_bordes(cell, fill_obj):
         thin = Side(border_style="thin", color="000000")
         cell.border = Border(top=thin, left=thin, right=thin, bottom=thin)
 
-# --- GENERADOR DE FILA MATRIZ BLINDADO v37 ---
+# --- GENERADOR DE FILA MATRIZ BLINDADO v36 ---
 def generar_fila_matriz(tipo, ia_data, manual_data, usuario_turno, paths_files):
     raw_code_in = ia_data.get("codigo_completo_entrada", "")
     cod_in = limpiar_codigo_prioridad(raw_code_in)
     unidad_f7 = extraer_unidad_f7(cod_in)
     
-    # DESTINATARIOS
     dest_ia = ia_data.get("destinatarios_todos", "")
     
     raw_code_out = ia_data.get("codigo_completo_salida", "")
@@ -420,7 +422,9 @@ def generar_fila_matriz(tipo, ia_data, manual_data, usuario_turno, paths_files):
     
     elif tipo == "REASIGNADO":
         row["L"] = "REASIGNADO"
-        row["P"] = ""; row["V"] = ""
+        # Según documento: P7 y V7 VACÍAS
+        row["P"] = ""
+        row["V"] = ""
         row["Q"] = row["H"]; row["W"] = row["H"]; row["X"] = row["H"]
         if manual_data.get("reasignado_a"): row["O"] = manual_data.get("reasignado_a")
 
@@ -435,6 +439,7 @@ def generar_fila_matriz(tipo, ia_data, manual_data, usuario_turno, paths_files):
 
     elif tipo == "CONOCIMIENTO":
         row["L"] = "CONOCIMIENTO"
+        # M,N,O,P,U,V VACIAS
         row["M"] = ""; row["O"] = ""; row["P"] = ""; row["U"] = ""; row["V"] = ""
         row["T"] = "NO"
         row["Q"] = row["C"]; row["W"] = row["C"]; row["X"] = row["C"]
@@ -500,6 +505,7 @@ else:
         st.markdown("---")
         if st.button("🔒 CERRAR SESIÓN"): st.session_state.logged_in = False; st.rerun()
 
+    # SECRETARIO/A
     if st.session_state.active_module == 'secretario':
         st.markdown(f'''<div class="main-header"><h1>SIGD DINIC</h1><h3>Módulo Secretario/a - Gestión Documental</h3></div>''', unsafe_allow_html=True)
         base_h = config_sistema.get("base_historica", 1258)
@@ -600,31 +606,10 @@ else:
                                 
                                 prompt = """
                                 Eres experto en gestión documental policial. Analiza y extrae JSON ESTRICTO.
-                                
-                                SI HAY DOCUMENTO DE RESPUESTA (SALIDA):
-                                1. DESTINATARIOS (Campo 'O'):
-                                   - UBICACIÓN CLAVE: Busca "PARA:" o bajo "ASUNTO:".
-                                   - INSTRUCCIÓN: Extrae TODOS los Grados y Nombres.
-                                   - PROHIBIDO: NO pongas cargos. NO pongas al remitente.
-                                
-                                2. CÓDIGO SALIDA (Campo 'P'): Esquina superior derecha.
-
-                                SI HAY DOCUMENTO DE ENTRADA:
-                                3. CÓDIGO ENTRADA (Campo 'G'): Esquina superior derecha.
-                                4. REMITENTE (Campo 'D'): Quien firma al final.
-
-                                JSON:
-                                {
-                                    "fecha_recepcion": "DD/MM/AAAA",
-                                    "remitente_grado_nombre": "Texto",
-                                    "remitente_cargo": "Texto",
-                                    "codigo_completo_entrada": "Texto",
-                                    "asunto_entrada": "Texto",
-                                    "resumen_breve": "Texto",
-                                    "destinatarios_todos": "Texto (Destinatarios Doc Salida)",
-                                    "codigo_completo_salida": "Texto",
-                                    "fecha_salida": "DD/MM/AAAA"
-                                }
+                                1. CÓDIGO (CRÍTICO): Busca en la esquina superior DERECHA (encabezado). Formato "Oficio Nro. PN-..." o "Memorando...". Extrae TODO el código. Ignora códigos en el cuerpo.
+                                2. DESTINATARIOS (PARA): Busca "PARA:" o "DESTINATARIO:". Extrae Nombres y Grados (NO CARGOS).
+                                3. REMITENTE (DE): Quien firma al final ("Atentamente").
+                                JSON: { "fecha_recepcion": "DD/MM/AAAA", "remitente_grado_nombre": "Texto", "remitente_cargo": "Texto", "codigo_completo_entrada": "Texto (El de arriba a la derecha)", "asunto_entrada": "Texto", "resumen_breve": "Texto", "destinatarios_todos": "Texto", "codigo_completo_salida": "Texto", "fecha_salida": "DD/MM/AAAA" }
                                 """
                                 data_ia = {}
                                 if files_ia:
