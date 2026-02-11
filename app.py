@@ -16,7 +16,7 @@ from openpyxl.styles import PatternFill, Border, Side, Alignment
 from datetime import datetime, timedelta, timezone
 
 # --- 1. CONFIGURACIÓN Y ESTILOS ---
-VER_SISTEMA = "v36.0"
+VER_SISTEMA = "v37.0"
 ADMIN_USER = "1723623011"
 ADMIN_PASS_MASTER = "9994915010022"
 
@@ -320,7 +320,7 @@ def frases_curiosas():
     frases = ["¿Sabías que? El primer virus se llamó Creeper.", "¿Sabías que? La seguridad es responsabilidad de todos.", "¿Sabías que? Tu contraseña es tu llave digital.", "¿Sabías que? La IA procesa, tú decides.", "¿Sabías que? Un escritorio limpio mejora la productividad."]
     return random.choice(frases)
 
-# --- FUNCIÓN DE LIMPIEZA DE CÓDIGO (IA MEJORADA) ---
+# --- FUNCIÓN DE LIMPIEZA DE CÓDIGO ---
 def extract_json_safe(text):
     try: return json.loads(text)
     except:
@@ -328,7 +328,6 @@ def extract_json_safe(text):
         if match:
             try: 
                 data = json.loads(match.group())
-                # SI LA IA DEVUELVE LISTA, TOMA EL PRIMERO
                 if isinstance(data, list) and len(data) > 0: return data[0]
                 elif isinstance(data, dict): return data
             except: return {}
@@ -336,7 +335,6 @@ def extract_json_safe(text):
 
 def limpiar_codigo_prioridad(texto):
     if not texto: return ""
-    # REGEX AMPLIADO
     match = re.search(r"(PN-[\w\-\(\)\.]+)", str(texto).upper())
     if match: 
         codigo = match.group(1).strip()
@@ -348,7 +346,6 @@ def limpiar_codigo_prioridad(texto):
 
 def extraer_unidad_f7(texto_codigo):
     if not texto_codigo: return "DINIC"
-    # F7: EXCLUSIVAMENTE ENTRE PN- Y QX
     match = re.search(r"PN-(.+?)-QX", str(texto_codigo), re.IGNORECASE)
     if match:
         unidad = match.group(1).strip().upper()
@@ -382,13 +379,13 @@ def preservar_bordes(cell, fill_obj):
         thin = Side(border_style="thin", color="000000")
         cell.border = Border(top=thin, left=thin, right=thin, bottom=thin)
 
-# --- GENERADOR DE FILA MATRIZ BLINDADO v36 ---
+# --- GENERADOR DE FILA MATRIZ BLINDADO v37 ---
 def generar_fila_matriz(tipo, ia_data, manual_data, usuario_turno, paths_files):
-    # 1. EXTRACCION
     raw_code_in = ia_data.get("codigo_completo_entrada", "")
     cod_in = limpiar_codigo_prioridad(raw_code_in)
-    unidad_f7 = extraer_unidad_f7(cod_in) # F7 estricto
+    unidad_f7 = extraer_unidad_f7(cod_in)
     
+    # DESTINATARIOS
     dest_ia = ia_data.get("destinatarios_todos", "")
     
     raw_code_out = ia_data.get("codigo_completo_salida", "")
@@ -397,11 +394,9 @@ def generar_fila_matriz(tipo, ia_data, manual_data, usuario_turno, paths_files):
     fecha_ia_in = ia_data.get("fecha_recepcion", "")
     fecha_ia_out = ia_data.get("fecha_salida", "")
     
-    # 2. ESTADO S7
     estado_s7 = "PENDIENTE"
     has_in = True if (paths_files.get("in") or manual_data.get("G")) else False
     has_out = True if (paths_files.get("out") or manual_data.get("P")) else False
-    
     if tipo in ["CONOCIMIENTO", "REASIGNADO", "GENERADO DESDE DESPACHO"]: estado_s7 = "FINALIZADO"
     elif has_in and has_out: estado_s7 = "FINALIZADO"
 
@@ -409,7 +404,6 @@ def generar_fila_matriz(tipo, ia_data, manual_data, usuario_turno, paths_files):
     es_interno = determinar_sale_no_sale(str_unidades)
     if tipo == "CONOCIMIENTO": es_interno = "NO"
 
-    # 3. CONSTRUCCIÓN
     row = {
         "C": fecha_ia_in, "D": ia_data.get("remitente_grado_nombre", ""),
         "E": ia_data.get("remitente_cargo", ""), "F": unidad_f7,
@@ -421,32 +415,26 @@ def generar_fila_matriz(tipo, ia_data, manual_data, usuario_turno, paths_files):
         "Y": "", "Z": ""
     }
 
-    # 4. REGLAS ESTRICTAS
     if tipo == "TRAMITE NORMAL":
         row["L"] = ""
-        # O7 = Destinatarios IA
     
     elif tipo == "REASIGNADO":
         row["L"] = "REASIGNADO"
-        # Doc 3: P7 y V7 VACIAS
-        row["P"] = ""
-        row["V"] = ""
+        row["P"] = ""; row["V"] = ""
         row["Q"] = row["H"]; row["W"] = row["H"]; row["X"] = row["H"]
         if manual_data.get("reasignado_a"): row["O"] = manual_data.get("reasignado_a")
 
     elif tipo == "GENERADO DESDE DESPACHO":
         row["L"] = "GENERADO DESDE DESPACHO"
-        # Doc 4: D7 y E7 VACIAS
-        row["D"] = ""; row["E"] = ""
         f_gen = fecha_ia_out if fecha_ia_out else fecha_ia_in
         row["C"] = f_gen; row["H"] = f_gen; row["Q"] = f_gen; row["W"] = f_gen; row["X"] = f_gen
+        row["D"] = ""; row["E"] = ""
         code_final = cod_out if cod_out else cod_in
         row["G"] = code_final; row["P"] = code_final; row["V"] = code_final
         row["F"] = extraer_unidad_f7(code_final)
 
     elif tipo == "CONOCIMIENTO":
         row["L"] = "CONOCIMIENTO"
-        # Doc 5: M,N,O,P,U,V VACIAS
         row["M"] = ""; row["O"] = ""; row["P"] = ""; row["U"] = ""; row["V"] = ""
         row["T"] = "NO"
         row["Q"] = row["C"]; row["W"] = row["C"]; row["X"] = row["C"]
@@ -512,10 +500,8 @@ else:
         st.markdown("---")
         if st.button("🔒 CERRAR SESIÓN"): st.session_state.logged_in = False; st.rerun()
 
-    # SECRETARIO/A
     if st.session_state.active_module == 'secretario':
         st.markdown(f'''<div class="main-header"><h1>SIGD DINIC</h1><h3>Módulo Secretario/a - Gestión Documental</h3></div>''', unsafe_allow_html=True)
-        
         base_h = config_sistema.get("base_historica", 1258)
         total_d = base_h + len(st.session_state.registros)
         total_ia = config_sistema.get("consultas_ia_global", 0) + st.session_state.consultas_ia
@@ -614,10 +600,31 @@ else:
                                 
                                 prompt = """
                                 Eres experto en gestión documental policial. Analiza y extrae JSON ESTRICTO.
-                                1. CÓDIGO (CRÍTICO): Busca en la esquina superior DERECHA. Formato "Oficio Nro. PN-..." o "Memorando...". Extrae el código completo.
-                                2. DESTINATARIOS (PARA): Busca "PARA:" o "DESTINATARIO:". Extrae Nombres y Grados (NO CARGOS).
-                                3. REMITENTE (DE): Quien firma al final ("Atentamente").
-                                JSON: { "fecha_recepcion": "DD/MM/AAAA", "remitente_grado_nombre": "Texto", "remitente_cargo": "Texto", "codigo_completo_entrada": "Texto", "asunto_entrada": "Texto", "resumen_breve": "Texto", "destinatarios_todos": "Texto", "codigo_completo_salida": "Texto", "fecha_salida": "DD/MM/AAAA" }
+                                
+                                SI HAY DOCUMENTO DE RESPUESTA (SALIDA):
+                                1. DESTINATARIOS (Campo 'O'):
+                                   - UBICACIÓN CLAVE: Busca "PARA:" o bajo "ASUNTO:".
+                                   - INSTRUCCIÓN: Extrae TODOS los Grados y Nombres.
+                                   - PROHIBIDO: NO pongas cargos. NO pongas al remitente.
+                                
+                                2. CÓDIGO SALIDA (Campo 'P'): Esquina superior derecha.
+
+                                SI HAY DOCUMENTO DE ENTRADA:
+                                3. CÓDIGO ENTRADA (Campo 'G'): Esquina superior derecha.
+                                4. REMITENTE (Campo 'D'): Quien firma al final.
+
+                                JSON:
+                                {
+                                    "fecha_recepcion": "DD/MM/AAAA",
+                                    "remitente_grado_nombre": "Texto",
+                                    "remitente_cargo": "Texto",
+                                    "codigo_completo_entrada": "Texto",
+                                    "asunto_entrada": "Texto",
+                                    "resumen_breve": "Texto",
+                                    "destinatarios_todos": "Texto (Destinatarios Doc Salida)",
+                                    "codigo_completo_salida": "Texto",
+                                    "fecha_salida": "DD/MM/AAAA"
+                                }
                                 """
                                 data_ia = {}
                                 if files_ia:
@@ -676,7 +683,6 @@ else:
                         st.download_button("📥 DESCARGAR MATRIZ FINAL", out, fn, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", type="primary")
                     except Exception as e: st.error(f"Error Excel: {e}")
 
-    # 2. ASESOR
     elif st.session_state.active_module == 'asesor':
         st.markdown("### 🧠 Asesor Inteligente")
         if st.session_state.user_id not in db_contratos:
@@ -701,7 +707,6 @@ else:
                         os.remove(p)
                     except Exception as e: st.error(str(e))
 
-    # 3. TH
     elif st.session_state.active_module == 'th':
         if not st.session_state.th_unlocked:
             st.markdown("### 👤 Talento Humano"); pwd = st.text_input("Contraseña:", type="password")
@@ -712,7 +717,6 @@ else:
             components.html(get_generador_policial_html(), height=800, scrolling=True)
             if st.button("Cerrar"): st.session_state.th_unlocked = False; st.rerun()
 
-    # 4. ADMIN
     elif st.session_state.active_module == 'admin':
         st.markdown("### 🛡️ ADMINISTRADOR"); pwd = st.text_input("Contraseña Maestra:", type="password")
         if st.session_state.user_role == "admin" and pwd == ADMIN_PASS_MASTER:
