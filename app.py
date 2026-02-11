@@ -16,7 +16,7 @@ from openpyxl.styles import PatternFill, Border, Side, Alignment
 from datetime import datetime, timedelta, timezone
 
 # --- 1. CONFIGURACIÓN Y ESTILOS ---
-VER_SISTEMA = "v44.1"
+VER_SISTEMA = "v44.2"
 ADMIN_USER = "1723623011"
 ADMIN_PASS_MASTER = "9994915010022"
 
@@ -229,7 +229,7 @@ except: sistema_activo = False
 
 def invocar_ia_segura(content):
     if not st.session_state.genai_model: raise Exception("IA no configurada")
-    # AUMENTO DE REINTENTOS PARA EVITAR ERROR 'SATURADO'
+    # AUMENTO DE REINTENTOS PARA EVITAR ERROR 'SATURADO' CON ESPERA PROGRESIVA
     max_retries = 5 
     wait_time = 2
     for i in range(max_retries):
@@ -238,10 +238,10 @@ def invocar_ia_segura(content):
         except Exception as e:
             if "429" in str(e): # Too Many Requests
                 time.sleep(wait_time)
-                wait_time *= 2 # Exponential backoff
+                wait_time *= 2 # Exponential backoff: 2s, 4s, 8s, 16s...
                 continue
             time.sleep(1)
-    raise Exception("Sistema saturado. Por favor espere 1 minuto.")
+    raise Exception("Sistema saturado. Por favor intente subir los documentos de uno en uno o espere un minuto.")
 
 def preservar_bordes(cell, fill_obj):
     from copy import copy
