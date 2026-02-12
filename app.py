@@ -16,7 +16,7 @@ from openpyxl.styles import PatternFill, Border, Side, Alignment
 from datetime import datetime, timedelta, timezone
 
 # --- 1. CONFIGURACIÓN E INICIO ---
-VER_SISTEMA = "v59.0 (Auto-Scan + UI Premium)"
+VER_SISTEMA = "v60.0 (Auto-Scan + Lectura Garantizada)"
 ADMIN_USER = "1723623011"
 ADMIN_PASS_MASTER = "9994915010022"
 
@@ -53,6 +53,7 @@ def preservar_bordes(cell, fill_obj):
     cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=False)
 
 def extract_json_safe(text):
+    """Extrae JSON incluso si la IA devuelve texto adicional"""
     try: return json.loads(text)
     except:
         match = re.search(r"(\{.*\}|\[.*\])", text, re.DOTALL)
@@ -117,7 +118,7 @@ def obtener_modelo_disponible():
                 modelos_validos.append(m.name)
         
         # Prioridad: Flash -> Pro 1.5 -> Pro 1.0 -> Cualquiera
-        if not modelos_validos: return "gemini-1.5-flash" # Fallback por si acaso
+        if not modelos_validos: return "models/gemini-1.5-flash" # Fallback por si acaso
         
         # Buscar Flash
         flash = next((m for m in modelos_validos if "flash" in m), None)
@@ -130,7 +131,7 @@ def obtener_modelo_disponible():
         # Devolver el primero que encuentre
         return modelos_validos[0]
     except:
-        return "gemini-1.5-flash" # Fallback si falla el listado
+        return "models/gemini-1.5-flash" # Fallback si falla el listado
 
 def invocar_ia_segura(content):
     if 'genai_model' not in st.session_state:
@@ -288,7 +289,7 @@ if 'consultas_ia' not in st.session_state: st.session_state.consultas_ia = 0
 if 'active_module' not in st.session_state: st.session_state.active_module = 'secretario'
 if 'lista_unidades' not in st.session_state: st.session_state.lista_unidades = db_listas.get("unidades", UNIDADES_DEFAULT)
 if 'lista_reasignados' not in st.session_state: st.session_state.lista_reasignados = db_listas.get("reasignados", [])
-if 'active_model_name' not in st.session_state: st.session_state.active_model_name = "Sin Conexión"
+if 'active_model_name' not in st.session_state: st.session_state.active_model_name = "Detectando..."
 
 # Persistencia F5
 token = st.query_params.get("token", None)
@@ -296,13 +297,13 @@ if token and not st.session_state.logged_in and token in db_usuarios:
     st.session_state.logged_in = True; st.session_state.user_id = token; st.session_state.user_role = "admin" if token == ADMIN_USER else "user"
     st.session_state.usuario_turno = f"{db_usuarios[token]['grado']} {db_usuarios[token]['nombre']}"
 
-# --- AUTO-SCAN DE IA ---
+# --- AUTO-SCAN DE IA (CORAZÓN DE LA SOLUCIÓN) ---
 sistema_activo = False
 try:
     api_key = st.secrets.get("GEMINI_API_KEY")
     if api_key:
         genai.configure(api_key=api_key)
-        # AQUÍ ESTÁ LA MAGIA: Escanea y elige
+        # Escanear modelos disponibles y elegir el mejor automáticamente
         if 'genai_model' not in st.session_state:
             modelo_elegido = obtener_modelo_disponible()
             st.session_state.genai_model = genai.GenerativeModel(modelo_elegido)
@@ -349,7 +350,7 @@ else:
         st.markdown("### 👮‍♂️ CONTROL DE MANDO")
         if st.session_state.user_role == "admin": st.markdown("""<div class="admin-badge">🛡️ MODO ADMINISTRADOR<br><span style="font-size: 0.8em; font-weight: normal;">CONTROL TOTAL</span></div>""", unsafe_allow_html=True)
         st.info(f"👤 **{st.session_state.usuario_turno}**")
-        st.caption(f"🤖 IA: {st.session_state.active_model_name}") # Indicador del modelo activo
+        st.caption(f"🤖 IA: {st.session_state.active_model_name}") 
         fecha_turno = st.date_input("Fecha Operación:", value=get_hora_ecuador().date())
         st.markdown("---"); st.markdown("### 📂 MÓDULOS")
         if st.button("📝 SECRETARIO/A", use_container_width=True, type="primary" if st.session_state.active_module == 'secretario' else "secondary"): st.session_state.active_module = 'secretario'; st.rerun()
@@ -497,6 +498,8 @@ else:
                                     res = invocar_ia_segura([prompt, *files_ia])
                                     txt_clean = res.text.replace("```json", "").replace("```", "")
                                     data_ia = extract_json_safe(txt_clean)
+                                    
+                                    if not data_ia: st.error("⚠️ La IA no devolvió datos válidos. Revisa el PDF.")
                                 
                                 final_d = reg_edit.copy() if is_edit else {}
                                 man_data = {"unidades_str": str_u, "tipo_doc_salida": tipo_doc, "reasignado_a": dest_reasig, "G": final_d.get("G",""), "P": final_d.get("P","")}
