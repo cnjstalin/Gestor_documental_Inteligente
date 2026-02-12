@@ -16,7 +16,7 @@ from openpyxl.styles import PatternFill, Border, Side, Alignment
 from datetime import datetime, timedelta, timezone
 
 # --- 1. CONFIGURACIÓN Y ESTILOS ---
-VER_SISTEMA = "v54.0 (Auto-Fix Model)"
+VER_SISTEMA = "v55.0 (Auto-Detect)"
 ADMIN_USER = "1723623011"
 ADMIN_PASS_MASTER = "9994915010022"
 
@@ -27,21 +27,17 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- 2. FUNCIONES GLOBALES (MOVIDAS AL INICIO PARA EVITAR ERRORES) ---
+# --- 2. FUNCIONES GLOBALES ---
 def get_hora_ecuador(): return datetime.now(timezone(timedelta(hours=-5)))
 
 def preservar_bordes(cell, fill_obj):
     from copy import copy
     from openpyxl.styles import Side, Border, Alignment
-    
-    if cell.border and (cell.border.left.style or cell.border.top.style):
-        new_border = copy(cell.border)
+    if cell.border and (cell.border.left.style or cell.border.top.style): new_border = copy(cell.border)
     else:
         thin = Side(border_style="thin", color="000000")
         new_border = Border(top=thin, left=thin, right=thin, bottom=thin)
-    
-    cell.border = new_border
-    cell.fill = fill_obj
+    cell.border = new_border; cell.fill = fill_obj
     cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=False)
 
 def extract_json_safe(text):
@@ -67,10 +63,7 @@ def limpiar_codigo_prioridad(texto):
 def extraer_unidad_f7(texto_codigo):
     if not texto_codigo: return "DINIC"
     match = re.search(r"PN-(.+?)-QX", str(texto_codigo), re.IGNORECASE)
-    if match:
-        unidad = match.group(1).strip().upper()
-        unidad = unidad.replace('(', '').replace(')', '')
-        return unidad
+    if match: return match.group(1).strip().upper().replace('(', '').replace(')', '')
     return "DINIC"
 
 def determinar_sale_no_sale(destinos_str):
@@ -100,11 +93,7 @@ USUARIOS_BASE = {
     "1723623011": {"grado": "CBOS", "nombre": "CARRILLO NARVAEZ JOHN STALIN", "activo": True}
 }
 
-UNIDADES_DEFAULT = [
-    "DINIC", "SOPORTE OPERATIVO", "APOYO OPERATIVO", "PLANIFICACION", 
-    "JURIDICO", "COMUNICACION", "ANALISIS DE INFORMACION", "COORDINACION OPERACIONAL", 
-    "FINANCIERO", "UCAP", "UNDECOF", "UDAR", "DIGIN", "DNATH", "DAOP", "DCOP", "DSOP"
-]
+UNIDADES_DEFAULT = ["DINIC", "SOPORTE OPERATIVO", "APOYO OPERATIVO", "PLANIFICACION", "JURIDICO", "COMUNICACION", "ANALISIS DE INFORMACION", "COORDINACION OPERACIONAL", "FINANCIERO", "UCAP", "UNDECOF", "UDAR", "DIGIN", "DNATH", "DAOP", "DCOP", "DSOP"]
 
 DB_FILE = "usuarios_db.json"
 CONFIG_FILE = "config_sistema.json"
@@ -112,69 +101,47 @@ CONTRATOS_FILE = "contratos_legal.json"
 LOGS_FILE = "historial_acciones.json"
 LISTAS_FILE = "listas_db.json"
 
-# FUNCIONES DE CARGA/GUARDADO
 def cargar_json(filepath, default):
     if os.path.exists(filepath):
         try:
-            with open(filepath, 'r') as f:
-                return json.load(f)
+            with open(filepath, 'r') as f: return json.load(f)
         except: return default
     return default
 
 def guardar_json(filepath, data):
     try:
-        with open(filepath, 'w') as f:
-            json.dump(data, f)
+        with open(filepath, 'w') as f: json.dump(data, f)
     except: pass
 
 def inicializar_usuarios_seguros():
     usuarios_finales = USUARIOS_BASE.copy()
     if os.path.exists(DB_FILE):
         try:
-            with open(DB_FILE, 'r') as f:
-                usuarios_locales = json.load(f)
-                if isinstance(usuarios_locales, dict):
-                    usuarios_finales.update(usuarios_locales)
+            with open(DB_FILE, 'r') as f: usuarios_finales.update(json.load(f))
         except: pass
     guardar_json(DB_FILE, usuarios_finales)
     return usuarios_finales
 
-def cargar_listas_desplegables():
-    datos = cargar_json(LISTAS_FILE, {"unidades": UNIDADES_DEFAULT, "reasignados": []})
-    if not isinstance(datos, dict): datos = {"unidades": UNIDADES_DEFAULT, "reasignados": []}
-    for u in UNIDADES_DEFAULT:
-        if u not in datos["unidades"]: datos["unidades"].append(u)
-    return datos
-
-def guardar_nueva_entrada_lista(tipo, valor):
-    datos = cargar_listas_desplegables()
-    if valor and valor not in datos[tipo]:
-        datos[tipo].append(valor)
-        guardar_json(LISTAS_FILE, datos)
-        if tipo == "unidades": st.session_state.lista_unidades = datos["unidades"]
-        if tipo == "reasignados": st.session_state.lista_reasignados = datos["reasignados"]
-
-# CARGA INICIAL
 config_sistema = cargar_json(CONFIG_FILE, {"pass_universal": "DINIC2026", "pass_th": "THDINIC123", "base_historica": 1258, "consultas_ia_global": 0})
 db_usuarios = inicializar_usuarios_seguros()
 db_contratos = cargar_json(CONTRATOS_FILE, {})
 db_logs = cargar_json(LOGS_FILE, [])
 if not isinstance(db_logs, list): db_logs = []
-db_listas = cargar_listas_desplegables()
+db_listas = cargar_json(LISTAS_FILE, {"unidades": UNIDADES_DEFAULT, "reasignados": []})
+
+def guardar_nueva_entrada_lista(tipo, valor):
+    if valor and valor not in db_listas[tipo]:
+        db_listas[tipo].append(valor); guardar_json(LISTAS_FILE, db_listas)
+        if tipo == "unidades": st.session_state.lista_unidades = db_listas["unidades"]
+        if tipo == "reasignados": st.session_state.lista_reasignados = db_listas["reasignados"]
 
 if 'lista_unidades' not in st.session_state: st.session_state.lista_unidades = db_listas["unidades"]
 if 'lista_reasignados' not in st.session_state: st.session_state.lista_reasignados = db_listas["reasignados"]
 
 def registrar_accion(usuario, accion, detalle=""):
     ahora = get_hora_ecuador().strftime("%Y-%m-%d %H:%M:%S")
-    nuevo_log = {"fecha": ahora, "usuario": usuario, "accion": accion, "detalle": detalle}
-    global db_logs
-    db_logs.insert(0, nuevo_log)
+    db_logs.insert(0, {"fecha": ahora, "usuario": usuario, "accion": accion, "detalle": detalle})
     guardar_json(LOGS_FILE, db_logs)
-
-def incrementar_contador_ia():
-    config_sistema["consultas_ia_global"] = config_sistema.get("consultas_ia_global", 0) + 1
-    guardar_json(CONFIG_FILE, config_sistema)
 
 def actualizar_presencia(cedula_usuario):
     if cedula_usuario in db_usuarios:
@@ -193,13 +160,6 @@ def get_estado_usuario(cedula):
         else: return "🔴 DESCONECTADO"
     except: return "🔴 ERROR"
 
-def get_ultima_accion_usuario(nombre_usuario):
-    if not isinstance(db_logs, list): return "---"
-    for log in db_logs:
-        if log.get('usuario') == nombre_usuario:
-            return f"{log.get('accion')} ({log.get('fecha','').split(' ')[1]})"
-    return "---"
-
 def get_img_as_base64(file_path):
     try:
         with open(file_path, "rb") as f: return base64.b64encode(f.read()).decode()
@@ -212,138 +172,11 @@ def get_logo_html(width="120px"):
     return f'<img src="https://upload.wikimedia.org/wikipedia/commons/2/25/Escudo_Policia_Nacional_del_Ecuador.png" style="width:{width}; margin-bottom:15px;">'
 
 def frases_curiosas():
-    frases = [
-        "¿Sabías que? El primer virus se llamó Creeper.",
-        "¿Sabías que? La seguridad es responsabilidad de todos.",
-        "¿Sabías que? Tu contraseña es tu llave digital.",
-        "¿Sabías que? La IA procesa, tú decides.",
-        "¿Sabías que? Un escritorio limpio mejora la productividad."
-    ]
-    return random.choice(frases)
+    return random.choice(["Analizando...", "Extrayendo datos...", "Verificando códigos...", "Conectando con IA..."])
 
 def generar_html_contrato(datos_usuario, img_b64):
     fecha_hora = get_hora_ecuador().strftime("%Y-%m-%d %H:%M:%S")
     return f"""<div style='font-family:Arial; padding:20px; border:1px solid black;'><h2>ACTA</h2><p>Usuario: {datos_usuario.get('grado')} {datos_usuario.get('nombre')}</p><p>Fecha: {fecha_hora}</p><img src='data:image/png;base64,{img_b64}' width='150'></div>"""
-
-# VARIABLE GLOBAL SISTEMA
-sistema_activo = False
-
-# --- 5. CONFIGURACIÓN IA (CON AUTO-REPARACIÓN 404) ---
-try:
-    api_key = st.secrets.get("GEMINI_API_KEY")
-    if api_key:
-        genai.configure(api_key=api_key)
-        # Inicialmente intentamos Flash
-        if 'genai_model' not in st.session_state or not st.session_state.genai_model:
-            st.session_state.genai_model = genai.GenerativeModel("gemini-1.5-flash")
-        sistema_activo = True
-except: sistema_activo = False
-
-def invocar_ia_segura(content):
-    if not st.session_state.genai_model: raise Exception("IA no configurada")
-    
-    max_retries = 3
-    for i in range(max_retries):
-        try:
-            return st.session_state.genai_model.generate_content(content)
-        except Exception as e:
-            # DETECTOR DE ERROR 404 (Modelo no encontrado) -> CAMBIO AUTOMÁTICO A GEMINI-PRO
-            error_str = str(e)
-            if "404" in error_str or "not found" in error_str:
-                try:
-                    # Cambiamos al modelo clásico que siempre funciona
-                    st.session_state.genai_model = genai.GenerativeModel("gemini-pro")
-                    # Reintentamos inmediatamente con el nuevo modelo
-                    return st.session_state.genai_model.generate_content(content)
-                except Exception as e2:
-                    raise Exception(f"Error irrecuperable: {e2}")
-            
-            # Si es error de saturación, esperamos
-            if "429" in error_str:
-                time.sleep(2)
-                continue
-            time.sleep(1)
-            
-    # Último intento desesperado
-    try:
-        return st.session_state.genai_model.generate_content(content)
-    except:
-        raise Exception("Error de conexión. Verifique su API Key o intente de nuevo.")
-
-# --- 6. LOGICA MATRIZ BLINDADA V54 (ORIGINAL + MEJORAS) ---
-def generar_fila_matriz(tipo, ia_data, manual_data, usuario_turno, paths_files):
-    # DATOS IA
-    raw_code_in = ia_data.get("recibido_codigo", "")
-    cod_in = limpiar_codigo_prioridad(raw_code_in)
-    unidad_f7 = extraer_unidad_f7(cod_in)
-    
-    dest_out = ia_data.get("respuesta_destinatarios", "")
-    
-    raw_code_out = ia_data.get("respuesta_codigo", "")
-    cod_out = limpiar_codigo_prioridad(raw_code_out)
-    
-    fecha_in = ia_data.get("recibido_fecha", "")
-    fecha_out = ia_data.get("respuesta_fecha", "")
-
-    estado_s7 = "PENDIENTE"
-    has_in = True if (paths_files.get("in") or manual_data.get("G")) else False
-    has_out = True if (paths_files.get("out") or manual_data.get("P")) else False
-    if tipo in ["CONOCIMIENTO", "REASIGNADO", "GENERADO DESDE DESPACHO"]: estado_s7 = "FINALIZADO"
-    elif has_in and has_out: estado_s7 = "FINALIZADO"
-
-    str_unidades = manual_data.get("unidades_str", "")
-    es_interno = determinar_sale_no_sale(str_unidades)
-    if tipo == "CONOCIMIENTO": es_interno = "NO"
-
-    row = {
-        "C": fecha_in, "D": ia_data.get("recibido_remitente_nombre", ""),
-        "E": ia_data.get("recibido_remitente_cargo", ""), "F": unidad_f7,
-        "G": cod_in, "H": fecha_in, "I": ia_data.get("recibido_asunto", ""),
-        "J": ia_data.get("recibido_resumen", ""), "K": usuario_turno,
-        "L": "", "M": str_unidades, "N": manual_data.get("tipo_doc_salida", ""),
-        "O": "", "P": "", "Q": "", "R": "", "S": estado_s7,
-        "T": es_interno, "U": "", "V": "", "W": "", "X": "", "Y": "", "Z": ""
-    }
-
-    if tipo == "TRAMITE NORMAL":
-        row["L"] = ""
-        row["O"] = dest_out 
-        row["P"] = cod_out  
-        row["Q"] = fecha_out
-        row["U"] = str_unidades
-        row["V"] = cod_out
-        row["W"] = fecha_out
-        row["X"] = fecha_out
-
-    elif tipo == "REASIGNADO":
-        row["L"] = "REASIGNADO"
-        row["O"] = manual_data.get("reasignado_a", "")
-        row["P"] = "" 
-        row["V"] = ""
-        row["Q"] = fecha_in; row["W"] = fecha_in; row["X"] = fecha_in
-        row["U"] = str_unidades
-
-    elif tipo == "GENERADO DESDE DESPACHO":
-        row["L"] = "GENERADO DESDE DESPACHO"
-        row["D"] = ""; row["E"] = ""
-        f_gen = fecha_out if fecha_out else fecha_in
-        c_gen = cod_out if cod_out else cod_in
-        row["C"] = f_gen; row["H"] = f_gen; row["Q"] = f_gen; row["W"] = f_gen; row["X"] = f_gen
-        row["G"] = c_gen; row["P"] = c_gen; row["V"] = c_gen
-        row["F"] = extraer_unidad_f7(c_gen)
-        row["O"] = dest_out
-        row["U"] = str_unidades
-
-    elif tipo == "CONOCIMIENTO":
-        row["L"] = "CONOCIMIENTO"
-        row["M"] = ""; row["O"] = ""; row["P"] = ""; row["U"] = ""; row["V"] = ""
-        row["T"] = "NO"
-        row["Q"] = fecha_in; row["W"] = fecha_in; row["X"] = fecha_in
-
-    if row["S"] == "PENDIENTE":
-        for k in ["O", "P", "Q", "V", "W", "X"]: row[k] = ""
-
-    return row
 
 def get_generador_policial_html():
     return """<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Generador</title><script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script><style>body{font-family:'Segoe UI',sans-serif;background:#1e1e1e;margin:0;display:flex;height:100vh;overflow:hidden;color:#eee}.sidebar{width:350px;background:#252526;display:flex;flex-direction:column;border-right:1px solid #333;padding:10px;overflow-y:auto}.group{margin-bottom:15px;background:#333;padding:10px;border-radius:4px}input,select,textarea{width:100%;padding:6px;background:#1e1e1e;border:1px solid #555;color:white;border-radius:3px}.preview-wrapper{flex:1;background:#525659;display:flex;justify-content:center;padding:20px;overflow-y:auto}#hoja-a4{background:white;width:210mm;min-height:296mm;padding:20mm;color:black;font-family:'Arial',sans-serif}.btn-main{width:100%;padding:10px;border:none;border-radius:4px;cursor:pointer;font-weight:bold;color:white;background:#00509e}</style></head><body><div class="sidebar"><h3>Generador Policial</h3><div class="group"><label>Tipo</label><select id="docType" onchange="u()"><option>MEMORANDO</option><option>OFICIO</option></select><label>Num</label><input type="text" id="inpNum" value="PN-DINIC-2026-001" oninput="u()"><label>Fecha</label><input type="text" id="inpFecha" oninput="u()"><label>Asunto</label><input type="text" id="inpAs" value="ASUNTO" oninput="u()"></div><div class="group"><label>Cuerpo</label><div id="editor" contenteditable="true" style="min-height:100px;border:1px solid #555" oninput="u()">Texto...</div></div><div class="group"><label>Firma</label><input type="text" id="inpNom" value="NOMBRE" oninput="u()"><label>Cargo</label><input type="text" id="inpCar" value="CARGO" oninput="u()"></div><button class="btn-main" onclick="p()">PDF</button></div><div class="preview-wrapper"><div id="hoja-a4"><div style="text-align:right"><b><span id="vNum"></span></b><br><span id="vFec"></span></div><br><b>PARA: [DEST]<br>ASUNTO: <span id="vAs"></span></b><br><br><div id="vBody" style="text-align:justify"></div><br><br><br><b><span id="vNom"></span><br><span id="vCar"></span></b></div></div><script>function u(){document.getElementById('vNum').innerText=document.getElementById('inpNum').value;document.getElementById('vFec').innerText=document.getElementById('inpFecha').value;document.getElementById('vAs').innerText=document.getElementById('inpAs').value;document.getElementById('vBody').innerHTML=document.getElementById('editor').innerHTML;document.getElementById('vNom').innerText=document.getElementById('inpNom').value;document.getElementById('vCar').innerText=document.getElementById('inpCar').value}function p(){html2pdf().from(document.getElementById('hoja-a4')).save()}u();</script></body></html>"""
@@ -359,15 +192,60 @@ if 'docs_procesados_hoy' not in st.session_state: st.session_state.docs_procesad
 if 'consultas_ia' not in st.session_state: st.session_state.consultas_ia = 0
 if 'active_module' not in st.session_state: st.session_state.active_module = 'secretario'
 if 'th_unlocked' not in st.session_state: st.session_state.th_unlocked = False
+if 'model_name_active' not in st.session_state: st.session_state.model_name_active = "Detectando..."
 
-# --- PERSISTENCIA DE SESIÓN (PARCHE) ---
+# --- PERSISTENCIA (F5) ---
 token_url = st.query_params.get("token", None)
-if token_url and not st.session_state.logged_in:
-    if token_url in db_usuarios:
-        st.session_state.logged_in = True
-        st.session_state.user_id = token_url
-        st.session_state.user_role = "admin" if token_url == ADMIN_USER else "user"
-        st.session_state.usuario_turno = f"{db_usuarios[token_url]['grado']} {db_usuarios[token_url]['nombre']}"
+if token_url and not st.session_state.logged_in and token_url in db_usuarios:
+    st.session_state.logged_in = True; st.session_state.user_id = token_url
+    st.session_state.user_role = "admin" if token_url == ADMIN_USER else "user"
+    st.session_state.usuario_turno = f"{db_usuarios[token_url]['grado']} {db_usuarios[token_url]['nombre']}"
+
+# --- 5. CONFIGURACIÓN IA AUTO-ADAPTABLE ---
+sistema_activo = False
+try:
+    api_key = st.secrets.get("GEMINI_API_KEY")
+    if api_key:
+        genai.configure(api_key=api_key)
+        
+        # LÓGICA DE AUTO-DETECCIÓN DE MODELOS
+        if 'genai_model' not in st.session_state or not st.session_state.genai_model:
+            available_models = []
+            try:
+                for m in genai.list_models():
+                    if 'generateContent' in m.supported_generation_methods:
+                        available_models.append(m.name)
+            except: pass
+            
+            # Prioridad de selección
+            chosen_model = "gemini-pro" # Fallback por defecto
+            if available_models:
+                # Buscamos primero Flash, luego Pro 1.5, luego Pro 1.0
+                flash = next((m for m in available_models if "flash" in m), None)
+                pro15 = next((m for m in available_models if "1.5-pro" in m), None)
+                pro10 = next((m for m in available_models if "1.0-pro" in m), None)
+                
+                if flash: chosen_model = flash
+                elif pro15: chosen_model = pro15
+                elif pro10: chosen_model = pro10
+                elif available_models: chosen_model = available_models[0]
+            
+            st.session_state.model_name_active = chosen_model
+            st.session_state.genai_model = genai.GenerativeModel(chosen_model)
+            
+        sistema_activo = True
+except: sistema_activo = False
+
+def invocar_ia_segura(content):
+    if not st.session_state.genai_model: raise Exception("IA no configurada")
+    max_retries = 3
+    for i in range(max_retries):
+        try: return st.session_state.genai_model.generate_content(content)
+        except Exception as e:
+            if "429" in str(e): time.sleep(2); continue
+            time.sleep(1)
+    # Intento final con el modelo detectado
+    return st.session_state.genai_model.generate_content(content)
 
 # ==============================================================================
 #  LOGIN
@@ -383,29 +261,19 @@ if not st.session_state.logged_in:
             pass_input = st.text_input("Contraseña:", type="password").strip()
             if st.form_submit_button("INGRESAR AL SISTEMA", type="primary"):
                 if usuario_input == ADMIN_USER and pass_input == ADMIN_PASS_MASTER:
-                    st.session_state.logged_in = True
-                    st.session_state.user_role = "admin"
-                    st.session_state.user_id = usuario_input
+                    st.session_state.logged_in = True; st.session_state.user_role = "admin"; st.session_state.user_id = usuario_input
                     admin_data = db_usuarios.get(ADMIN_USER, {"grado": "CBOS.", "nombre": "CARRILLO NARVAEZ JOHN STALIN"})
                     st.session_state.usuario_turno = f"{admin_data['grado']} {admin_data['nombre']}"
-                    st.success("✅ Acceso Concedido: ADMINISTRADOR")
                     registrar_accion(st.session_state.usuario_turno, "INICIO SESIÓN ADMIN")
-                    actualizar_presencia(usuario_input)
-                    st.query_params["token"] = usuario_input # GUARDAR TOKEN EN URL
-                    st.rerun()
+                    actualizar_presencia(usuario_input); st.query_params["token"] = usuario_input; st.rerun()
                 elif usuario_input in db_usuarios:
                     user_data = db_usuarios[usuario_input]
                     if pass_input == config_sistema["pass_universal"]:
                         if user_data["activo"]:
-                            st.session_state.logged_in = True
-                            st.session_state.user_role = "user"
-                            st.session_state.user_id = usuario_input
+                            st.session_state.logged_in = True; st.session_state.user_role = "user"; st.session_state.user_id = usuario_input
                             st.session_state.usuario_turno = f"{user_data['grado']} {user_data['nombre']}"
-                            st.success(f"✅ Bienvenido: {st.session_state.usuario_turno}")
                             registrar_accion(st.session_state.usuario_turno, "INICIO SESIÓN USUARIO")
-                            actualizar_presencia(usuario_input)
-                            st.query_params["token"] = usuario_input # GUARDAR TOKEN EN URL
-                            st.rerun()
+                            actualizar_presencia(usuario_input); st.query_params["token"] = usuario_input; st.rerun()
                         else: st.error("🚫 Usuario inactivo.")
                     else: st.error("🚫 Contraseña incorrecta.")
                 else: st.error("🚫 Usuario no autorizado.")
@@ -418,6 +286,7 @@ else:
         st.markdown("### 👮‍♂️ CONTROL DE MANDO")
         if st.session_state.user_role == "admin": st.markdown("""<div class="admin-badge">🛡️ MODO ADMINISTRADOR<br><span style="font-size: 0.8em; font-weight: normal;">CONTROL TOTAL</span></div>""", unsafe_allow_html=True)
         st.info(f"👤 **{st.session_state.usuario_turno}**")
+        st.caption(f"🤖 Modelo IA: {st.session_state.model_name_active}") # Feedback visual del modelo
         fecha_turno = st.date_input("Fecha Operación:", value=get_hora_ecuador().date())
         st.markdown("---"); st.markdown("### 📂 MÓDULOS")
         if st.button("📝 SECRETARIO/A", use_container_width=True, type="primary" if st.session_state.active_module == 'secretario' else "secondary"): st.session_state.active_module = 'secretario'; st.rerun()
@@ -426,21 +295,12 @@ else:
         if st.button("🛡️ ADMINISTRADOR", use_container_width=True, type="primary" if st.session_state.active_module == 'admin' else "secondary"): st.session_state.active_module = 'admin'; st.rerun()
         st.markdown("---")
         if st.button("🔒 CERRAR SESIÓN"): 
-            st.session_state.logged_in = False
-            st.query_params.clear()
-            st.rerun()
+            st.session_state.logged_in = False; st.query_params.clear(); st.rerun()
 
     if st.session_state.active_module == 'secretario':
         st.markdown(f'''<div class="main-header"><h1>SIGD DINIC</h1><h3>Módulo Secretario/a - Gestión Documental</h3></div>''', unsafe_allow_html=True)
         
-        # --- ESTILOS VISUALES ---
-        st.markdown("""
-        <style>
-            .main-header { background-color: #0E2F44; padding: 20px; border-radius: 10px; color: white; text-align: center; margin-bottom: 20px; border-bottom: 4px solid #D4AF37; }
-            .metric-card { background-color: #f8f9fa; border-radius: 10px; padding: 15px; text-align: center; border: 1px solid #dee2e6; }
-            .metric-card h3 { color: #0E2F44; font-size: 2rem; margin: 0; font-weight: 800; }
-        </style>
-        """, unsafe_allow_html=True)
+        st.markdown("""<style>.main-header { background-color: #0E2F44; padding: 20px; border-radius: 10px; color: white; text-align: center; margin-bottom: 20px; border-bottom: 4px solid #D4AF37; } .metric-card { background-color: #f8f9fa; border-radius: 10px; padding: 15px; text-align: center; border: 1px solid #dee2e6; } .metric-card h3 { color: #0E2F44; font-size: 2rem; margin: 0; font-weight: 800; }</style>""", unsafe_allow_html=True)
 
         base_h = config_sistema.get("base_historica", 1258)
         total_d = base_h + len(st.session_state.registros)
@@ -448,19 +308,16 @@ else:
         c1, c2, c3 = st.columns(3)
         c1.markdown(f"<div class='metric-card'><h3>📥 {st.session_state.docs_procesados_hoy}</h3><p>Docs Turno Actual</p></div>", unsafe_allow_html=True)
         c2.markdown(f"<div class='metric-card'><h3>📈 {total_d}</h3><p>Total Histórico</p></div>", unsafe_allow_html=True)
-        c3.markdown(f"<div class='metric-card'><h3>🧠 {total_ia}</h3><p>Consultas IA (Global)</p></div>", unsafe_allow_html=True)
+        c3.markdown(f"<div class='metric-card'><h3>🧠 {total_ia}</h3><p>Consultas IA</p></div>", unsafe_allow_html=True)
         
         with st.expander("⚙️ CONFIGURACIÓN Y RESPALDO RÁPIDO"):
             c_conf1, c_conf2 = st.columns(2)
             with c_conf1:
-                # NOMBRE PERSONALIZADO DEL RESPALDO
                 safe_user = re.sub(r'[^a-zA-Z0-9]', '_', st.session_state.usuario_turno)
                 date_str = get_hora_ecuador().strftime("%Y-%m-%d")
                 bk_name = f"RESPALDO_TURNO_{safe_user}_{date_str}.json"
-                
                 if st.session_state.registros: 
                     st.download_button("⬇️ RESPALDAR TURNO", json.dumps(st.session_state.registros, default=str), bk_name, "application/json")
-                
                 up_bk = st.file_uploader("⬆️ RESTAURAR TURNO", type=['json'])
                 if up_bk: 
                     try: 
@@ -545,22 +402,17 @@ else:
                                 if paths["in"]: files_ia.append(genai.upload_file(paths["in"], display_name="In"))
                                 if paths["out"]: files_ia.append(genai.upload_file(paths["out"], display_name="Out"))
                                 
-                                # PROMPT V54 - O7 ESTRICTO Y DEFINITIVO
                                 prompt = """
                                 Eres experto en gestión documental policial. Analiza y extrae JSON ESTRICTO.
-                                
                                 1. CÓDIGO (CRÍTICO): Busca en la esquina superior DERECHA (encabezado). Formato "Oficio Nro. PN-..." o "Memorando...". Extrae TODO el código.
-                                
                                 2. DESTINATARIOS (Campo O7):
                                    - UBICACIÓN CLAVE: Busca la sección "PARA:" en la parte SUPERIOR del documento.
                                    - INSTRUCCIÓN: Extrae NOMBRES y GRADOS de esa sección.
                                    - REGLA DE ORO: SI LA LINEA TIENE UN CARGO (Ej: "Jefe de...", "Director...", "Comandante..."), ¡IGNORA ESA LINEA!. SOLO QUIERO EL NOMBRE.
                                    - ¡PROHIBIDO!: NO mires la parte inferior (firma/atentamente). NO extraigas Cargos.
-                                
                                 3. REMITENTE (Campo D7):
                                    - Busca "DE:" en la cabecera O la firma al final. Extrae GRADO y NOMBRE (Ej: Sgos. Juan Perez).
                                    - IMPORTANTE: SIEMPRE incluye el GRADO.
-
                                 JSON:
                                 {
                                     "recibido_fecha": "DD/MM/AAAA",
@@ -593,7 +445,7 @@ else:
                                 if paths["in"]: os.remove(paths["in"])
                                 if paths["out"]: os.remove(paths["out"])
                                 st.rerun()
-                            except Exception as e: st.error(f"Error: {e}")
+                            except Exception as e: st.error(f"Error Técnico: {str(e)}")
                     else: st.warning("⚠️ Sube documento.")
 
             if st.session_state.registros:
