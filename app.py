@@ -16,7 +16,7 @@ from openpyxl.styles import PatternFill, Border, Side, Alignment
 from datetime import datetime, timedelta, timezone
 
 # --- 1. CONFIGURACIÓN Y ESTILOS ---
-VER_SISTEMA = "v44.2"
+VER_SISTEMA = "v52.0"
 ADMIN_USER = "1723623011"
 ADMIN_PASS_MASTER = "9994915010022"
 
@@ -27,7 +27,60 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- 2. BASES DE DATOS ---
+# --- 2. FUNCIONES GLOBALES (MOVIDAS AL INICIO PARA EVITAR ERRORES) ---
+def get_hora_ecuador(): return datetime.now(timezone(timedelta(hours=-5)))
+
+def preservar_bordes(cell, fill_obj):
+    from copy import copy
+    from openpyxl.styles import Side, Border, Alignment
+    
+    if cell.border and (cell.border.left.style or cell.border.top.style):
+        new_border = copy(cell.border)
+    else:
+        thin = Side(border_style="thin", color="000000")
+        new_border = Border(top=thin, left=thin, right=thin, bottom=thin)
+    
+    cell.border = new_border
+    cell.fill = fill_obj
+    cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=False)
+
+def extract_json_safe(text):
+    try: return json.loads(text)
+    except:
+        match = re.search(r"(\{.*\}|\[.*\])", text, re.DOTALL)
+        if match:
+            try: 
+                data = json.loads(match.group(1))
+                if isinstance(data, list) and len(data) > 0: return data[0]
+                elif isinstance(data, dict): return data
+            except: return {}
+        return {}
+
+def limpiar_codigo_prioridad(texto):
+    if not texto: return ""
+    match = re.search(r"(PN-[\w\-\(\)\.]+)", str(texto).upper())
+    if match: return match.group(1).strip()
+    match2 = re.search(r"(?:OFICIO|MEMORANDO).*?(PN-.*)", str(texto), re.IGNORECASE)
+    if match2: return match2.group(1).strip().upper()
+    return str(texto).strip()
+
+def extraer_unidad_f7(texto_codigo):
+    if not texto_codigo: return "DINIC"
+    match = re.search(r"PN-(.+?)-QX", str(texto_codigo), re.IGNORECASE)
+    if match:
+        unidad = match.group(1).strip().upper()
+        unidad = unidad.replace('(', '').replace(')', '')
+        return unidad
+    return "DINIC"
+
+def determinar_sale_no_sale(destinos_str):
+    unidades_externas = ["UCAP", "UNDECOF", "UDAR", "DIGIN", "DNATH", "COMANDO GENERAL", "OTRAS DIRECCIONES"]
+    destinos_upper = destinos_str.upper()
+    for u in unidades_externas:
+        if u in destinos_upper: return "SI"
+    return "NO"
+
+# --- 3. BASES DE DATOS ---
 USUARIOS_BASE = {
     "0702870460": {"grado": "SGOS", "nombre": "VILLALTA OCHOA XAVIER BISMARK", "activo": True},
     "1715081731": {"grado": "SGOS", "nombre": "MINDA MINDA FRANCISCO GABRIEL", "activo": True},
@@ -112,9 +165,6 @@ db_listas = cargar_listas_desplegables()
 if 'lista_unidades' not in st.session_state: st.session_state.lista_unidades = db_listas["unidades"]
 if 'lista_reasignados' not in st.session_state: st.session_state.lista_reasignados = db_listas["reasignados"]
 
-# --- 3. FUNCIONES AUXILIARES ---
-def get_hora_ecuador(): return datetime.now(timezone(timedelta(hours=-5)))
-
 def registrar_accion(usuario, accion, detalle=""):
     ahora = get_hora_ecuador().strftime("%Y-%m-%d %H:%M:%S")
     nuevo_log = {"fecha": ahora, "usuario": usuario, "accion": accion, "detalle": detalle}
@@ -171,42 +221,9 @@ def frases_curiosas():
     ]
     return random.choice(frases)
 
-# --- 4. EXTRACCIÓN Y LIMPIEZA ---
-def extract_json_safe(text):
-    try: return json.loads(text)
-    except:
-        match = re.search(r"(\{.*\}|\[.*\])", text, re.DOTALL)
-        if match:
-            try: 
-                data = json.loads(match.group())
-                if isinstance(data, list) and len(data) > 0: return data[0]
-                elif isinstance(data, dict): return data
-            except: return {}
-        return {}
-
-def limpiar_codigo_prioridad(texto):
-    if not texto: return ""
-    match = re.search(r"(PN-[\w\-\(\)\.]+)", str(texto).upper())
-    if match: return match.group(1).strip()
-    match2 = re.search(r"(?:OFICIO|MEMORANDO).*?(PN-.*)", str(texto), re.IGNORECASE)
-    if match2: return match2.group(1).strip().upper()
-    return str(texto).strip()
-
-def extraer_unidad_f7(texto_codigo):
-    if not texto_codigo: return "DINIC"
-    match = re.search(r"PN-(.+?)-QX", str(texto_codigo), re.IGNORECASE)
-    if match:
-        unidad = match.group(1).strip().upper()
-        unidad = unidad.replace('(', '').replace(')', '')
-        return unidad
-    return "DINIC"
-
-def determinar_sale_no_sale(destinos_str):
-    unidades_externas = ["UCAP", "UNDECOF", "UDAR", "DIGIN", "DNATH", "COMANDO GENERAL", "OTRAS DIRECCIONES"]
-    destinos_upper = destinos_str.upper()
-    for u in unidades_externas:
-        if u in destinos_upper: return "SI"
-    return "NO"
+def generar_html_contrato(datos_usuario, img_b64):
+    fecha_hora = get_hora_ecuador().strftime("%Y-%m-%d %H:%M:%S")
+    return f"""<div style='font-family:Arial; padding:20px; border:1px solid black;'><h2>ACTA</h2><p>Usuario: {datos_usuario.get('grado')} {datos_usuario.get('nombre')}</p><p>Fecha: {fecha_hora}</p><img src='data:image/png;base64,{img_b64}' width='150'></div>"""
 
 # VARIABLE GLOBAL SISTEMA
 sistema_activo = False
@@ -217,47 +234,27 @@ try:
     if api_key:
         genai.configure(api_key=api_key)
         if 'genai_model' not in st.session_state or not st.session_state.genai_model:
-            model_name = "gemini-1.5-flash"
-            try:
-                listado = genai.list_models()
-                names = [m.name for m in listado if 'generateContent' in m.supported_generation_methods]
-                if any('flash' in n for n in names): model_name = next(n for n in names if 'flash' in n)
-            except: pass
-            st.session_state.genai_model = genai.GenerativeModel(model_name)
+            # Intentamos usar el modelo Flash 1.5 que es más rápido y compatible con cuentas de pago
+            st.session_state.genai_model = genai.GenerativeModel("gemini-1.5-flash")
         sistema_activo = True
 except: sistema_activo = False
 
 def invocar_ia_segura(content):
     if not st.session_state.genai_model: raise Exception("IA no configurada")
-    # AUMENTO DE REINTENTOS PARA EVITAR ERROR 'SATURADO' CON ESPERA PROGRESIVA
-    max_retries = 5 
-    wait_time = 2
+    max_retries = 3
+    wait_time = 1
     for i in range(max_retries):
         try:
             return st.session_state.genai_model.generate_content(content)
         except Exception as e:
-            if "429" in str(e): # Too Many Requests
+            if "429" in str(e): 
                 time.sleep(wait_time)
-                wait_time *= 2 # Exponential backoff: 2s, 4s, 8s, 16s...
+                wait_time *= 2
                 continue
             time.sleep(1)
-    raise Exception("Sistema saturado. Por favor intente subir los documentos de uno en uno o espere un minuto.")
+    raise Exception("Sistema saturado. Espere un momento.")
 
-def preservar_bordes(cell, fill_obj):
-    from copy import copy
-    from openpyxl.styles import Side, Border, Alignment
-    
-    if cell.border and (cell.border.left.style or cell.border.top.style):
-        new_border = copy(cell.border)
-    else:
-        thin = Side(border_style="thin", color="000000")
-        new_border = Border(top=thin, left=thin, right=thin, bottom=thin)
-    
-    cell.border = new_border
-    cell.fill = fill_obj
-    cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=False)
-
-# --- 6. LOGICA MATRIZ BLINDADA V44 (MANTENIDA) ---
+# --- 6. LOGICA MATRIZ BLINDADA V52 (ORIGINAL CON PARCHES) ---
 def generar_fila_matriz(tipo, ia_data, manual_data, usuario_turno, paths_files):
     # DATOS IA
     raw_code_in = ia_data.get("recibido_codigo", "")
@@ -347,6 +344,15 @@ if 'consultas_ia' not in st.session_state: st.session_state.consultas_ia = 0
 if 'active_module' not in st.session_state: st.session_state.active_module = 'secretario'
 if 'th_unlocked' not in st.session_state: st.session_state.th_unlocked = False
 
+# --- PERSISTENCIA DE SESIÓN (PARCHE) ---
+token_url = st.query_params.get("token", None)
+if token_url and not st.session_state.logged_in:
+    if token_url in db_usuarios:
+        st.session_state.logged_in = True
+        st.session_state.user_id = token_url
+        st.session_state.user_role = "admin" if token_url == ADMIN_USER else "user"
+        st.session_state.usuario_turno = f"{db_usuarios[token_url]['grado']} {db_usuarios[token_url]['nombre']}"
+
 # ==============================================================================
 #  LOGIN
 # ==============================================================================
@@ -369,6 +375,7 @@ if not st.session_state.logged_in:
                     st.success("✅ Acceso Concedido: ADMINISTRADOR")
                     registrar_accion(st.session_state.usuario_turno, "INICIO SESIÓN ADMIN")
                     actualizar_presencia(usuario_input)
+                    st.query_params["token"] = usuario_input # GUARDAR TOKEN EN URL
                     st.rerun()
                 elif usuario_input in db_usuarios:
                     user_data = db_usuarios[usuario_input]
@@ -381,6 +388,7 @@ if not st.session_state.logged_in:
                             st.success(f"✅ Bienvenido: {st.session_state.usuario_turno}")
                             registrar_accion(st.session_state.usuario_turno, "INICIO SESIÓN USUARIO")
                             actualizar_presencia(usuario_input)
+                            st.query_params["token"] = usuario_input # GUARDAR TOKEN EN URL
                             st.rerun()
                         else: st.error("🚫 Usuario inactivo.")
                     else: st.error("🚫 Contraseña incorrecta.")
@@ -401,7 +409,10 @@ else:
         if st.button("👤 TALENTO HUMANO", use_container_width=True, type="primary" if st.session_state.active_module == 'th' else "secondary"): st.session_state.active_module = 'th'; st.rerun()
         if st.button("🛡️ ADMINISTRADOR", use_container_width=True, type="primary" if st.session_state.active_module == 'admin' else "secondary"): st.session_state.active_module = 'admin'; st.rerun()
         st.markdown("---")
-        if st.button("🔒 CERRAR SESIÓN"): st.session_state.logged_in = False; st.rerun()
+        if st.button("🔒 CERRAR SESIÓN"): 
+            st.session_state.logged_in = False
+            st.query_params.clear()
+            st.rerun()
 
     if st.session_state.active_module == 'secretario':
         st.markdown(f'''<div class="main-header"><h1>SIGD DINIC</h1><h3>Módulo Secretario/a - Gestión Documental</h3></div>''', unsafe_allow_html=True)
@@ -518,6 +529,7 @@ else:
                                 if paths["in"]: files_ia.append(genai.upload_file(paths["in"], display_name="In"))
                                 if paths["out"]: files_ia.append(genai.upload_file(paths["out"], display_name="Out"))
                                 
+                                # PROMPT V52 - O7 ESTRICTO
                                 prompt = """
                                 Eres experto en gestión documental policial. Analiza y extrae JSON ESTRICTO.
                                 
@@ -526,6 +538,7 @@ else:
                                 2. DESTINATARIOS (Campo O7):
                                    - UBICACIÓN CLAVE: Busca la sección "PARA:" en la parte SUPERIOR del documento.
                                    - INSTRUCCIÓN: Extrae NOMBRES y GRADOS de esa sección.
+                                   - REGLA DE ORO: SI LA LINEA TIENE UN CARGO (Ej: "Jefe de...", "Director...", "Comandante..."), ¡IGNORA ESA LINEA!. SOLO QUIERO EL NOMBRE.
                                    - ¡PROHIBIDO!: NO mires la parte inferior (firma/atentamente). NO extraigas Cargos.
                                 
                                 3. REMITENTE (Campo D7):
@@ -540,7 +553,7 @@ else:
                                     "recibido_codigo": "Texto",
                                     "recibido_asunto": "Texto",
                                     "recibido_resumen": "Texto",
-                                    "respuesta_destinatarios": "Texto (Solo Nombres/Grados de la sección PARA)",
+                                    "respuesta_destinatarios": "Texto (Solo Nombres/Grados de la sección PARA, separados por coma, SIN CARGOS)",
                                     "respuesta_codigo": "Texto",
                                     "respuesta_fecha": "DD/MM/AAAA"
                                 }
