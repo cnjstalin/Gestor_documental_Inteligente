@@ -16,7 +16,7 @@ from openpyxl.styles import PatternFill, Border, Side, Alignment
 from datetime import datetime, timedelta, timezone
 
 # --- 1. CONFIGURACIÓN Y ESTILOS ---
-VER_SISTEMA = "v55.0 (Auto-Detect)"
+VER_SISTEMA = "v56.0 (Final Fix)"
 ADMIN_USER = "1723623011"
 ADMIN_PASS_MASTER = "9994915010022"
 
@@ -27,7 +27,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- 2. FUNCIONES GLOBALES ---
+# --- 2. FUNCIONES GLOBALES (CRÍTICAS) ---
 def get_hora_ecuador(): return datetime.now(timezone(timedelta(hours=-5)))
 
 def preservar_bordes(cell, fill_obj):
@@ -72,6 +72,80 @@ def determinar_sale_no_sale(destinos_str):
     for u in unidades_externas:
         if u in destinos_upper: return "SI"
     return "NO"
+
+# --- AQUÍ ESTÁ LA FUNCIÓN QUE FALTABA ---
+def generar_fila_matriz(tipo, ia_data, manual_data, usuario_turno, paths_files):
+    raw_code_in = ia_data.get("recibido_codigo", "")
+    cod_in = limpiar_codigo_prioridad(raw_code_in)
+    unidad_f7 = extraer_unidad_f7(cod_in)
+    
+    dest_out = ia_data.get("respuesta_destinatarios", "")
+    
+    raw_code_out = ia_data.get("respuesta_codigo", "")
+    cod_out = limpiar_codigo_prioridad(raw_code_out)
+    
+    fecha_in = ia_data.get("recibido_fecha", "")
+    fecha_out = ia_data.get("respuesta_fecha", "")
+
+    estado_s7 = "PENDIENTE"
+    has_in = True if (paths_files.get("in") or manual_data.get("G")) else False
+    has_out = True if (paths_files.get("out") or manual_data.get("P")) else False
+    if tipo in ["CONOCIMIENTO", "REASIGNADO", "GENERADO DESDE DESPACHO"]: estado_s7 = "FINALIZADO"
+    elif has_in and has_out: estado_s7 = "FINALIZADO"
+
+    str_unidades = manual_data.get("unidades_str", "")
+    es_interno = determinar_sale_no_sale(str_unidades)
+    if tipo == "CONOCIMIENTO": es_interno = "NO"
+
+    row = {
+        "C": fecha_in, "D": ia_data.get("recibido_remitente_nombre", ""),
+        "E": ia_data.get("recibido_remitente_cargo", ""), "F": unidad_f7,
+        "G": cod_in, "H": fecha_in, "I": ia_data.get("recibido_asunto", ""),
+        "J": ia_data.get("recibido_resumen", ""), "K": usuario_turno,
+        "L": "", "M": str_unidades, "N": manual_data.get("tipo_doc_salida", ""),
+        "O": "", "P": "", "Q": "", "R": "", "S": estado_s7,
+        "T": es_interno, "U": "", "V": "", "W": "", "X": "", "Y": "", "Z": ""
+    }
+
+    if tipo == "TRAMITE NORMAL":
+        row["L"] = ""
+        row["O"] = dest_out 
+        row["P"] = cod_out  
+        row["Q"] = fecha_out
+        row["U"] = str_unidades
+        row["V"] = cod_out
+        row["W"] = fecha_out
+        row["X"] = fecha_out
+
+    elif tipo == "REASIGNADO":
+        row["L"] = "REASIGNADO"
+        row["O"] = manual_data.get("reasignado_a", "")
+        row["P"] = "" 
+        row["V"] = ""
+        row["Q"] = fecha_in; row["W"] = fecha_in; row["X"] = fecha_in
+        row["U"] = str_unidades
+
+    elif tipo == "GENERADO DESDE DESPACHO":
+        row["L"] = "GENERADO DESDE DESPACHO"
+        row["D"] = ""; row["E"] = ""
+        f_gen = fecha_out if fecha_out else fecha_in
+        c_gen = cod_out if cod_out else cod_in
+        row["C"] = f_gen; row["H"] = f_gen; row["Q"] = f_gen; row["W"] = f_gen; row["X"] = f_gen
+        row["G"] = c_gen; row["P"] = c_gen; row["V"] = c_gen
+        row["F"] = extraer_unidad_f7(c_gen)
+        row["O"] = dest_out
+        row["U"] = str_unidades
+
+    elif tipo == "CONOCIMIENTO":
+        row["L"] = "CONOCIMIENTO"
+        row["M"] = ""; row["O"] = ""; row["P"] = ""; row["U"] = ""; row["V"] = ""
+        row["T"] = "NO"
+        row["Q"] = fecha_in; row["W"] = fecha_in; row["X"] = fecha_in
+
+    if row["S"] == "PENDIENTE":
+        for k in ["O", "P", "Q", "V", "W", "X"]: row[k] = ""
+
+    return row
 
 # --- 3. BASES DE DATOS ---
 USUARIOS_BASE = {
@@ -242,9 +316,19 @@ def invocar_ia_segura(content):
     for i in range(max_retries):
         try: return st.session_state.genai_model.generate_content(content)
         except Exception as e:
+            # DETECTOR DE ERROR 404 Y REPARACIÓN AL VUELO
+            if "404" in str(e) or "not found" in str(e):
+                try:
+                    # Si falla, forzamos al siguiente disponible
+                    fallback = "gemini-1.5-pro" if "flash" in st.session_state.model_name_active else "gemini-pro"
+                    st.session_state.genai_model = genai.GenerativeModel(fallback)
+                    st.session_state.model_name_active = fallback
+                    return st.session_state.genai_model.generate_content(content)
+                except: pass # Si falla el fallback, lanzará error al final
+            
             if "429" in str(e): time.sleep(2); continue
             time.sleep(1)
-    # Intento final con el modelo detectado
+    
     return st.session_state.genai_model.generate_content(content)
 
 # ==============================================================================
@@ -286,7 +370,7 @@ else:
         st.markdown("### 👮‍♂️ CONTROL DE MANDO")
         if st.session_state.user_role == "admin": st.markdown("""<div class="admin-badge">🛡️ MODO ADMINISTRADOR<br><span style="font-size: 0.8em; font-weight: normal;">CONTROL TOTAL</span></div>""", unsafe_allow_html=True)
         st.info(f"👤 **{st.session_state.usuario_turno}**")
-        st.caption(f"🤖 Modelo IA: {st.session_state.model_name_active}") # Feedback visual del modelo
+        st.caption(f"🤖 Modelo IA: {st.session_state.model_name_active}") # Feedback visual
         fecha_turno = st.date_input("Fecha Operación:", value=get_hora_ecuador().date())
         st.markdown("---"); st.markdown("### 📂 MÓDULOS")
         if st.button("📝 SECRETARIO/A", use_container_width=True, type="primary" if st.session_state.active_module == 'secretario' else "secondary"): st.session_state.active_module = 'secretario'; st.rerun()
