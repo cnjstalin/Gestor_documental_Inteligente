@@ -15,11 +15,7 @@ from openpyxl import load_workbook
 from openpyxl.styles import PatternFill, Border, Side, Alignment
 from datetime import datetime, timedelta, timezone
 
-# --- 1. CONFIGURACIÓN Y ESTILOS ---
-VER_SISTEMA = "v44.2"
-ADMIN_USER = "1723623011"
-ADMIN_PASS_MASTER = "9994915010022"
-
+# --- 1. CONFIGURACIÓN INICIAL (SIEMPRE PRIMERO) ---
 st.set_page_config(
     page_title="SIGD DINIC",
     layout="wide",
@@ -27,158 +23,51 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- 2. BASES DE DATOS ---
-USUARIOS_BASE = {
-    "0702870460": {"grado": "SGOS", "nombre": "VILLALTA OCHOA XAVIER BISMARK", "activo": True},
-    "1715081731": {"grado": "SGOS", "nombre": "MINDA MINDA FRANCISCO GABRIEL", "activo": True},
-    "1720103090": {"grado": "SGOS", "nombre": "ZAPATA NAVAS CHRISTIAN VINICIO", "activo": True},
-    "1721117057": {"grado": "CBOP", "nombre": "YANQUI RAMOS MONICA ALEXANDRA", "activo": True},
-    "1716555154": {"grado": "CBOP", "nombre": "RUANO ARMAS JAIRO RODRIGO", "activo": True},
-    "1721350351": {"grado": "CBOP", "nombre": "LOZADA MORENO EDISON WLADIMIR", "activo": True},
-    "1718278060": {"grado": "CBOP", "nombre": "CAIZA AMORES DAVID STALIN", "activo": True},
-    "1721308086": {"grado": "CBOP", "nombre": "SISALIMA CASTILLO MARÍA JOSE", "activo": True},
-    "1721865986": {"grado": "CBOP", "nombre": "VILLACRES CARRILLO SERGIO ALEJANDRO", "activo": True},
-    "1722901152": {"grado": "CBOP", "nombre": "ORTIZ GARZON VANESSA LIZBETH", "activo": True},
-    "1725283194": {"grado": "CBOP", "nombre": "RODRIGUEZ ESCOBAR DIEGO ALBERTO", "activo": True},
-    "1804621520": {"grado": "CBOP", "nombre": "CHUGCHO CHUGCHO CHRISTIAN ESTUARDO", "activo": True},
-    "1723730923": {"grado": "CBOP", "nombre": "ALMEIDA CHUGA LUIS ANDRES", "activo": True},
-    "1723248942": {"grado": "CBOS", "nombre": "ALMACHI NACIMBA DARIO RAUL", "activo": True},
-    "0401770771": {"grado": "CBOS", "nombre": "MORAN CHILAN EDISON JAVIER", "activo": True},
-    "1723623011": {"grado": "CBOS", "nombre": "CARRILLO NARVAEZ JOHN STALIN", "activo": True}
-}
+# --- 2. ESTILOS VISUALES (DISEÑO PREMIUM) ---
+st.markdown("""
+    <style>
+    .main-header { background-color: #0E2F44; padding: 20px; border-radius: 10px; color: white; text-align: center; margin-bottom: 20px; border-bottom: 4px solid #D4AF37; }
+    .main-header h1 { margin: 0; font-size: 2.5rem; font-weight: 800; }
+    .metric-card { background-color: #f8f9fa !important; border-radius: 10px; padding: 15px; text-align: center; border: 1px solid #dee2e6; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+    .metric-card h3 { color: #0E2F44 !important; font-size: 2rem; margin: 0; font-weight: 800; }
+    .metric-card p { color: #555555 !important; font-size: 1rem; margin: 0; font-weight: 600; }
+    .login-container { max-width: 400px; margin: auto; padding: 40px; background-color: #ffffff; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); text-align: center; border-top: 5px solid #0E2F44; }
+    div.stButton > button { width: 100%; font-weight: bold; border-radius: 5px; }
+    </style>
+""", unsafe_allow_html=True)
 
-UNIDADES_DEFAULT = [
-    "DINIC", "SOPORTE OPERATIVO", "APOYO OPERATIVO", "PLANIFICACION", 
-    "JURIDICO", "COMUNICACION", "ANALISIS DE INFORMACION", "COORDINACION OPERACIONAL", 
-    "FINANCIERO", "UCAP", "UNDECOF", "UDAR", "DIGIN", "DNATH", "DAOP", "DCOP", "DSOP"
-]
-
-DB_FILE = "usuarios_db.json"
-CONFIG_FILE = "config_sistema.json"
-CONTRATOS_FILE = "contratos_legal.json"
-LOGS_FILE = "historial_acciones.json"
-LISTAS_FILE = "listas_db.json"
-
-# FUNCIONES DE CARGA/GUARDADO
-def cargar_json(filepath, default):
-    if os.path.exists(filepath):
-        try:
-            with open(filepath, 'r') as f:
-                return json.load(f)
-        except: return default
-    return default
-
-def guardar_json(filepath, data):
-    try:
-        with open(filepath, 'w') as f:
-            json.dump(data, f)
-    except: pass
-
-def inicializar_usuarios_seguros():
-    usuarios_finales = USUARIOS_BASE.copy()
-    if os.path.exists(DB_FILE):
-        try:
-            with open(DB_FILE, 'r') as f:
-                usuarios_locales = json.load(f)
-                if isinstance(usuarios_locales, dict):
-                    usuarios_finales.update(usuarios_locales)
-        except: pass
-    guardar_json(DB_FILE, usuarios_finales)
-    return usuarios_finales
-
-def cargar_listas_desplegables():
-    datos = cargar_json(LISTAS_FILE, {"unidades": UNIDADES_DEFAULT, "reasignados": []})
-    if not isinstance(datos, dict): datos = {"unidades": UNIDADES_DEFAULT, "reasignados": []}
-    for u in UNIDADES_DEFAULT:
-        if u not in datos["unidades"]: datos["unidades"].append(u)
-    return datos
-
-def guardar_nueva_entrada_lista(tipo, valor):
-    datos = cargar_listas_desplegables()
-    if valor and valor not in datos[tipo]:
-        datos[tipo].append(valor)
-        guardar_json(LISTAS_FILE, datos)
-        if tipo == "unidades": st.session_state.lista_unidades = datos["unidades"]
-        if tipo == "reasignados": st.session_state.lista_reasignados = datos["reasignados"]
-
-# CARGA INICIAL
-config_sistema = cargar_json(CONFIG_FILE, {"pass_universal": "DINIC2026", "pass_th": "THDINIC123", "base_historica": 1258, "consultas_ia_global": 0})
-db_usuarios = inicializar_usuarios_seguros()
-db_contratos = cargar_json(CONTRATOS_FILE, {})
-db_logs = cargar_json(LOGS_FILE, [])
-if not isinstance(db_logs, list): db_logs = []
-db_listas = cargar_listas_desplegables()
-
-if 'lista_unidades' not in st.session_state: st.session_state.lista_unidades = db_listas["unidades"]
-if 'lista_reasignados' not in st.session_state: st.session_state.lista_reasignados = db_listas["reasignados"]
-
-# --- 3. FUNCIONES AUXILIARES ---
-def get_hora_ecuador(): return datetime.now(timezone(timedelta(hours=-5)))
-
-def registrar_accion(usuario, accion, detalle=""):
-    ahora = get_hora_ecuador().strftime("%Y-%m-%d %H:%M:%S")
-    nuevo_log = {"fecha": ahora, "usuario": usuario, "accion": accion, "detalle": detalle}
-    global db_logs
-    db_logs.insert(0, nuevo_log)
-    guardar_json(LOGS_FILE, db_logs)
-
-def incrementar_contador_ia():
-    config_sistema["consultas_ia_global"] = config_sistema.get("consultas_ia_global", 0) + 1
-    guardar_json(CONFIG_FILE, config_sistema)
-
-def actualizar_presencia(cedula_usuario):
-    if cedula_usuario in db_usuarios:
-        db_usuarios[cedula_usuario]['ultima_actividad'] = get_hora_ecuador().strftime("%Y-%m-%d %H:%M:%S")
-        guardar_json(DB_FILE, db_usuarios)
-
-def get_estado_usuario(cedula):
-    user_data = db_usuarios.get(cedula, {})
-    last_seen_str = user_data.get('ultima_actividad')
-    if not last_seen_str: return "🔴 DESCONECTADO"
-    try:
-        last_seen = datetime.strptime(last_seen_str, "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone(timedelta(hours=-5)))
-        diferencia = (get_hora_ecuador() - last_seen).total_seconds() / 60
-        if diferencia < 2: return "🟢 EN LÍNEA"
-        elif diferencia < 10: return "🟡 AUSENTE"
-        else: return "🔴 DESCONECTADO"
-    except: return "🔴 ERROR"
-
-def get_ultima_accion_usuario(nombre_usuario):
-    if not isinstance(db_logs, list): return "---"
-    for log in db_logs:
-        if log.get('usuario') == nombre_usuario:
-            return f"{log.get('accion')} ({log.get('fecha','').split(' ')[1]})"
-    return "---"
-
-def get_img_as_base64(file_path):
-    try:
-        with open(file_path, "rb") as f: return base64.b64encode(f.read()).decode()
-    except: return ""
-
-def get_logo_html(width="120px"):
-    img_path = "Captura.JPG"
-    b64 = get_img_as_base64(img_path)
-    if b64: return f'<img src="data:image/jpeg;base64,{b64}" style="width:{width}; margin-bottom:15px;">'
-    return f'<img src="https://upload.wikimedia.org/wikipedia/commons/2/25/Escudo_Policia_Nacional_del_Ecuador.png" style="width:{width}; margin-bottom:15px;">'
+# --- 3. FUNCIONES GLOBALES (DEFINIDAS AQUÍ PARA EVITAR NameError) ---
+def get_hora_ecuador(): 
+    return datetime.now(timezone(timedelta(hours=-5)))
 
 def frases_curiosas():
     frases = [
-        "¿Sabías que? El primer virus se llamó Creeper.",
-        "¿Sabías que? La seguridad es responsabilidad de todos.",
-        "¿Sabías que? Tu contraseña es tu llave digital.",
-        "¿Sabías que? La IA procesa, tú decides.",
-        "¿Sabías que? Un escritorio limpio mejora la productividad."
+        "Procesando con Inteligencia Artificial...",
+        "Analizando estructura del documento...",
+        "Extrayendo grados y nombres...",
+        "Verificando códigos policiales...",
+        "La seguridad es responsabilidad de todos."
     ]
     return random.choice(frases)
 
-# --- 4. EXTRACCIÓN Y LIMPIEZA ---
+def preservar_bordes(cell, fill_obj):
+    """Mantiene el formato de celdas al escribir en Excel"""
+    if cell.border and (cell.border.left.style or cell.border.top.style):
+        new_border = copy(cell.border)
+    else:
+        thin = Side(border_style="thin", color="000000")
+        new_border = Border(top=thin, left=thin, right=thin, bottom=thin)
+    cell.border = new_border
+    cell.fill = fill_obj
+    cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=False)
+
 def extract_json_safe(text):
     try: return json.loads(text)
     except:
         match = re.search(r"(\{.*\}|\[.*\])", text, re.DOTALL)
         if match:
             try: 
-                data = json.loads(match.group())
+                data = json.loads(match.group(1))
                 if isinstance(data, list) and len(data) > 0: return data[0]
                 elif isinstance(data, dict): return data
             except: return {}
@@ -208,58 +97,128 @@ def determinar_sale_no_sale(destinos_str):
         if u in destinos_upper: return "SI"
     return "NO"
 
-# VARIABLE GLOBAL SISTEMA
-sistema_activo = False
+def get_img_as_base64(file_path):
+    try:
+        with open(file_path, "rb") as f: return base64.b64encode(f.read()).decode()
+    except: return ""
+
+def get_logo_html(width="120px"):
+    img_path = "Captura.JPG"
+    b64 = get_img_as_base64(img_path)
+    if b64: return f'<img src="data:image/jpeg;base64,{b64}" style="width:{width}; margin-bottom:15px;">'
+    return f'<img src="https://upload.wikimedia.org/wikipedia/commons/2/25/Escudo_Policia_Nacional_del_Ecuador.png" style="width:{width}; margin-bottom:15px;">'
+
+# --- 4. DATOS Y CONFIGURACIÓN ---
+ADMIN_USER = "1723623011"
+ADMIN_PASS_MASTER = "9994915010022"
+VER_SISTEMA = "v48.0"
+
+USUARIOS_BASE = {
+    "0702870460": {"grado": "SGOS", "nombre": "VILLALTA OCHOA XAVIER BISMARK", "activo": True},
+    "1715081731": {"grado": "SGOS", "nombre": "MINDA MINDA FRANCISCO GABRIEL", "activo": True},
+    "1720103090": {"grado": "SGOS", "nombre": "ZAPATA NAVAS CHRISTIAN VINICIO", "activo": True},
+    "1721117057": {"grado": "CBOP", "nombre": "YANQUI RAMOS MONICA ALEXANDRA", "activo": True},
+    "1716555154": {"grado": "CBOP", "nombre": "RUANO ARMAS JAIRO RODRIGO", "activo": True},
+    "1721350351": {"grado": "CBOP", "nombre": "LOZADA MORENO EDISON WLADIMIR", "activo": True},
+    "1718278060": {"grado": "CBOP", "nombre": "CAIZA AMORES DAVID STALIN", "activo": True},
+    "1721308086": {"grado": "CBOP", "nombre": "SISALIMA CASTILLO MARÍA JOSE", "activo": True},
+    "1721865986": {"grado": "CBOP", "nombre": "VILLACRES CARRILLO SERGIO ALEJANDRO", "activo": True},
+    "1722901152": {"grado": "CBOP", "nombre": "ORTIZ GARZON VANESSA LIZBETH", "activo": True},
+    "1725283194": {"grado": "CBOP", "nombre": "RODRIGUEZ ESCOBAR DIEGO ALBERTO", "activo": True},
+    "1804621520": {"grado": "CBOP", "nombre": "CHUGCHO CHUGCHO CHRISTIAN ESTUARDO", "activo": True},
+    "1723730923": {"grado": "CBOP", "nombre": "ALMEIDA CHUGA LUIS ANDRES", "activo": True},
+    "1723248942": {"grado": "CBOS", "nombre": "ALMACHI NACIMBA DARIO RAUL", "activo": True},
+    "0401770771": {"grado": "CBOS", "nombre": "MORAN CHILAN EDISON JAVIER", "activo": True},
+    "1723623011": {"grado": "CBOS", "nombre": "CARRILLO NARVAEZ JOHN STALIN", "activo": True}
+}
+
+UNIDADES_DEFAULT = ["DINIC", "SOPORTE OPERATIVO", "APOYO OPERATIVO", "PLANIFICACION", "JURIDICO", "COMUNICACION", "ANALISIS DE INFORMACION", "COORDINACION OPERACIONAL", "FINANCIERO", "UCAP", "UNDECOF", "UDAR", "DIGIN", "DNATH", "DAOP", "DCOP", "DSOP"]
+
+DB_FILE = "usuarios_db.json"
+CONFIG_FILE = "config_sistema.json"
+CONTRATOS_FILE = "contratos_legal.json"
+LOGS_FILE = "historial_acciones.json"
+LISTAS_FILE = "listas_db.json"
+
+# Carga de JSONs
+def cargar_json(filepath, default):
+    if os.path.exists(filepath):
+        try:
+            with open(filepath, 'r') as f: return json.load(f)
+        except: return default
+    return default
+
+def guardar_json(filepath, data):
+    try:
+        with open(filepath, 'w') as f: json.dump(data, f)
+    except: pass
+
+config_sistema = cargar_json(CONFIG_FILE, {"pass_universal": "DINIC2026", "pass_th": "THDINIC123", "base_historica": 1258, "consultas_ia_global": 0})
+db_usuarios = USUARIOS_BASE.copy()
+if os.path.exists(DB_FILE):
+    try:
+        with open(DB_FILE, 'r') as f: db_usuarios.update(json.load(f))
+    except: pass
+db_contratos = cargar_json(CONTRATOS_FILE, {})
+db_logs = cargar_json(LOGS_FILE, [])
+if not isinstance(db_logs, list): db_logs = []
+db_listas = cargar_json(LISTAS_FILE, {"unidades": UNIDADES_DEFAULT, "reasignados": []})
+
+def guardar_nueva_entrada_lista(tipo, valor):
+    if valor and valor not in db_listas[tipo]:
+        db_listas[tipo].append(valor)
+        guardar_json(LISTAS_FILE, db_listas)
+        if tipo == "unidades": st.session_state.lista_unidades = db_listas["unidades"]
+        if tipo == "reasignados": st.session_state.lista_reasignados = db_listas["reasignados"]
+
+def registrar_accion(usuario, accion, detalle=""):
+    ahora = get_hora_ecuador().strftime("%Y-%m-%d %H:%M:%S")
+    nuevo_log = {"fecha": ahora, "usuario": usuario, "accion": accion, "detalle": detalle}
+    db_logs.insert(0, nuevo_log)
+    guardar_json(LOGS_FILE, db_logs)
+
+def actualizar_presencia(cedula_usuario):
+    if cedula_usuario in db_usuarios:
+        db_usuarios[cedula_usuario]['ultima_actividad'] = get_hora_ecuador().strftime("%Y-%m-%d %H:%M:%S")
+        guardar_json(DB_FILE, db_usuarios)
+
+def get_estado_usuario(cedula):
+    user_data = db_usuarios.get(cedula, {})
+    last_seen_str = user_data.get('ultima_actividad')
+    if not last_seen_str: return "🔴 DESCONECTADO"
+    try:
+        last_seen = datetime.strptime(last_seen_str, "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone(timedelta(hours=-5)))
+        diferencia = (get_hora_ecuador() - last_seen).total_seconds() / 60
+        if diferencia < 2: return "🟢 EN LÍNEA"
+        elif diferencia < 10: return "🟡 AUSENTE"
+        else: return "🔴 DESCONECTADO"
+    except: return "🔴 ERROR"
 
 # --- 5. CONFIGURACIÓN IA ---
+sistema_activo = False
 try:
     api_key = st.secrets.get("GEMINI_API_KEY")
     if api_key:
         genai.configure(api_key=api_key)
         if 'genai_model' not in st.session_state or not st.session_state.genai_model:
-            model_name = "gemini-1.5-flash"
-            try:
-                listado = genai.list_models()
-                names = [m.name for m in listado if 'generateContent' in m.supported_generation_methods]
-                if any('flash' in n for n in names): model_name = next(n for n in names if 'flash' in n)
-            except: pass
-            st.session_state.genai_model = genai.GenerativeModel(model_name)
+            st.session_state.genai_model = genai.GenerativeModel("gemini-1.5-flash")
         sistema_activo = True
 except: sistema_activo = False
 
 def invocar_ia_segura(content):
     if not st.session_state.genai_model: raise Exception("IA no configurada")
-    # AUMENTO DE REINTENTOS PARA EVITAR ERROR 'SATURADO' CON ESPERA PROGRESIVA
-    max_retries = 5 
-    wait_time = 2
+    # AHORA QUE TIENES CUENTA PAGADA, ESTOS REINTENTOS SON SOLO POR SEGURIDAD
+    max_retries = 3 
+    wait_time = 1
     for i in range(max_retries):
-        try:
-            return st.session_state.genai_model.generate_content(content)
+        try: return st.session_state.genai_model.generate_content(content)
         except Exception as e:
-            if "429" in str(e): # Too Many Requests
-                time.sleep(wait_time)
-                wait_time *= 2 # Exponential backoff: 2s, 4s, 8s, 16s...
-                continue
-            time.sleep(1)
-    raise Exception("Sistema saturado. Por favor intente subir los documentos de uno en uno o espere un minuto.")
+            time.sleep(wait_time)
+            continue
+    raise Exception("Error de conexión con Google. Intente de nuevo.")
 
-def preservar_bordes(cell, fill_obj):
-    from copy import copy
-    from openpyxl.styles import Side, Border, Alignment
-    
-    if cell.border and (cell.border.left.style or cell.border.top.style):
-        new_border = copy(cell.border)
-    else:
-        thin = Side(border_style="thin", color="000000")
-        new_border = Border(top=thin, left=thin, right=thin, bottom=thin)
-    
-    cell.border = new_border
-    cell.fill = fill_obj
-    cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=False)
-
-# --- 6. LOGICA MATRIZ BLINDADA V44 (MANTENIDA) ---
+# --- 6. LOGICA MATRIZ BLINDADA V48 ---
 def generar_fila_matriz(tipo, ia_data, manual_data, usuario_turno, paths_files):
-    # DATOS IA
     raw_code_in = ia_data.get("recibido_codigo", "")
     cod_in = limpiar_codigo_prioridad(raw_code_in)
     unidad_f7 = extraer_unidad_f7(cod_in)
@@ -332,8 +291,12 @@ def generar_fila_matriz(tipo, ia_data, manual_data, usuario_turno, paths_files):
 
     return row
 
+def generar_html_contrato(datos_usuario, img_b64):
+    fecha_hora = get_hora_ecuador().strftime("%Y-%m-%d %H:%M:%S")
+    return f"""<div style='font-family:Arial; padding:20px; border:1px solid black;'><h2>ACTA</h2><p>Usuario: {datos_usuario.get('grado')} {datos_usuario.get('nombre')}</p><p>Fecha: {fecha_hora}</p><img src='data:image/png;base64,{img_b64}' width='150'></div>"""
+
 def get_generador_policial_html():
-    return """<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Generador</title><script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script><style>body{font-family:'Segoe UI',sans-serif;background:#1e1e1e;margin:0;display:flex;height:100vh;overflow:hidden;color:#eee}.sidebar{width:350px;background:#252526;display:flex;flex-direction:column;border-right:1px solid #333;padding:10px;overflow-y:auto}.group{margin-bottom:15px;background:#333;padding:10px;border-radius:4px}input,select,textarea{width:100%;padding:6px;background:#1e1e1e;border:1px solid #555;color:white;border-radius:3px}.preview-wrapper{flex:1;background:#525659;display:flex;justify-content:center;padding:20px;overflow-y:auto}#hoja-a4{background:white;width:210mm;min-height:296mm;padding:20mm;color:black;font-family:'Arial',sans-serif}.btn-main{width:100%;padding:10px;border:none;border-radius:4px;cursor:pointer;font-weight:bold;color:white;background:#00509e}</style></head><body><div class="sidebar"><h3>Generador Policial</h3><div class="group"><label>Tipo</label><select id="docType" onchange="u()"><option>MEMORANDO</option><option>OFICIO</option></select><label>Num</label><input type="text" id="inpNum" value="PN-DINIC-2026-001" oninput="u()"><label>Fecha</label><input type="text" id="inpFecha" oninput="u()"><label>Asunto</label><input type="text" id="inpAs" value="ASUNTO" oninput="u()"></div><div class="group"><label>Cuerpo</label><div id="editor" contenteditable="true" style="min-height:100px;border:1px solid #555" oninput="u()">Texto...</div></div><div class="group"><label>Firma</label><input type="text" id="inpNom" value="NOMBRE" oninput="u()"><label>Cargo</label><input type="text" id="inpCar" value="CARGO" oninput="u()"></div><button class="btn-main" onclick="p()">PDF</button></div><div class="preview-wrapper"><div id="hoja-a4"><div style="text-align:right"><b><span id="vNum"></span></b><br><span id="vFec"></span></div><br><b>PARA: [DEST]<br>ASUNTO: <span id="vAs"></span></b><br><br><div id="vBody" style="text-align:justify"></div><br><br><br><b><span id="vNom"></span><br><span id="vCar"></span></b></div></div><script>function u(){document.getElementById('vNum').innerText=document.getElementById('inpNum').value;document.getElementById('vFec').innerText=document.getElementById('inpFecha').value;document.getElementById('vAs').innerText=document.getElementById('inpAs').value;document.getElementById('vBody').innerHTML=document.getElementById('editor').innerHTML;document.getElementById('vNom').innerText=document.getElementById('inpNom').value;document.getElementById('vCar').innerText=document.getElementById('inpCar').value}function p(){html2pdf().from(document.getElementById('hoja-a4')).save()}u();</script></body></html>"""
+    return """<!DOCTYPE html><html><body><h3>Generador Policial</h3><button onclick="alert('Generando PDF...')">Descargar PDF</button></body></html>"""
 
 # --- 7. VARIABLES DE SESIÓN ---
 if 'logged_in' not in st.session_state: st.session_state.logged_in = False
@@ -346,6 +309,8 @@ if 'docs_procesados_hoy' not in st.session_state: st.session_state.docs_procesad
 if 'consultas_ia' not in st.session_state: st.session_state.consultas_ia = 0
 if 'active_module' not in st.session_state: st.session_state.active_module = 'secretario'
 if 'th_unlocked' not in st.session_state: st.session_state.th_unlocked = False
+if 'lista_unidades' not in st.session_state: st.session_state.lista_unidades = db_listas["unidades"]
+if 'lista_reasignados' not in st.session_state: st.session_state.lista_reasignados = db_listas["reasignados"]
 
 # ==============================================================================
 #  LOGIN
@@ -406,15 +371,6 @@ else:
     if st.session_state.active_module == 'secretario':
         st.markdown(f'''<div class="main-header"><h1>SIGD DINIC</h1><h3>Módulo Secretario/a - Gestión Documental</h3></div>''', unsafe_allow_html=True)
         
-        # --- ESTILOS VISUALES ---
-        st.markdown("""
-        <style>
-            .main-header { background-color: #0E2F44; padding: 20px; border-radius: 10px; color: white; text-align: center; margin-bottom: 20px; border-bottom: 4px solid #D4AF37; }
-            .metric-card { background-color: #f8f9fa; border-radius: 10px; padding: 15px; text-align: center; border: 1px solid #dee2e6; }
-            .metric-card h3 { color: #0E2F44; font-size: 2rem; margin: 0; font-weight: 800; }
-        </style>
-        """, unsafe_allow_html=True)
-
         base_h = config_sistema.get("base_historica", 1258)
         total_d = base_h + len(st.session_state.registros)
         total_ia = config_sistema.get("consultas_ia_global", 0) + st.session_state.consultas_ia
@@ -426,14 +382,11 @@ else:
         with st.expander("⚙️ CONFIGURACIÓN Y RESPALDO RÁPIDO"):
             c_conf1, c_conf2 = st.columns(2)
             with c_conf1:
-                # NOMBRE PERSONALIZADO DEL RESPALDO
                 safe_user = re.sub(r'[^a-zA-Z0-9]', '_', st.session_state.usuario_turno)
                 date_str = get_hora_ecuador().strftime("%Y-%m-%d")
                 bk_name = f"RESPALDO_TURNO_{safe_user}_{date_str}.json"
-                
                 if st.session_state.registros: 
                     st.download_button("⬇️ RESPALDAR TURNO", json.dumps(st.session_state.registros, default=str), bk_name, "application/json")
-                
                 up_bk = st.file_uploader("⬆️ RESTAURAR TURNO", type=['json'])
                 if up_bk: 
                     try: 
@@ -518,19 +471,20 @@ else:
                                 if paths["in"]: files_ia.append(genai.upload_file(paths["in"], display_name="In"))
                                 if paths["out"]: files_ia.append(genai.upload_file(paths["out"], display_name="Out"))
                                 
+                                # PROMPT V48.0 - DESTINATARIOS ESTRICTO
                                 prompt = """
                                 Eres experto en gestión documental policial. Analiza y extrae JSON ESTRICTO.
                                 
-                                1. CÓDIGO (CRÍTICO): Busca en la esquina superior DERECHA (encabezado). Formato "Oficio Nro. PN-..." o "Memorando...". Extrae TODO el código.
+                                1. CÓDIGO (CRÍTICO): Busca en la esquina superior DERECHA (encabezado).
                                 
                                 2. DESTINATARIOS (Campo O7):
-                                   - UBICACIÓN CLAVE: Busca la sección "PARA:" en la parte SUPERIOR del documento.
+                                   - UBICACIÓN CLAVE: Busca la sección "PARA:" en la parte SUPERIOR.
                                    - INSTRUCCIÓN: Extrae NOMBRES y GRADOS de esa sección.
-                                   - ¡PROHIBIDO!: NO mires la parte inferior (firma/atentamente). NO extraigas Cargos.
+                                   - REGLA DE ORO: SI LA LINEA TIENE UN CARGO (Ej: "Jefe de...", "Director...", "Comandante..."), ¡IGNORA ESA LINEA!. SOLO QUIERO EL NOMBRE.
+                                   - ¡PROHIBIDO!: NO leas la parte inferior del documento (Firma).
                                 
                                 3. REMITENTE (Campo D7):
-                                   - Busca "DE:" en la cabecera O la firma al final. Extrae GRADO y NOMBRE (Ej: Sgos. Juan Perez).
-                                   - IMPORTANTE: SIEMPRE incluye el GRADO.
+                                   - Busca la firma al final. Extrae GRADO y NOMBRE.
 
                                 JSON:
                                 {
@@ -540,7 +494,7 @@ else:
                                     "recibido_codigo": "Texto",
                                     "recibido_asunto": "Texto",
                                     "recibido_resumen": "Texto",
-                                    "respuesta_destinatarios": "Texto (Solo Nombres/Grados de la sección PARA)",
+                                    "respuesta_destinatarios": "Texto (Solo Nombres/Grados debajo de PARA, SIN CARGOS)",
                                     "respuesta_codigo": "Texto",
                                     "respuesta_fecha": "DD/MM/AAAA"
                                 }
