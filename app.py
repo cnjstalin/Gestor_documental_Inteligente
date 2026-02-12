@@ -16,7 +16,7 @@ from openpyxl.styles import PatternFill, Border, Side, Alignment
 from datetime import datetime, timedelta, timezone
 
 # --- 1. CONFIGURACIÓN Y ESTILOS ---
-VER_SISTEMA = "v53.0 (Base v44.2 Fix)"
+VER_SISTEMA = "v54.0 (Auto-Fix Model)"
 ADMIN_USER = "1723623011"
 ADMIN_PASS_MASTER = "9994915010022"
 
@@ -228,36 +228,49 @@ def generar_html_contrato(datos_usuario, img_b64):
 # VARIABLE GLOBAL SISTEMA
 sistema_activo = False
 
-# --- 5. CONFIGURACIÓN IA ---
+# --- 5. CONFIGURACIÓN IA (CON AUTO-REPARACIÓN 404) ---
 try:
     api_key = st.secrets.get("GEMINI_API_KEY")
     if api_key:
         genai.configure(api_key=api_key)
+        # Inicialmente intentamos Flash
         if 'genai_model' not in st.session_state or not st.session_state.genai_model:
-            # Intentamos usar el modelo Flash 1.5 que es más rápido y compatible con cuentas de pago
             st.session_state.genai_model = genai.GenerativeModel("gemini-1.5-flash")
         sistema_activo = True
 except: sistema_activo = False
 
 def invocar_ia_segura(content):
     if not st.session_state.genai_model: raise Exception("IA no configurada")
-    # REINTENTOS MEJORADOS PARA EVITAR "SISTEMA SATURADO"
+    
     max_retries = 3
     for i in range(max_retries):
         try:
             return st.session_state.genai_model.generate_content(content)
         except Exception as e:
-            if "429" in str(e): # Si es saturación real (poco probable con cuenta paga, pero posible)
+            # DETECTOR DE ERROR 404 (Modelo no encontrado) -> CAMBIO AUTOMÁTICO A GEMINI-PRO
+            error_str = str(e)
+            if "404" in error_str or "not found" in error_str:
+                try:
+                    # Cambiamos al modelo clásico que siempre funciona
+                    st.session_state.genai_model = genai.GenerativeModel("gemini-pro")
+                    # Reintentamos inmediatamente con el nuevo modelo
+                    return st.session_state.genai_model.generate_content(content)
+                except Exception as e2:
+                    raise Exception(f"Error irrecuperable: {e2}")
+            
+            # Si es error de saturación, esperamos
+            if "429" in error_str:
                 time.sleep(2)
                 continue
             time.sleep(1)
-    # Si falla después de reintentos, lanzamos error detallado
+            
+    # Último intento desesperado
     try:
         return st.session_state.genai_model.generate_content(content)
-    except Exception as e:
-        raise Exception(f"Error Google (Verifique API Key): {e}")
+    except:
+        raise Exception("Error de conexión. Verifique su API Key o intente de nuevo.")
 
-# --- 6. LOGICA MATRIZ BLINDADA V53 (ORIGINAL CON PARCHES) ---
+# --- 6. LOGICA MATRIZ BLINDADA V54 (ORIGINAL + MEJORAS) ---
 def generar_fila_matriz(tipo, ia_data, manual_data, usuario_turno, paths_files):
     # DATOS IA
     raw_code_in = ia_data.get("recibido_codigo", "")
@@ -532,7 +545,7 @@ else:
                                 if paths["in"]: files_ia.append(genai.upload_file(paths["in"], display_name="In"))
                                 if paths["out"]: files_ia.append(genai.upload_file(paths["out"], display_name="Out"))
                                 
-                                # PROMPT V53 - O7 ESTRICTO Y DEFINITIVO
+                                # PROMPT V54 - O7 ESTRICTO Y DEFINITIVO
                                 prompt = """
                                 Eres experto en gestión documental policial. Analiza y extrae JSON ESTRICTO.
                                 
