@@ -16,7 +16,7 @@ from openpyxl.styles import PatternFill, Border, Side, Alignment
 from datetime import datetime, timedelta, timezone
 
 # --- 1. CONFIGURACIÓN Y ESTILOS ---
-VER_SISTEMA = "v52.0"
+VER_SISTEMA = "v53.0 (Base v44.2 Fix)"
 ADMIN_USER = "1723623011"
 ADMIN_PASS_MASTER = "9994915010022"
 
@@ -241,20 +241,23 @@ except: sistema_activo = False
 
 def invocar_ia_segura(content):
     if not st.session_state.genai_model: raise Exception("IA no configurada")
+    # REINTENTOS MEJORADOS PARA EVITAR "SISTEMA SATURADO"
     max_retries = 3
-    wait_time = 1
     for i in range(max_retries):
         try:
             return st.session_state.genai_model.generate_content(content)
         except Exception as e:
-            if "429" in str(e): 
-                time.sleep(wait_time)
-                wait_time *= 2
+            if "429" in str(e): # Si es saturación real (poco probable con cuenta paga, pero posible)
+                time.sleep(2)
                 continue
             time.sleep(1)
-    raise Exception("Sistema saturado. Espere un momento.")
+    # Si falla después de reintentos, lanzamos error detallado
+    try:
+        return st.session_state.genai_model.generate_content(content)
+    except Exception as e:
+        raise Exception(f"Error Google (Verifique API Key): {e}")
 
-# --- 6. LOGICA MATRIZ BLINDADA V52 (ORIGINAL CON PARCHES) ---
+# --- 6. LOGICA MATRIZ BLINDADA V53 (ORIGINAL CON PARCHES) ---
 def generar_fila_matriz(tipo, ia_data, manual_data, usuario_turno, paths_files):
     # DATOS IA
     raw_code_in = ia_data.get("recibido_codigo", "")
@@ -529,7 +532,7 @@ else:
                                 if paths["in"]: files_ia.append(genai.upload_file(paths["in"], display_name="In"))
                                 if paths["out"]: files_ia.append(genai.upload_file(paths["out"], display_name="Out"))
                                 
-                                # PROMPT V52 - O7 ESTRICTO
+                                # PROMPT V53 - O7 ESTRICTO Y DEFINITIVO
                                 prompt = """
                                 Eres experto en gestión documental policial. Analiza y extrae JSON ESTRICTO.
                                 
