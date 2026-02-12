@@ -16,7 +16,7 @@ from openpyxl.styles import PatternFill, Border, Side, Alignment
 from datetime import datetime, timedelta, timezone
 
 # --- 1. CONFIGURACIÓN E INICIO ---
-VER_SISTEMA = "v58.0 (UI Premium + IA Robusta)"
+VER_SISTEMA = "v59.0 (Auto-Scan + UI Premium)"
 ADMIN_USER = "1723623011"
 ADMIN_PASS_MASTER = "9994915010022"
 
@@ -27,7 +27,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- 2. ESTILOS CSS (RECUPERADOS) ---
+# --- 2. ESTILOS VISUALES (PREMIUM) ---
 st.markdown("""
     <style>
     .main-header { background-color: #0E2F44; padding: 20px; border-radius: 10px; color: white; text-align: center; margin-bottom: 20px; border-bottom: 4px solid #D4AF37; }
@@ -106,33 +106,51 @@ def generar_html_contrato(datos_usuario, img_b64):
 def get_generador_policial_html():
     return """<!DOCTYPE html><html><body><h3>Generador Policial</h3><button>Descargar PDF</button></body></html>"""
 
-# --- 4. GESTIÓN DE MODELOS (SOLUCIÓN ERROR 404) ---
-def configurar_ia_robusta():
-    api_key = st.secrets.get("GEMINI_API_KEY")
-    if not api_key: return None
-    genai.configure(api_key=api_key)
-    return True
+# --- 4. GESTIÓN DE MODELOS (AUTO-ESCANEO PARA ARREGLAR 404) ---
+def obtener_modelo_disponible():
+    """Pregunta a Google qué modelos hay y devuelve el mejor disponible"""
+    try:
+        listado = genai.list_models()
+        modelos_validos = []
+        for m in listado:
+            if 'generateContent' in m.supported_generation_methods:
+                modelos_validos.append(m.name)
+        
+        # Prioridad: Flash -> Pro 1.5 -> Pro 1.0 -> Cualquiera
+        if not modelos_validos: return "gemini-1.5-flash" # Fallback por si acaso
+        
+        # Buscar Flash
+        flash = next((m for m in modelos_validos if "flash" in m), None)
+        if flash: return flash
+        
+        # Buscar 1.5 Pro
+        pro15 = next((m for m in modelos_validos if "1.5-pro" in m), None)
+        if pro15: return pro15
+        
+        # Devolver el primero que encuentre
+        return modelos_validos[0]
+    except:
+        return "gemini-1.5-flash" # Fallback si falla el listado
 
 def invocar_ia_segura(content):
-    # Lista de modelos en orden de preferencia
-    modelos_a_probar = ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-1.0-pro"]
-    last_error = ""
+    if 'genai_model' not in st.session_state:
+        raise Exception("IA no inicializada")
     
-    for modelo in modelos_a_probar:
+    max_retries = 3
+    for i in range(max_retries):
         try:
-            model = genai.GenerativeModel(modelo)
-            return model.generate_content(content)
+            return st.session_state.genai_model.generate_content(content)
         except Exception as e:
-            last_error = str(e)
-            if "429" in last_error: # Saturación temporal
+            if "429" in str(e): # Saturación
                 time.sleep(2)
-                try: return model.generate_content(content)
-                except: pass
-            continue # Prueba el siguiente modelo
+                continue
+            # Si es otro error, reintentar una vez más tras pausa
+            time.sleep(1)
             
-    raise Exception(f"Error de conexión con Google (404/Auth). Último error: {last_error}")
+    # Último intento
+    return st.session_state.genai_model.generate_content(content)
 
-# --- 5. LOGICA MATRIZ (ESTRICTA SEGÚN WORD) ---
+# --- 5. LOGICA MATRIZ (ESTRICTA) ---
 def generar_fila_matriz(tipo, ia_data, manual_data, usuario_turno, paths_files):
     # Extracción
     raw_code_in = ia_data.get("recibido_codigo", "")
@@ -270,6 +288,7 @@ if 'consultas_ia' not in st.session_state: st.session_state.consultas_ia = 0
 if 'active_module' not in st.session_state: st.session_state.active_module = 'secretario'
 if 'lista_unidades' not in st.session_state: st.session_state.lista_unidades = db_listas.get("unidades", UNIDADES_DEFAULT)
 if 'lista_reasignados' not in st.session_state: st.session_state.lista_reasignados = db_listas.get("reasignados", [])
+if 'active_model_name' not in st.session_state: st.session_state.active_model_name = "Sin Conexión"
 
 # Persistencia F5
 token = st.query_params.get("token", None)
@@ -277,7 +296,19 @@ if token and not st.session_state.logged_in and token in db_usuarios:
     st.session_state.logged_in = True; st.session_state.user_id = token; st.session_state.user_role = "admin" if token == ADMIN_USER else "user"
     st.session_state.usuario_turno = f"{db_usuarios[token]['grado']} {db_usuarios[token]['nombre']}"
 
-sistema_activo = configurar_ia_robusta()
+# --- AUTO-SCAN DE IA ---
+sistema_activo = False
+try:
+    api_key = st.secrets.get("GEMINI_API_KEY")
+    if api_key:
+        genai.configure(api_key=api_key)
+        # AQUÍ ESTÁ LA MAGIA: Escanea y elige
+        if 'genai_model' not in st.session_state:
+            modelo_elegido = obtener_modelo_disponible()
+            st.session_state.genai_model = genai.GenerativeModel(modelo_elegido)
+            st.session_state.active_model_name = modelo_elegido
+        sistema_activo = True
+except: sistema_activo = False
 
 # ==============================================================================
 #  INTERFAZ GRÁFICA PRINCIPAL
@@ -318,6 +349,7 @@ else:
         st.markdown("### 👮‍♂️ CONTROL DE MANDO")
         if st.session_state.user_role == "admin": st.markdown("""<div class="admin-badge">🛡️ MODO ADMINISTRADOR<br><span style="font-size: 0.8em; font-weight: normal;">CONTROL TOTAL</span></div>""", unsafe_allow_html=True)
         st.info(f"👤 **{st.session_state.usuario_turno}**")
+        st.caption(f"🤖 IA: {st.session_state.active_model_name}") # Indicador del modelo activo
         fecha_turno = st.date_input("Fecha Operación:", value=get_hora_ecuador().date())
         st.markdown("---"); st.markdown("### 📂 MÓDULOS")
         if st.button("📝 SECRETARIO/A", use_container_width=True, type="primary" if st.session_state.active_module == 'secretario' else "secondary"): st.session_state.active_module = 'secretario'; st.rerun()
