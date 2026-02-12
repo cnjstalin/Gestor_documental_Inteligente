@@ -15,7 +15,7 @@ from openpyxl import load_workbook
 from openpyxl.styles import PatternFill, Border, Side, Alignment
 from datetime import datetime, timedelta, timezone
 
-# --- 1. CONFIGURACIÓN INICIAL (SIEMPRE PRIMERO) ---
+# --- 1. CONFIGURACIÓN INICIAL ---
 st.set_page_config(
     page_title="SIGD DINIC",
     layout="wide",
@@ -23,35 +23,20 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- 2. ESTILOS VISUALES (DISEÑO PREMIUM) ---
+# --- 2. ESTILOS VISUALES ---
 st.markdown("""
     <style>
     .main-header { background-color: #0E2F44; padding: 20px; border-radius: 10px; color: white; text-align: center; margin-bottom: 20px; border-bottom: 4px solid #D4AF37; }
-    .main-header h1 { margin: 0; font-size: 2.5rem; font-weight: 800; }
-    .metric-card { background-color: #f8f9fa !important; border-radius: 10px; padding: 15px; text-align: center; border: 1px solid #dee2e6; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+    .metric-card { background-color: #f8f9fa !important; border-radius: 10px; padding: 15px; text-align: center; border: 1px solid #dee2e6; }
     .metric-card h3 { color: #0E2F44 !important; font-size: 2rem; margin: 0; font-weight: 800; }
-    .metric-card p { color: #555555 !important; font-size: 1rem; margin: 0; font-weight: 600; }
-    .login-container { max-width: 400px; margin: auto; padding: 40px; background-color: #ffffff; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); text-align: center; border-top: 5px solid #0E2F44; }
-    div.stButton > button { width: 100%; font-weight: bold; border-radius: 5px; }
     </style>
 """, unsafe_allow_html=True)
 
-# --- 3. FUNCIONES GLOBALES (DEFINIDAS AQUÍ PARA EVITAR NameError) ---
+# --- 3. FUNCIONES GLOBALES ---
 def get_hora_ecuador(): 
     return datetime.now(timezone(timedelta(hours=-5)))
 
-def frases_curiosas():
-    frases = [
-        "Procesando con Inteligencia Artificial...",
-        "Analizando estructura del documento...",
-        "Extrayendo grados y nombres...",
-        "Verificando códigos policiales...",
-        "La seguridad es responsabilidad de todos."
-    ]
-    return random.choice(frases)
-
 def preservar_bordes(cell, fill_obj):
-    """Mantiene el formato de celdas al escribir en Excel"""
     if cell.border and (cell.border.left.style or cell.border.top.style):
         new_border = copy(cell.border)
     else:
@@ -108,10 +93,13 @@ def get_logo_html(width="120px"):
     if b64: return f'<img src="data:image/jpeg;base64,{b64}" style="width:{width}; margin-bottom:15px;">'
     return f'<img src="https://upload.wikimedia.org/wikipedia/commons/2/25/Escudo_Policia_Nacional_del_Ecuador.png" style="width:{width}; margin-bottom:15px;">'
 
+def frases_curiosas():
+    return "Procesando documento..."
+
 # --- 4. DATOS Y CONFIGURACIÓN ---
 ADMIN_USER = "1723623011"
 ADMIN_PASS_MASTER = "9994915010022"
-VER_SISTEMA = "v48.0"
+VER_SISTEMA = "v49.0"
 
 USUARIOS_BASE = {
     "0702870460": {"grado": "SGOS", "nombre": "VILLALTA OCHOA XAVIER BISMARK", "activo": True},
@@ -140,7 +128,6 @@ CONTRATOS_FILE = "contratos_legal.json"
 LOGS_FILE = "historial_acciones.json"
 LISTAS_FILE = "listas_db.json"
 
-# Carga de JSONs
 def cargar_json(filepath, default):
     if os.path.exists(filepath):
         try:
@@ -194,7 +181,7 @@ def get_estado_usuario(cedula):
         else: return "🔴 DESCONECTADO"
     except: return "🔴 ERROR"
 
-# --- 5. CONFIGURACIÓN IA ---
+# --- 5. CONFIGURACIÓN IA (MODO DIAGNÓSTICO) ---
 sistema_activo = False
 try:
     api_key = st.secrets.get("GEMINI_API_KEY")
@@ -207,17 +194,24 @@ except: sistema_activo = False
 
 def invocar_ia_segura(content):
     if not st.session_state.genai_model: raise Exception("IA no configurada")
-    # AHORA QUE TIENES CUENTA PAGADA, ESTOS REINTENTOS SON SOLO POR SEGURIDAD
+    # REINTENTOS CON REPORTE DE ERROR REAL
     max_retries = 3 
     wait_time = 1
+    last_error = ""
     for i in range(max_retries):
         try: return st.session_state.genai_model.generate_content(content)
         except Exception as e:
-            time.sleep(wait_time)
-            continue
-    raise Exception("Error de conexión con Google. Intente de nuevo.")
+            last_error = str(e) # Guardamos el error real
+            if "429" in str(e): # Solo reintentar si es saturación temporal
+                time.sleep(wait_time)
+                wait_time *= 2 
+                continue
+            else:
+                # Si es otro error (ej: Permisos, API Key invalida), fallar rapido para mostrarlo
+                raise Exception(f"Error Técnico Google: {str(e)}")
+    raise Exception(f"No se pudo conectar tras intentos. Detalle: {last_error}")
 
-# --- 6. LOGICA MATRIZ BLINDADA V48 ---
+# --- 6. LOGICA MATRIZ BLINDADA V49 ---
 def generar_fila_matriz(tipo, ia_data, manual_data, usuario_turno, paths_files):
     raw_code_in = ia_data.get("recibido_codigo", "")
     cod_in = limpiar_codigo_prioridad(raw_code_in)
@@ -459,7 +453,7 @@ else:
                     elif d_in or d_out: process = True
                     
                     if process:
-                        with st.spinner(f"⏳ PROCESANDO... {frases_curiosas()}"):
+                        with st.spinner(f"⏳ {frases_curiosas()}"):
                             try:
                                 paths = {"in":None, "out":None}
                                 if d_in:
@@ -471,7 +465,6 @@ else:
                                 if paths["in"]: files_ia.append(genai.upload_file(paths["in"], display_name="In"))
                                 if paths["out"]: files_ia.append(genai.upload_file(paths["out"], display_name="Out"))
                                 
-                                # PROMPT V48.0 - DESTINATARIOS ESTRICTO
                                 prompt = """
                                 Eres experto en gestión documental policial. Analiza y extrae JSON ESTRICTO.
                                 
@@ -518,7 +511,7 @@ else:
                                 if paths["in"]: os.remove(paths["in"])
                                 if paths["out"]: os.remove(paths["out"])
                                 st.rerun()
-                            except Exception as e: st.error(f"Error: {e}")
+                            except Exception as e: st.error(f"⚠️ {str(e)}")
                     else: st.warning("⚠️ Sube documento.")
 
             if st.session_state.registros:
