@@ -1,201 +1,172 @@
 import streamlit as st
 
 # ==============================================================================
-# 1. CONFIGURACIÓN BASE Y CONSTANTES ETERNAS
+# 1. CONFIGURACIÓN BASE
 # ==============================================================================
 st.set_page_config(
-    page_title="SIGD DINIC | Centro de Mando",
+    page_title="SIGD DINIC",
     layout="wide",
     page_icon="🛡️",
     initial_sidebar_state="collapsed"
 )
 
-# CONSTANTES INMUTABLES
-NOMBRE_SISTEMA = "SISTEMA INTEGRAL DE GESTION DOCUMENTAL DINIC"
+# URL del Escudo (Aseguramos que sea una URL pública válida o base64 si fuera local)
 URL_ESCUDO = "https://upload.wikimedia.org/wikipedia/commons/2/25/Escudo_Policia_Nacional_del_Ecuador.png"
 
 # ==============================================================================
-# 2. INYECCIÓN DE CSS (DISEÑO TÁCTICO HORIZONTAL)
+# 2. ESTILOS CSS (DISEÑO TÁCTICO)
 # ==============================================================================
 st.markdown("""
     <style>
-    /* IMPORTAR FUENTES TÉCNICAS */
-    @import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;700&family=Roboto:wght@300;400;500&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@600;800&family=Roboto:wght@300;400;500&display=swap');
 
-    /* --- 2.1 ESTRUCTURA GENERAL --- */
+    /* FONDO */
     .stApp {
-        background-color: #0a1018;
+        background-color: #050a10;
         background-image: 
-            radial-gradient(circle at 50% 30%, #1a2a3a 0%, #0a1018 70%),
-            linear-gradient(rgba(255, 255, 255, 0.01) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(255, 255, 255, 0.01) 1px, transparent 1px);
+            radial-gradient(circle at 50% 30%, #122030 0%, #050a10 70%),
+            linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
         background-size: 100% 100%, 40px 40px, 40px 40px;
         color: #e0e0e0;
-        font-family: 'Roboto', sans-serif;
     }
     
     #MainMenu, footer, header {visibility: hidden;}
     [data-testid="collapsedControl"] {display: none;}
-    .block-container { padding-top: 3rem !important; padding-bottom: 5rem !important; max-width: 1400px !important; }
-    hr { border-color: rgba(212, 175, 55, 0.2) !important; margin: 50px 0 !important; }
-
-
-    /* --- 2.2 CABECERA INSTITUCIONAL CENTRADA --- */
-    .header-container {
+    .block-container { padding-top: 2rem !important; padding-bottom: 5rem !important; max-width: 1400px !important; }
+    
+    /* CABECERA PERSONALIZADA */
+    .header-wrapper {
         display: flex;
-        flex-direction: column; /* Apilado verticalmente para centrar mejor */
+        flex-direction: column;
         align-items: center;
         justify-content: center;
-        margin-bottom: 50px;
-        padding: 30px;
-        background: rgba(13, 22, 33, 0.6);
-        backdrop-filter: blur(10px);
-        border-radius: 20px;
-        border: 1px solid rgba(212, 175, 55, 0.1);
-        text-align: center; /* Asegura que el texto interno esté centrado */
+        margin-bottom: 40px;
+        padding: 20px;
+        border-bottom: 2px solid rgba(212, 175, 55, 0.3); /* Línea dorada */
+        background: rgba(13, 22, 33, 0.8);
+        border-radius: 15px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.5);
     }
-
-    .logo-box img {
-        width: 130px; /* Un poco más grande */
-        filter: drop-shadow(0 0 20px rgba(212, 175, 55, 0.4));
-        margin-bottom: 20px;
-    }
-
-    .title-box h1 {
+    
+    .main-title {
         font-family: 'Rajdhani', sans-serif;
-        color: #ffffff;
-        font-size: 3rem;
+        font-size: 4rem; /* TÍTULO GIGANTE */
         font-weight: 800;
+        color: white;
+        text-align: center;
         margin: 0;
-        letter-spacing: 2px;
-        text-transform: uppercase;
-        text-shadow: 0 4px 10px rgba(0, 0, 0, 0.8);
-        background: -webkit-linear-gradient(#fff, #cfd8dc);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
+        letter-spacing: 5px;
+        text-shadow: 0 0 20px rgba(0, 188, 212, 0.5);
+        line-height: 1;
     }
-
-    .title-box h3 {
+    
+    .sub-title {
         font-family: 'Roboto', sans-serif;
-        color: #D4AF37;
         font-size: 1.2rem;
-        font-weight: 500;
-        margin: 15px 0 0 0;
-        letter-spacing: 4px;
+        color: #D4AF37; /* DORADO */
+        text-align: center;
+        margin-top: 10px;
+        letter-spacing: 3px;
         text-transform: uppercase;
-        opacity: 0.9;
+        font-weight: 500;
     }
 
-
-    /* --- 2.3 TARJETAS HORIZONTALES (NUEVO DISEÑO) --- */
+    /* BOTONES HORIZONTALES */
     div.stButton > button {
         background: linear-gradient(90deg, rgba(20, 30, 45, 0.95), rgba(15, 25, 35, 0.95)) !important;
-        border: 1px solid rgba(212, 175, 55, 0.15) !important;
-        border-radius: 12px !important;
-        color: #e0e0e0 !important;
+        border: 1px solid rgba(212, 175, 55, 0.2) !important;
+        border-radius: 10px !important;
+        color: #fff !important;
         
-        /* GEOMETRÍA HORIZONTAL */
         width: 100% !important;
-        height: 140px !important; /* Más bajo */
+        height: 100px !important; /* Altura controlada */
+        
         display: flex !important;
-        flex-direction: row !important; /* Elementos lado a lado */
-        justify-content: flex-start !important; /* Alineado a la izquierda */
+        flex-direction: row !important;
+        justify-content: flex-start !important;
         align-items: center !important;
-        padding: 0 30px !important; /* Relleno horizontal */
-        gap: 25px; /* Espacio entre icono y texto */
+        padding: 0 30px !important;
+        gap: 20px;
 
-        /* TIPOGRAFÍA */
         font-family: 'Rajdhani', sans-serif !important;
         font-size: 1.5rem !important;
         font-weight: 700 !important;
         text-transform: uppercase !important;
         letter-spacing: 1px !important;
-        text-align: left !important;
         
         transition: all 0.3s ease !important;
-        box-shadow: 0 10px 30px rgba(0,0,0,0.2) !important;
-        position: relative !important;
-        overflow: hidden !important;
+        box-shadow: 0 5px 15px rgba(0,0,0,0.3) !important;
     }
 
-    /* Iconos (Emojis) a la izquierda */
-    div.stButton > button::before {
-        font-size: 55px;
-        margin-bottom: 0; /* Sin margen inferior en modo horizontal */
-        filter: grayscale(100%) opacity(0.7);
-        transition: all 0.3s ease;
-        flex-shrink: 0; /* Evita que el icono se aplaste */
-    }
-    
-    /* EFECTOS HOVER */
     div.stButton > button:hover {
-        transform: translateX(5px) !important; /* Pequeño desplazamiento lateral */
-        background: linear-gradient(90deg, rgba(30, 45, 70, 1), rgba(20, 30, 45, 1)) !important;
+        transform: translateX(10px) !important;
+        background: linear-gradient(90deg, #1e3c50, #102030) !important;
         border-color: #D4AF37 !important;
-        box-shadow: 0 15px 40px rgba(0,0,0,0.4), inset 0 0 20px rgba(212, 175, 55, 0.1) !important;
-        color: #ffffff !important;
+        box-shadow: 0 0 20px rgba(212, 175, 55, 0.2) !important;
     }
 
-    div.stButton > button:hover::before {
-        filter: grayscale(0%) opacity(1) drop-shadow(0 0 10px rgba(255,255,255,0.3));
+    /* Iconos CSS antes del texto */
+    div.stButton > button::before {
+        font-size: 40px;
+        margin: 0;
+        filter: grayscale(100%);
+        transition: 0.3s;
     }
-    
-    /* Asignación de Iconos Específicos */
+    div.stButton > button:hover::before { filter: grayscale(0%); transform: scale(1.2); }
+
+    /* Asignar Iconos */
     div.row-widget.stButton:nth-of-type(1) button::before { content: "📝"; }
     div.row-widget.stButton:nth-of-type(2) button::before { content: "👤"; }
     div.row-widget.stButton:nth-of-type(3) button::before { content: "🤖"; }
+    div.row-widget.stButton:nth-of-type(4) button::before { content: "🛡️"; }
 
-    /* FOOTER SIMPLE */
-    .footer-status {
-        position: fixed; bottom: 0; left: 0; width: 100%; text-align: center; padding: 10px;
-        background: rgba(10, 16, 24, 0.9); color: #546e7a; font-size: 10px; border-top: 1px solid rgba(255,255,255,0.05);
-        font-family: 'Roboto Mono', monospace; letter-spacing: 1px;
+    /* FOOTER */
+    .footer {
+        position: fixed; bottom: 0; left: 0; width: 100%; text-align: center;
+        background: #080c10; color: #546e7a; font-size: 11px; padding: 5px;
+        border-top: 1px solid #333; font-family: monospace;
     }
     </style>
 """, unsafe_allow_html=True)
 
 # ==============================================================================
-# 3. ESTRUCTURA DEL LAYOUT
+# 3. LAYOUT VISUAL
 # ==============================================================================
 
-# --- 3.1 CABECERA CENTRADA ---
-st.markdown(f"""
-    <div class="header-container">
-        <div class="logo-box"><img src="{URL_ESCUDO}"></div>
-        <div class="title-box">
-            <h1>{NOMBRE_SISTEMA}</h1>
-            <h3>CENTRO DE MANDO OPERATIVO | NIVEL CENTRAL</h3>
-        </div>
-    </div>
-""", unsafe_allow_html=True)
+# --- CABECERA ---
+# Usamos columnas de Streamlit para centrar la imagen (Método infalible)
+c1, c2, c3 = st.columns([4, 2, 4])
+with c2:
+    st.image(URL_ESCUDO, use_container_width=True)
 
-st.markdown("---")
-
-# --- 3.2 GRID HORIZONTAL DE MÓDULOS (3 COLUMNAS) ---
-# Usamos 3 columnas para que los botones sean anchos y horizontales
-m1, m2, m3 = st.columns(3, gap="large")
-
-with m1:
-    # El icono 📝 se añade por CSS
-    if st.button("SECRETARIO/A"):
-        st.toast("Accediendo a Gestión Documental...", icon="📝")
-        # Lógica de navegación aquí
-
-with m2:
-    # El icono 👤 se añade por CSS
-    if st.button("TALENTO HUMANO"):
-        st.toast("Validando credenciales TH...", icon="👤")
-        # Lógica de navegación aquí
-
-with m3:
-    # El icono 🤖 se añade por CSS
-    if st.button("GENERADOR DOCUMENTAL"):
-        st.toast("Iniciando motor de IA...", icon="🤖")
-        # Lógica de navegación aquí
-
-# --- 3.3 PIE DE PÁGINA ---
 st.markdown("""
-    <div class="footer-status">
-        SISTEMA OPERATIVO | CONEXIÓN CIFRADA | DINIC 2026
+    <div class="header-wrapper">
+        <div class="main-title">SIGD DINIC</div>
+        <div class="sub-title">SISTEMA INTEGRAL DE GESTIÓN DOCUMENTAL</div>
     </div>
 """, unsafe_allow_html=True)
+
+# --- GRID DE BOTONES (2 Columnas x 2 Filas para que se vean grandes y ordenados) ---
+col_izq, col_der = st.columns(2, gap="large")
+
+with col_izq:
+    st.markdown("#### 📂 GESTIÓN OPERATIVA")
+    if st.button("SECRETARIO/A"):
+        st.toast("Cargando Módulo Secretaría...", icon="📝")
+    
+    st.markdown("#### 🧠 INTELIGENCIA ARTIFICIAL")
+    if st.button("GENERADOR DOCUMENTAL"):
+        st.toast("Iniciando Generador IA...", icon="🤖")
+
+with col_der:
+    st.markdown("#### 👥 PERSONAL")
+    if st.button("TALENTO HUMANO"):
+        st.toast("Accediendo a TH...", icon="👤")
+
+    st.markdown("#### 🔒 CONTROL")
+    if st.button("ADMINISTRACIÓN"):
+        st.toast("Verificando permisos de Admin...", icon="🛡️")
+
+# --- FOOTER ---
+st.markdown('<div class="footer">DINIC 2026 | PROTEGIDO POR LEY ORGÁNICA DE SEGURIDAD</div>', unsafe_allow_html=True)
