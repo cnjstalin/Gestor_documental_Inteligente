@@ -1,7 +1,7 @@
 import streamlit as st
 
 # ==============================================================================
-# 1. CONFIGURACIÓN BASE
+# 1. CONFIGURACIÓN DEL ENTORNO
 # ==============================================================================
 st.set_page_config(
     page_title="SIGD DINIC",
@@ -10,161 +10,177 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# URL DEL ESCUDO
-URL_ESCUDO = "https://upload.wikimedia.org/wikipedia/commons/2/25/Escudo_Policia_Nacional_del_Ecuador.png"
-
 # ==============================================================================
-# 2. ESTILOS CSS (BOTONES UNIFICADOS 1x4)
+# 2. ESTILOS CSS (ESTRICTOS Y UNIFORMES)
 # ==============================================================================
 st.markdown("""
     <style>
-    @import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@600;800&family=Roboto:wght@300;400;500&display=swap');
+    /* FUENTES */
+    @import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@600;700&family=Roboto:wght@300;400;500&display=swap');
 
-    /* FONDO */
+    /* FONDO GENERAL */
     .stApp {
         background-color: #050a10;
         background-image: 
-            radial-gradient(circle at 50% 0%, #152535 0%, #050a10 80%),
+            radial-gradient(circle at 50% 0%, #1a2a3a 0%, #050a10 85%),
             linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
             linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
         background-size: 100% 100%, 40px 40px, 40px 40px;
         color: #e0e0e0;
     }
     
+    /* LIMPIEZA DE INTERFAZ */
     #MainMenu, footer, header {visibility: hidden;}
     [data-testid="collapsedControl"] {display: none;}
-    .block-container { padding-top: 1rem !important; padding-bottom: 5rem !important; max-width: 95% !important; }
+    .block-container { padding-top: 1rem !important; padding-bottom: 5rem !important; max-width: 98% !important; }
     
-    /* TÍTULOS */
-    .main-title {
+    /* CABECERA HTML UNIFICADA */
+    .header-box {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 30px;
+        background: rgba(13, 22, 33, 0.8);
+        border-bottom: 2px solid #D4AF37;
+        margin-bottom: 40px;
+        border-radius: 0 0 20px 20px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    }
+    
+    .header-logo {
+        width: 120px;
+        height: auto;
+        filter: drop-shadow(0 0 15px rgba(212, 175, 55, 0.6));
+        margin-bottom: 15px;
+        display: block; /* Asegura que se comporte como bloque */
+    }
+    
+    .header-title {
         font-family: 'Rajdhani', sans-serif;
-        font-size: 4rem; 
+        font-size: 3.5rem;
         font-weight: 800;
         color: white;
-        text-align: center;
+        text-transform: uppercase;
+        letter-spacing: 3px;
         margin: 0;
-        line-height: 1;
-        text-shadow: 0 0 30px rgba(0, 188, 212, 0.3);
-        background: -webkit-linear-gradient(#fff, #90a4ae);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
+        text-shadow: 0 0 20px rgba(0, 188, 212, 0.5);
+        line-height: 1.1;
+        text-align: center;
     }
     
-    .sub-title {
+    .header-subtitle {
         font-family: 'Roboto', sans-serif;
-        font-size: 1.2rem;
+        font-size: 1.1rem;
         color: #D4AF37;
+        letter-spacing: 4px;
+        margin-top: 10px;
+        text-transform: uppercase;
         text-align: center;
-        margin-top: 5px;
-        letter-spacing: 3px;
-        font-weight: 500;
-        margin-bottom: 40px;
     }
 
-    /* --- REGLA MAESTRA PARA BOTONES UNIFORMES --- */
+    /* BOTONES - GRID UNIFORME (1x4) */
     div.stButton > button {
-        background: linear-gradient(180deg, rgba(20, 30, 45, 0.9), rgba(10, 20, 30, 0.95)) !important;
+        background: linear-gradient(180deg, rgba(25, 35, 45, 0.9), rgba(10, 15, 20, 0.95)) !important;
         border: 1px solid rgba(212, 175, 55, 0.2) !important;
-        border-radius: 15px !important;
+        border-radius: 12px !important;
         color: #fff !important;
         
-        /* DIMENSIONES FORZADAS (CUADRADOS VERTICALES PARA FILA DE 4) */
+        /* FUERZA BRUTA DE DIMENSIONES */
         width: 100% !important;
-        height: 200px !important;      
-        min-height: 200px !important;  
+        height: 180px !important;
+        min-height: 180px !important;
+        max-height: 180px !important;
         
         display: flex !important;
-        flex-direction: column !important; /* Icono arriba, texto abajo */
+        flex-direction: column !important;
         justify-content: center !important;
         align-items: center !important;
-        padding: 20px !important;
-        gap: 15px;
+        padding: 10px !important;
+        gap: 10px;
 
         font-family: 'Rajdhani', sans-serif !important;
-        font-size: 1.3rem !important; /* Texto ajustado */
+        font-size: 1.3rem !important;
         font-weight: 700 !important;
         text-transform: uppercase !important;
         letter-spacing: 1px !important;
-        text-align: center !important;
-        white-space: normal !important; /* Permite que el texto baje de línea */
+        white-space: normal !important; /* Permite saltos de línea si el texto es largo */
         
-        transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1) !important;
-        box-shadow: 0 10px 30px rgba(0,0,0,0.4) !important;
+        transition: all 0.2s ease !important;
+        box-shadow: 0 5px 15px rgba(0,0,0,0.3) !important;
     }
 
     div.stButton > button:hover {
-        transform: translateY(-10px) !important;
+        transform: translateY(-5px) !important;
         background: linear-gradient(180deg, #1e3c50, #102030) !important;
         border-color: #D4AF37 !important;
         box-shadow: 0 0 25px rgba(212, 175, 55, 0.3) !important;
     }
 
-    /* ICONOS GIGANTES CENTRADOS */
+    /* Iconos CSS */
     div.stButton > button::before {
         font-size: 50px;
-        margin-bottom: 10px;
+        margin-bottom: 5px;
         filter: grayscale(100%) opacity(0.8);
         transition: 0.3s;
         display: block;
     }
     div.stButton > button:hover::before { filter: grayscale(0%) opacity(1); transform: scale(1.1); }
 
-    /* ASIGNACIÓN DE ICONOS POR ORDEN */
+    /* Asignación de Iconos */
     div.row-widget.stButton:nth-of-type(1) button::before { content: "📝"; }
     div.row-widget.stButton:nth-of-type(2) button::before { content: "👤"; }
     div.row-widget.stButton:nth-of-type(3) button::before { content: "🤖"; }
     div.row-widget.stButton:nth-of-type(4) button::before { content: "🛡️"; }
 
-    /* FOOTER */
-    .footer {
+    /* FOOTER PERSONALIZADO */
+    .custom-footer {
         position: fixed; bottom: 0; left: 0; width: 100%; text-align: center;
-        background: rgba(5, 8, 12, 0.95); color: #607d8b; font-size: 11px; padding: 12px;
-        border-top: 1px solid #1f2b38; font-family: 'Roboto', sans-serif;
+        background: #080c10; color: #546e7a; font-size: 11px; padding: 12px;
+        border-top: 1px solid #263238; font-family: 'Roboto', monospace;
+        z-index: 9999;
     }
-    .footer span { color: #D4AF37; font-weight: bold; margin: 0 5px; }
+    .custom-footer b { color: #D4AF37; }
     </style>
 """, unsafe_allow_html=True)
 
 # ==============================================================================
-# 3. LAYOUT VISUAL
+# 3. INTERFAZ GRÁFICA
 # ==============================================================================
 
-# --- CABECERA (MÉTODO INFALIBLE PARA LA IMAGEN) ---
-# Usamos 3 columnas vacías a los lados para centrar la imagen al medio
-c_left, c_center, c_right = st.columns([5, 2, 5])
-
-with c_center:
-    # st.image es nativo de Python, no falla como HTML/CSS a veces
-    st.image(URL_ESCUDO, use_container_width=True)
-
+# --- CABECERA (HTML PURO PARA GARANTIZAR VISUALIZACIÓN) ---
 st.markdown("""
-    <div class="main-title">SIGD DINIC</div>
-    <div class="sub-title">SISTEMA INTEGRAL DE GESTIÓN DOCUMENTAL</div>
+    <div class="header-box">
+        <img src="https://upload.wikimedia.org/wikipedia/commons/2/25/Escudo_Policia_Nacional_del_Ecuador.png" class="header-logo" alt="Escudo PN">
+        
+        <div class="header-title">SIGD DINIC</div>
+        <div class="header-subtitle">SISTEMA INTEGRAL DE GESTIÓN DOCUMENTAL</div>
+    </div>
 """, unsafe_allow_html=True)
 
-# --- GRID EN UNA SOLA FILA (4 COLUMNAS) ---
-# Usamos 4 columnas iguales. El CSS forzará la altura exacta en todas.
+# --- GRID DE BOTONES (1 FILA X 4 COLUMNAS) ---
+# Al usar CSS forzado arriba, todos tendrán la misma altura exacta
 col1, col2, col3, col4 = st.columns(4, gap="medium")
 
 with col1:
     if st.button("SECRETARIO/A"):
-        st.toast("Módulo Secretaría", icon="📝")
+        st.toast("Cargando Módulo...", icon="📝")
 
 with col2:
     if st.button("TALENTO HUMANO"):
-        st.toast("Módulo TH", icon="👤")
+        st.toast("Verificando Acceso...", icon="👤")
 
 with col3:
-    if st.button("GENERADOR DOC."): # Texto abreviado para que encaje mejor, o usa "DOCUMENTAL" si prefieres que baje de línea
-        st.toast("Módulo IA", icon="🤖")
+    if st.button("GENERADOR DOCUMENTAL"):
+        st.toast("Iniciando IA...", icon="🤖")
 
 with col4:
     if st.button("ADMINISTRACIÓN"):
-        st.toast("Módulo Admin", icon="🛡️")
+        st.toast("Acceso Restringido", icon="🛡️")
 
-# --- FOOTER ---
+# --- FOOTER CON TUS DATOS ---
 st.markdown("""
-    <div class="footer">
-        SIGD DINIC v5.0 | Desarrollado por: <span>JSCN</span> | Correo: <span>cnjstalin@gmail.com</span> | Soporte: <span>0996652042</span>
+    <div class="custom-footer">
+        SIGD DINIC v6.0 | DESARROLLADO POR: <b>JSCN</b> | CORREO: <b>cnjstalin@gmail.com</b> | SOPORTE: <b>0996652042</b>
     </div>
 """, unsafe_allow_html=True)
