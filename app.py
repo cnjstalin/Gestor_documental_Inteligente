@@ -4,7 +4,7 @@ import os
 from datetime import date
 
 # ==============================================================================
-# 1. CONFIGURACIÓN INICIAL Y ESTADO
+# 1. CONFIGURACIÓN INICIAL
 # ==============================================================================
 st.set_page_config(
     page_title="SIGD DINIC",
@@ -13,17 +13,14 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# Inicializar Estado de Navegación
-if 'page' not in st.session_state:
-    st.session_state.page = 'landing'
+if 'page' not in st.session_state: st.session_state.page = 'landing'
 
-# Función para navegar
 def navegar_a(pagina):
     st.session_state.page = pagina
     st.rerun()
 
 # ==============================================================================
-# 2. LÓGICA DE RECURSOS (ESCUDO)
+# 2. RECURSOS (ESCUDO)
 # ==============================================================================
 def get_escudo_html():
     if os.path.exists("Captura.JPG"):
@@ -35,63 +32,66 @@ def get_escudo_html():
     return f'<img src="https://upload.wikimedia.org/wikipedia/commons/2/25/Escudo_Policia_Nacional_del_Ecuador.png" class="escudo-img">'
 
 # ==============================================================================
-# 3. ESTILOS CSS GLOBALES (AQUÍ ESTÁ EL DISEÑO "EN PIEDRA")
+# 3. ESTILOS CSS MAESTROS
 # ==============================================================================
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap');
 
-    /* --- GLOBAL --- */
+    /* GLOBAL */
     .stApp { background-color: #f4f6f8; color: #2c3e50; font-family: 'Roboto', sans-serif; }
     #MainMenu, footer, header {visibility: hidden;}
     [data-testid="collapsedControl"] {display: none;}
-    .block-container { padding-top: 2rem !important; padding-bottom: 5rem !important; }
+    .block-container { padding-top: 1rem !important; padding-bottom: 5rem !important; max-width: 98% !important; }
 
-    /* --- ESTILOS DE LA LANDING PAGE (INTOCABLES) --- */
-    .header-box {
-        text-align: center; padding-top: 40px; margin-bottom: 20px;
-        display: flex; flex-direction: column; align-items: center;
-    }
+    /* --- ESTILOS LANDING PAGE (CENTRO DE MANDO) --- */
+    .header-box { text-align: center; padding-top: 40px; margin-bottom: 20px; display: flex; flex-direction: column; align-items: center; }
     .escudo-img { width: 130px; height: auto; margin-bottom: 20px; filter: drop-shadow(0 5px 10px rgba(0,0,0,0.1)); }
     .main-title { font-size: 2.8rem; font-weight: 800; color: #0E2F44; margin: 0; text-transform: uppercase; letter-spacing: 1px; }
     .sub-title { font-size: 1rem; color: #D4AF37; font-weight: 700; letter-spacing: 3px; margin-top: 5px; border-bottom: 2px solid #e1e4e8; padding-bottom: 20px; width: 100%; text-align: center; }
     
-    /* Botones del Menú Principal */
     .btn-landing {
-        width: 100%; height: 80px; margin-bottom: 20px;
-        display: flex; align-items: center; padding-left: 30px;
-        background-color: #ffffff; color: #0E2F44;
-        border: 1px solid #e1e4e8; border-left: 8px solid #0E2F44; border-radius: 8px;
-        font-weight: 700; text-transform: uppercase; letter-spacing: 1px; cursor: pointer;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.02); transition: all 0.3s;
+        width: 100%; height: 80px; margin-bottom: 20px; display: flex; align-items: center; padding-left: 30px;
+        background-color: #ffffff; color: #0E2F44; border: 1px solid #e1e4e8; border-left: 8px solid #0E2F44; border-radius: 8px;
+        font-weight: 700; text-transform: uppercase; letter-spacing: 1px; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.02); transition: all 0.3s;
     }
     .btn-landing:hover { border-left: 8px solid #D4AF37; transform: translateX(5px); box-shadow: 0 10px 20px rgba(0,0,0,0.08); background-color: #fff; }
 
-    /* --- ESTILOS DEL FORMULARIO SECRETARÍA --- */
-    .sec-header {
-        background-color: #0E2F44; color: white; padding: 10px 20px;
-        border-radius: 8px 8px 0 0; font-weight: 700; letter-spacing: 1px;
-        margin-top: 30px; border-bottom: 3px solid #D4AF37;
-        display: flex; align-items: center;
+    /* --- ESTILOS MÓDULO SECRETARÍA --- */
+    /* Barra Superior Oscura */
+    .toolbar-container {
+        background-color: #263238; padding: 10px 20px; border-radius: 8px; margin-bottom: 20px;
+        display: flex; justify-content: space-between; align-items: center; box-shadow: 0 4px 10px rgba(0,0,0,0.2);
     }
-    .sec-container {
-        background-color: white; padding: 25px; border-radius: 0 0 8px 8px;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.05); border: 1px solid #e0e0e0; margin-bottom: 20px;
+    .toolbar-title { color: white; font-weight: 700; font-size: 1.2rem; display: flex; align-items: center; gap: 10px; }
+    
+    /* Botones de Herramientas (Colores Específicos) */
+    div.stButton > button.btn-tool {
+        border: none !important; color: white !important; font-weight: 700 !important; font-size: 0.85rem !important;
+        padding: 0.5rem 1rem !important; border-radius: 5px !important; text-transform: uppercase !important;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.2) !important; transition: transform 0.1s !important; height: auto !important; width: auto !important;
     }
-    /* Inputs personalizados */
-    div[data-baseweb="input"] { border-radius: 5px; }
-    label { color: #0E2F44 !important; font-weight: 600 !important; font-size: 0.9rem !important; }
+    div.stButton > button.btn-tool:hover { transform: translateY(-2px); filter: brightness(110%); }
+    div.stButton > button.btn-tool:active { transform: translateY(0); }
 
-    /* FOOTER */
-    .footer { position: fixed; bottom: 0; left: 0; width: 100%; text-align: center; background: #fff; border-top: 1px solid #eee; padding: 15px; font-size: 11px; color: #aaa; font-family: monospace; z-index:999; }
+    /* Formulario */
+    .sec-header { background-color: #0E2F44; color: white; padding: 8px 15px; border-radius: 5px 5px 0 0; font-weight: 600; font-size: 0.9rem; margin-top: 20px; border-left: 5px solid #D4AF37; }
+    .sec-body { background-color: white; padding: 20px; border-radius: 0 0 5px 5px; border: 1px solid #e0e0e0; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+    
+    /* Inputs Compactos */
+    label { color: #37474f !important; font-weight: 700 !important; font-size: 0.8rem !important; margin-bottom: 0px !important; }
+    div[data-baseweb="input"] { background-color: #fff !important; border-color: #cfd8dc !important; }
+    div[data-testid="stDateInput"] > div { margin-top: 0px; }
+
+    /* Footer */
+    .footer { position: fixed; bottom: 0; left: 0; width: 100%; text-align: center; background: #fff; border-top: 1px solid #eee; padding: 10px; font-size: 11px; color: #aaa; font-family: monospace; z-index:999; }
     </style>
 """, unsafe_allow_html=True)
 
 # ==============================================================================
-# 4. PANTALLA: LANDING PAGE (DISEÑO EN PIEDRA)
+# 4. LANDING PAGE (MENÚ PRINCIPAL)
 # ==============================================================================
 def mostrar_landing():
-    # Cabecera
     st.markdown(f"""
         <div class="header-box">
             {get_escudo_html()}
@@ -100,130 +100,133 @@ def mostrar_landing():
         </div>
     """, unsafe_allow_html=True)
 
-    # Menú
     izq, centro, der = st.columns([1, 0.8, 1])
     with centro:
-        # Usamos un truco de CSS+HTML para los botones personalizados que activan funciones de Streamlit
-        # Pero para mantener la funcionalidad nativa simple y robusta, usaremos los botones st con el estilo inyectado
-        
-        # Inyección de estilo específico para los botones de Streamlit en esta página
+        # Inyectamos estilos específicos para los botones del menú principal (Tarjeta Ejecutiva)
         st.markdown("""
             <style>
-            div.stButton > button {
-                background-color: #ffffff !important; color: #0E2F44 !important;
-                border: 1px solid #e1e4e8 !important; border-left: 8px solid #0E2F44 !important;
-                border-radius: 8px !important; width: 100% !important; height: 80px !important;
-                margin-bottom: 20px !important; display: flex !important; justify-content: flex-start !important;
-                align-items: center !important; padding-left: 30px !important;
-                font-family: 'Roboto', sans-serif !important; font-size: 1.2rem !important;
-                font-weight: 700 !important; text-transform: uppercase !important;
-                box-shadow: 0 4px 6px rgba(0,0,0,0.02) !important;
+            div.row-widget.stButton > button {
+                background-color: #ffffff !important; color: #0E2F44 !important; border: 1px solid #e1e4e8 !important;
+                border-left: 8px solid #0E2F44 !important; border-radius: 8px !important; width: 100% !important; height: 80px !important;
+                margin-bottom: 20px !important; display: flex !important; justify-content: flex-start !important; align-items: center !important;
+                padding-left: 30px !important; font-family: 'Roboto', sans-serif !important; font-size: 1.2rem !important;
+                font-weight: 700 !important; text-transform: uppercase !important; box-shadow: 0 4px 6px rgba(0,0,0,0.02) !important;
             }
-            div.stButton > button:hover {
-                border-left: 8px solid #D4AF37 !important; transform: translateX(5px);
-                box-shadow: 0 10px 20px rgba(0,0,0,0.08) !important;
-            }
-            div.stButton > button::before { content: "➤"; margin-right: 15px; color: #b0b0b0; font-size: 18px; }
-            div.stButton > button:hover::before { color: #D4AF37; }
+            div.row-widget.stButton > button:hover { border-left: 8px solid #D4AF37 !important; transform: translateX(5px); box-shadow: 0 10px 20px rgba(0,0,0,0.08) !important; }
             </style>
         """, unsafe_allow_html=True)
 
-        if st.button("SECRETARIO/A"): navegar_a("secretario")
-        if st.button("TALENTO HUMANO"): st.toast("En desarrollo...")
-        if st.button("GENERADOR"): st.toast("En desarrollo...")
-        if st.button("ADMINISTRACIÓN"): st.toast("En desarrollo...")
+        if st.button("📝 SECRETARIO/A"): navegar_a("secretario")
+        if st.button("👤 TALENTO HUMANO"): st.toast("En desarrollo...")
+        if st.button("🤖 GENERADOR"): st.toast("En desarrollo...")
+        if st.button("🛡️ ADMINISTRACIÓN"): st.toast("En desarrollo...")
 
-    # Footer
-    st.markdown("""
-        <div class="footer">
-            SIGD DINIC v20.0 | Desarrollado por: <b>JSCN</b> | cnjstalin@gmail.com | Soporte: 0996652042
-        </div>
-    """, unsafe_allow_html=True)
+    st.markdown("""<div class="footer">SIGD DINIC v21.0 | Desarrollado por: <b>JSCN</b> | cnjstalin@gmail.com | Soporte: 0996652042</div>""", unsafe_allow_html=True)
 
 # ==============================================================================
-# 5. PANTALLA: MÓDULO SECRETARIO (FORMULARIO ELEGANTE)
+# 5. MÓDULO SECRETARIO (INTERFAZ REPLICADA)
 # ==============================================================================
 def mostrar_secretario():
-    # Botón de Retorno (Estilo simple)
-    if st.button("⬅ VOLVER AL MENÚ PRINCIPAL"):
-        navegar_a("landing")
+    # --- BARRA DE HERRAMIENTAS PERSONALIZADA ---
+    # Usamos columnas ajustadas para replicar la barra de la imagen
     
-    st.markdown(f"""
-        <div style="display:flex; align-items:center; gap:20px; margin-bottom:20px;">
-            {get_escudo_html().replace('width: 130px','width: 60px')}
-            <div>
-                <h2 style="margin:0; color:#0E2F44;">MÓDULO DE SECRETARÍA</h2>
-                <span style="color:#D4AF37; font-weight:bold;">REGISTRO Y CONTROL DOCUMENTAL</span>
+    # 1. Título a la izquierda
+    # 2. Botones a la derecha
+    
+    c_title, c_tools = st.columns([2, 5])
+    
+    with c_title:
+         st.markdown(f"""
+            <div style="background:#263238; padding:10px; border-radius:8px; color:white; font-weight:bold; display:flex; align-items:center; height:60px;">
+                <span style="font-size:20px; margin-right:10px;">🛡️</span> GESTOR DOCUMENTAL DINIC
             </div>
-        </div>
-    """, unsafe_allow_html=True)
+        """, unsafe_allow_html=True)
+    
+    with c_tools:
+        # Contenedor oscuro para los botones
+        with st.container():
+            st.markdown("""<style>div.stButton > button { height: 45px !important; margin-top: 8px; }</style>""", unsafe_allow_html=True)
+            
+            # Grid de botones ajustado
+            b1, b2, b3, b4, b5 = st.columns([1.2, 1, 1, 1.2, 1])
+            
+            # Inyección de colores específicos para cada botón
+            b1.markdown("""<style>div.stButton > button:first-child { background-color: #673AB7 !important; }</style>""", unsafe_allow_html=True)
+            with b1: st.button("📂 SUBIR PLANTILLA", key="btn_up", help="Cargar Excel Base", type="primary")
 
-    # --- SECCIÓN 1: DOCUMENTO RECEPTADO ---
+            b2.markdown("""<style>div.stButton > button:first-child { background-color: #00BCD4 !important; color: black !important; }</style>""", unsafe_allow_html=True)
+            with b2: st.button("⬇ RESPALDAR", key="btn_bak", help="Guardar Backup")
+
+            b3.markdown("""<style>div.stButton > button:first-child { background-color: #FFC107 !important; color: black !important; }</style>""", unsafe_allow_html=True)
+            with b3: st.button("⬆ RESTAURAR", key="btn_res", help="Cargar Backup")
+
+            # Separador visual vertical (simulado con columna vacía o borde)
+            
+            b4.markdown("""<style>div.stButton > button:first-child { background-color: #4CAF50 !important; }</style>""", unsafe_allow_html=True)
+            with b4: st.button("✨ NUEVO TURNO", key="btn_new", help="Limpiar Todo")
+
+            b5.markdown("""<style>div.stButton > button:first-child { background-color: #D32F2F !important; }</style>""", unsafe_allow_html=True)
+            with b5: 
+                if st.button("🗑️ REINICIAR", key="btn_rst"): navegar_a("landing")
+
+    # --- FORMULARIO ---
+    
+    # SECCIÓN 1
     st.markdown('<div class="sec-header">1. DOCUMENTO RECEPTADO</div>', unsafe_allow_html=True)
     with st.container():
-        st.markdown('<div class="sec-container">', unsafe_allow_html=True)
+        st.markdown('<div class="sec-body">', unsafe_allow_html=True)
         
-        # Fila 1
-        c1, c2, c3 = st.columns(3)
-        with c1: st.date_input("Fecha Documento Receptado", value=date.today())
-        with c2: st.date_input("Fecha de Recepción", value=date.today())
-        with c3: st.text_input("Remitente")
+        c1, c2, c3 = st.columns([1, 2, 1.5])
+        with c1: st.date_input("FECHA DOC:", value=date.today())
+        with c2: st.text_input("REMITENTE:")
+        with c3: st.text_input("CARGO:")
         
-        # Fila 2
-        c1, c2, c3 = st.columns(3)
-        with c1: st.text_input("Cargo del Remitente")
-        with c2: st.text_input("Unidad de Origen")
-        with c3: st.text_input("S. Policial que Recibe")
+        c1, c2, c3 = st.columns([1.5, 1.5, 1])
+        with c1: st.text_input("UNIDAD ORIGEN:")
+        with c2: st.text_input("N° DOCUMENTO (PN):")
+        with c3: st.date_input("FECHA RECEPCIÓN:", value=date.today())
         
-        # Fila 3
-        st.text_input("Asunto")
-        st.text_area("Descripción / Resumen", height=80)
-        st.text_input("Observación", placeholder="Ej: Urgente, Reservado, etc.")
+        st.text_input("ASUNTO:")
+        st.text_area("DESCRIPCIÓN:", height=60)
+        
+        c1, c2 = st.columns([2, 1])
+        with c1: st.text_input("S. POLICIAL TURNO:")
+        with c2: st.selectbox("OBSERVACIÓN:", ["NINGUNA", "URGENTE", "RESERVADO"])
         
         st.markdown('</div>', unsafe_allow_html=True)
 
-    # --- SECCIÓN 2: GESTIÓN O TRÁMITE ---
-    st.markdown('<div class="sec-header">2. GESTIÓN O TRÁMITE DEL DOCUMENTO</div>', unsafe_allow_html=True)
+    # SECCIÓN 2
+    st.markdown('<div class="sec-header">2. GESTIÓN / TRÁMITE</div>', unsafe_allow_html=True)
     with st.container():
-        st.markdown('<div class="sec-container">', unsafe_allow_html=True)
+        st.markdown('<div class="sec-body">', unsafe_allow_html=True)
+        c1, c2, c3 = st.columns(3)
+        with c1: st.text_input("UNIDAD DESTINO:")
+        with c2: st.selectbox("TIPO DOC:", ["OFICIO", "MEMORANDO", "PARTE"])
+        with c3: st.date_input("FECHA EMISIÓN:")
         
         c1, c2, c3 = st.columns(3)
-        with c1: st.text_input("Unidad de Destino (Gestión)")
-        with c2: st.selectbox("Tipo de Documento", ["Oficio", "Memorando", "Parte", "Telegrama", "Otro"])
-        with c3: st.date_input("Fecha de Emisión")
-        
-        c1, c2 = st.columns(2)
-        with c1: st.text_input("N° Documento Respuesta (Gestión)")
-        with c2: st.text_input("Grado y Nombre Receptor")
-        
-        st.selectbox("Estado del Trámite", ["PENDIENTE", "EN PROCESO", "FINALIZADO", "ARCHIVADO"])
-        
+        with c1: st.text_input("N° DOC RESPUESTA:")
+        with c2: st.text_input("RECEPTOR (GRADO/NOMBRE):")
+        with c3: st.selectbox("ESTADO:", ["PENDIENTE", "FINALIZADO"])
         st.markdown('</div>', unsafe_allow_html=True)
 
-    # --- SECCIÓN 3: SALIDA DEL DOCUMENTO ---
-    st.markdown('<div class="sec-header">3. SALIDA DEL DOCUMENTO DE RESPUESTA</div>', unsafe_allow_html=True)
+    # SECCIÓN 3
+    st.markdown('<div class="sec-header">3. SALIDA RESPUESTA</div>', unsafe_allow_html=True)
     with st.container():
-        st.markdown('<div class="sec-container">', unsafe_allow_html=True)
-        
+        st.markdown('<div class="sec-body">', unsafe_allow_html=True)
         c1, c2, c3 = st.columns(3)
-        with c1: st.radio("¿El documento sale de la DINIC?", ["SÍ", "NO"], horizontal=True)
-        with c2: st.text_input("Unidad de Destino Final")
-        with c3: st.text_input("N° Documento Respuesta (Final)")
-
-        c1, c2 = st.columns(2)
-        with c1: st.date_input("Fecha de Salida")
-        with c2: st.date_input("Fecha de Recepción (Destino)")
-        
+        with c1: st.radio("¿SALE DE DINIC?", ["SI", "NO"], horizontal=True)
+        with c2: st.text_input("DESTINO FINAL:")
+        with c3: st.text_input("N° DOC FINAL:")
         st.markdown('</div>', unsafe_allow_html=True)
 
-    # Botón de Guardado
-    col_save, _ = st.columns([1, 4])
-    with col_save:
-        if st.button("💾 GUARDAR REGISTRO", use_container_width=True, type="primary"):
-            st.success("¡Registro guardado exitosamente en el sistema!")
+    # Botón Guardar Inferior
+    st.markdown("<br>", unsafe_allow_html=True)
+    if st.button("💾 GUARDAR REGISTRO EN LA BASE DE DATOS", type="primary", use_container_width=True):
+        st.success("Registro Almacenado Correctamente")
 
 # ==============================================================================
-# 6. EJECUCIÓN PRINCIPAL
+# 6. ROUTER
 # ==============================================================================
 if st.session_state.page == 'landing':
     mostrar_landing()
