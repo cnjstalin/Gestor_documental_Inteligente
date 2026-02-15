@@ -10,61 +10,32 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# URL ESCUDO (Directa y pública)
+# URL DEL ESCUDO
 URL_ESCUDO = "https://upload.wikimedia.org/wikipedia/commons/2/25/Escudo_Policia_Nacional_del_Ecuador.png"
 
 # ==============================================================================
-# 2. ESTILOS CSS (DISEÑO TÁCTICO UNIFORME)
+# 2. ESTILOS CSS (BOTONES UNIFICADOS 1x4)
 # ==============================================================================
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@600;800&family=Roboto:wght@300;400;500&display=swap');
 
-    /* FONDO DE PANTALLA TÁCTICO */
+    /* FONDO */
     .stApp {
         background-color: #050a10;
         background-image: 
-            radial-gradient(circle at 50% 10%, #152535 0%, #050a10 90%),
+            radial-gradient(circle at 50% 0%, #152535 0%, #050a10 80%),
             linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
             linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
         background-size: 100% 100%, 40px 40px, 40px 40px;
         color: #e0e0e0;
     }
     
-    /* OCULTAR ELEMENTOS NATIVOS */
     #MainMenu, footer, header {visibility: hidden;}
     [data-testid="collapsedControl"] {display: none;}
-    .block-container { padding-top: 1rem !important; padding-bottom: 5rem !important; max-width: 1200px !important; }
+    .block-container { padding-top: 1rem !important; padding-bottom: 5rem !important; max-width: 95% !important; }
     
-    /* CABECERA INTEGRADA (ESCUDO + TÍTULOS) */
-    .header-container {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        margin-bottom: 40px;
-        padding: 30px;
-        background: rgba(13, 22, 33, 0.85);
-        border-radius: 20px;
-        border: 1px solid rgba(212, 175, 55, 0.15); /* Borde dorado tenue */
-        box-shadow: 0 15px 40px rgba(0,0,0,0.6);
-    }
-    
-    .escudo-box {
-        margin-bottom: 20px;
-        text-align: center;
-        width: 100%;
-        display: flex;
-        justify-content: center;
-    }
-
-    .escudo-img {
-        width: 130px !important;
-        height: auto;
-        filter: drop-shadow(0 0 25px rgba(212, 175, 55, 0.4));
-        display: block;
-    }
-    
+    /* TÍTULOS */
     .main-title {
         font-family: 'Rajdhani', sans-serif;
         font-size: 4rem; 
@@ -73,7 +44,6 @@ st.markdown("""
         text-align: center;
         margin: 0;
         line-height: 1;
-        letter-spacing: 5px;
         text-shadow: 0 0 30px rgba(0, 188, 212, 0.3);
         background: -webkit-linear-gradient(#fff, #90a4ae);
         -webkit-background-clip: text;
@@ -82,85 +52,76 @@ st.markdown("""
     
     .sub-title {
         font-family: 'Roboto', sans-serif;
-        font-size: 1.1rem;
-        color: #D4AF37; /* DORADO */
+        font-size: 1.2rem;
+        color: #D4AF37;
         text-align: center;
-        margin-top: 15px;
-        letter-spacing: 4px;
-        text-transform: uppercase;
+        margin-top: 5px;
+        letter-spacing: 3px;
         font-weight: 500;
-        border-top: 1px solid rgba(212, 175, 55, 0.3);
-        padding-top: 15px;
-        width: 100%;
-        max-width: 800px;
+        margin-bottom: 40px;
     }
 
-    /* BOTONES HORIZONTALES UNIFORMES (REGLA MAESTRA) */
+    /* --- REGLA MAESTRA PARA BOTONES UNIFORMES --- */
     div.stButton > button {
-        background: linear-gradient(90deg, rgba(20, 30, 45, 0.95), rgba(10, 20, 30, 0.98)) !important;
+        background: linear-gradient(180deg, rgba(20, 30, 45, 0.9), rgba(10, 20, 30, 0.95)) !important;
         border: 1px solid rgba(212, 175, 55, 0.2) !important;
-        border-radius: 12px !important;
+        border-radius: 15px !important;
         color: #fff !important;
         
-        /* DIMENSIONES FIJAS PARA UNIFORMIDAD */
+        /* DIMENSIONES FORZADAS (CUADRADOS VERTICALES PARA FILA DE 4) */
         width: 100% !important;
-        height: 120px !important;      /* Altura fija */
-        min-height: 120px !important;  /* Forzar altura mínima */
-        max-height: 120px !important;  /* Forzar altura máxima */
+        height: 200px !important;      
+        min-height: 200px !important;  
         
         display: flex !important;
-        flex-direction: row !important;
-        justify-content: flex-start !important;
+        flex-direction: column !important; /* Icono arriba, texto abajo */
+        justify-content: center !important;
         align-items: center !important;
-        padding: 0 40px !important; /* Espacio lateral interno */
-        gap: 30px; /* Separación Icono-Texto */
+        padding: 20px !important;
+        gap: 15px;
 
         font-family: 'Rajdhani', sans-serif !important;
-        font-size: 1.5rem !important;
+        font-size: 1.3rem !important; /* Texto ajustado */
         font-weight: 700 !important;
         text-transform: uppercase !important;
         letter-spacing: 1px !important;
+        text-align: center !important;
+        white-space: normal !important; /* Permite que el texto baje de línea */
         
         transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1) !important;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.3) !important;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.4) !important;
     }
 
     div.stButton > button:hover {
-        transform: translateY(-5px) !important;
-        background: linear-gradient(90deg, #1e3c50, #102030) !important;
+        transform: translateY(-10px) !important;
+        background: linear-gradient(180deg, #1e3c50, #102030) !important;
         border-color: #D4AF37 !important;
-        box-shadow: 0 10px 30px rgba(0,0,0,0.5), 0 0 15px rgba(212, 175, 55, 0.2) !important;
+        box-shadow: 0 0 25px rgba(212, 175, 55, 0.3) !important;
     }
 
-    div.stButton > button:active {
-        transform: scale(0.98) !important;
-    }
-
-    /* Iconos CSS uniformes */
+    /* ICONOS GIGANTES CENTRADOS */
     div.stButton > button::before {
-        font-size: 45px;
-        margin: 0;
-        filter: grayscale(100%) opacity(0.7);
+        font-size: 50px;
+        margin-bottom: 10px;
+        filter: grayscale(100%) opacity(0.8);
         transition: 0.3s;
-        width: 50px; /* Ancho fijo para el icono para alinear textos */
-        text-align: center;
+        display: block;
     }
     div.stButton > button:hover::before { filter: grayscale(0%) opacity(1); transform: scale(1.1); }
 
-    /* Asignar Iconos */
+    /* ASIGNACIÓN DE ICONOS POR ORDEN */
     div.row-widget.stButton:nth-of-type(1) button::before { content: "📝"; }
     div.row-widget.stButton:nth-of-type(2) button::before { content: "👤"; }
     div.row-widget.stButton:nth-of-type(3) button::before { content: "🤖"; }
     div.row-widget.stButton:nth-of-type(4) button::before { content: "🛡️"; }
 
-    /* FOOTER DE CRÉDITOS */
+    /* FOOTER */
     .footer {
         position: fixed; bottom: 0; left: 0; width: 100%; text-align: center;
-        background: rgba(5, 8, 12, 0.98); color: #607d8b; font-size: 10px; padding: 10px;
-        border-top: 1px solid #1f2b38; font-family: 'Roboto', sans-serif; letter-spacing: 0.5px;
-        z-index: 9999;
+        background: rgba(5, 8, 12, 0.95); color: #607d8b; font-size: 11px; padding: 12px;
+        border-top: 1px solid #1f2b38; font-family: 'Roboto', sans-serif;
     }
-    .footer span { color: #D4AF37; font-weight: bold; }
+    .footer span { color: #D4AF37; font-weight: bold; margin: 0 5px; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -168,43 +129,42 @@ st.markdown("""
 # 3. LAYOUT VISUAL
 # ==============================================================================
 
-# --- CABECERA UNIFICADA ---
-st.markdown(f"""
-    <div class="header-container">
-        <div class="escudo-box">
-            <img src="{URL_ESCUDO}" class="escudo-img">
-        </div>
-        <div class="main-title">SIGD DINIC</div>
-        <div class="sub-title">SISTEMA INTEGRAL DE GESTIÓN DOCUMENTAL</div>
-    </div>
+# --- CABECERA (MÉTODO INFALIBLE PARA LA IMAGEN) ---
+# Usamos 3 columnas vacías a los lados para centrar la imagen al medio
+c_left, c_center, c_right = st.columns([5, 2, 5])
+
+with c_center:
+    # st.image es nativo de Python, no falla como HTML/CSS a veces
+    st.image(URL_ESCUDO, use_container_width=True)
+
+st.markdown("""
+    <div class="main-title">SIGD DINIC</div>
+    <div class="sub-title">SISTEMA INTEGRAL DE GESTIÓN DOCUMENTAL</div>
 """, unsafe_allow_html=True)
 
-# --- GRID DE BOTONES UNIFORMES (2 Columnas x 2 Filas) ---
-c1, c2 = st.columns(2, gap="large")
+# --- GRID EN UNA SOLA FILA (4 COLUMNAS) ---
+# Usamos 4 columnas iguales. El CSS forzará la altura exacta en todas.
+col1, col2, col3, col4 = st.columns(4, gap="medium")
 
-with c1:
+with col1:
     if st.button("SECRETARIO/A"):
-        st.toast("Accediendo a Secretaría...", icon="📝")
-        # Aquí irás agregando la lógica de cambio de página
+        st.toast("Módulo Secretaría", icon="📝")
 
-    # Espacio vertical (Markdown vacío para separar)
-    st.markdown("<div style='height: 20px;'></div>", unsafe_allow_html=True)
-    
-    if st.button("GENERADOR DOCUMENTAL"):
-        st.toast("Iniciando IA Generativa...", icon="🤖")
-
-with c2:
+with col2:
     if st.button("TALENTO HUMANO"):
-        st.toast("Verificando credenciales...", icon="👤")
-    
-    st.markdown("<div style='height: 20px;'></div>", unsafe_allow_html=True)
-    
-    if st.button("ADMINISTRACIÓN"):
-        st.toast("Panel de Control activado.", icon="🛡️")
+        st.toast("Módulo TH", icon="👤")
 
-# --- FOOTER DE CRÉDITOS ---
+with col3:
+    if st.button("GENERADOR DOC."): # Texto abreviado para que encaje mejor, o usa "DOCUMENTAL" si prefieres que baje de línea
+        st.toast("Módulo IA", icon="🤖")
+
+with col4:
+    if st.button("ADMINISTRACIÓN"):
+        st.toast("Módulo Admin", icon="🛡️")
+
+# --- FOOTER ---
 st.markdown("""
     <div class="footer">
-        SIGD DINIC V1.0 | Desarrollado por: <span>JSCN</span> | Correo: <span>cnjstalin@gmail.com</span> | Soporte: <span>0996652042</span>
+        SIGD DINIC v5.0 | Desarrollado por: <span>JSCN</span> | Correo: <span>cnjstalin@gmail.com</span> | Soporte: <span>0996652042</span>
     </div>
 """, unsafe_allow_html=True)
