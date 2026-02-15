@@ -13,7 +13,7 @@ st.set_page_config(
 )
 
 # ==============================================================================
-# 2. LÓGICA DE ESCUDO (INFALIBLE)
+# 2. LOGICA DEL ESCUDO (INFALIBLE)
 # ==============================================================================
 def get_escudo_html():
     # Intento 1: Local
@@ -29,16 +29,15 @@ def get_escudo_html():
 escudo_render = get_escudo_html()
 
 # ==============================================================================
-# 3. ESTILOS CSS (DISEÑO VERTICAL LIMPIO)
+# 3. ESTILOS CSS (GEOMETRÍA PERFECTA)
 # ==============================================================================
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap');
 
-    /* FONDO BLANCO LIMPIO */
+    /* FONDO GENERAL */
     .stApp {
         background-color: #f8f9fa;
-        background-image: linear-gradient(to bottom, #ffffff, #e9ecef);
         color: #212529;
     }
     
@@ -48,100 +47,91 @@ st.markdown("""
     /* CABECERA */
     .header-box {
         text-align: center;
-        padding: 30px 20px;
+        padding: 40px;
         background: white;
-        border-bottom: 4px solid #0E2F44; /* Azul Policial */
-        box-shadow: 0 4px 15px rgba(0,0,0,0.05);
-        margin-bottom: 30px;
-        border-radius: 0 0 20px 20px;
+        border-bottom: 4px solid #0E2F44; 
+        margin-bottom: 40px;
     }
     
     .escudo-img {
-        width: 120px;
+        width: 140px;
         height: auto;
-        margin-bottom: 15px;
+        margin-bottom: 20px;
     }
 
     .main-title {
         font-family: 'Roboto', sans-serif;
-        font-size: 2.5rem;
+        font-size: 3rem;
         font-weight: 800;
         color: #0E2F44;
         margin: 0;
-        text-transform: uppercase;
-        letter-spacing: 2px;
+        line-height: 1.2;
     }
     
     .sub-title {
-        font-size: 1rem;
-        color: #D4AF37; /* Dorado */
+        font-size: 1.2rem;
+        color: #D4AF37;
         font-weight: 700;
-        letter-spacing: 1px;
+        letter-spacing: 2px;
+        margin-top: 10px;
     }
 
-    /* --- BOTONES VERTICALES (ESTILO LISTA) --- */
+    /* --- BOTONES PERFECTOS --- */
     div.stButton > button {
+        /* ESTILO VISUAL */
         background: white !important;
-        border: 1px solid #ced4da !important;
-        border-left: 8px solid #0E2F44 !important; /* Borde izquierdo azul */
+        border: 2px solid #e0e0e0 !important;
         color: #0E2F44 !important;
-        border-radius: 8px !important;
+        border-radius: 10px !important;
         
-        /* DIMENSIONES UNIFORMES */
+        /* GEOMETRÍA FIJA (AQUÍ ESTÁ EL TRUCO) */
         width: 100% !important;
-        height: 80px !important;      /* Altura cómoda */
-        margin-bottom: 10px !important;
+        height: 100px !important;      /* Altura exacta para todos */
+        min-height: 100px !important;  /* No encoger */
+        max-height: 100px !important;  /* No crecer */
+        margin-bottom: 15px !important; /* Espacio entre botones */
         
-        /* ALINEACIÓN (Icono Izq - Texto Centro) */
+        /* ALINEACIÓN DE TEXTO */
         display: flex !important;
-        flex-direction: row !important;
-        align-items: center !important;
-        justify-content: flex-start !important; /* Alinear contenido a la izq */
-        padding-left: 30px !important;
-        gap: 20px;
-
+        justify-content: center !important; /* Centrado Horizontal */
+        align-items: center !important;     /* Centrado Vertical */
+        text-align: center !important;
+        
+        /* TIPOGRAFÍA */
         font-family: 'Roboto', sans-serif !important;
-        font-size: 1.2rem !important;
+        font-size: 1.3rem !important;
         font-weight: 700 !important;
         text-transform: uppercase !important;
+        letter-spacing: 1px !important;
         
         transition: all 0.2s ease !important;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.05) !important;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.05) !important;
     }
 
-    /* HOVER (EFECTO AL PASAR EL MOUSE) */
+    /* HOVER (EFECTO AL PASAR MOUSE) */
     div.stButton > button:hover {
-        background: #0E2F44 !important; /* Fondo Azul */
-        color: white !important;         /* Texto Blanco */
-        border-left: 8px solid #D4AF37 !important; /* Borde Dorado */
-        padding-left: 40px !important;   /* Pequeño desplazamiento */
+        background: #0E2F44 !important;
+        color: white !important;
+        border-color: #D4AF37 !important;
         transform: scale(1.02);
+        box-shadow: 0 8px 15px rgba(0,0,0,0.1) !important;
     }
 
-    /* ICONOS */
-    div.stButton > button::before {
-        font-size: 30px;
-        margin-right: 15px;
-        content: "🔹"; /* Icono por defecto si falla el CSS específico */
-    }
-
-    /* Asignar Iconos Específicos */
-    div.row-widget.stButton:nth-of-type(1) button::before { content: "📝"; }
-    div.row-widget.stButton:nth-of-type(2) button::before { content: "👤"; }
-    div.row-widget.stButton:nth-of-type(3) button::before { content: "🤖"; }
-    div.row-widget.stButton:nth-of-type(4) button::before { content: "🛡️"; }
+    /* ELIMINAR CUALQUIER ICONO O ROMBO */
+    div.stButton > button::before { content: none !important; }
+    div.stButton > button::after { content: none !important; }
 
     /* FOOTER */
     .footer {
         position: fixed; bottom: 0; left: 0; width: 100%; text-align: center;
-        background: #fff; border-top: 1px solid #ddd; padding: 10px;
-        font-size: 11px; color: #666;
+        background: #fff; border-top: 1px solid #ddd; padding: 15px;
+        font-size: 12px; color: #666; font-family: monospace;
     }
     </style>
 """, unsafe_allow_html=True)
 
 # ==============================================================================
-# 3. INTERFAZ
+# 3. INTERFAZ GRÁFICA
 # ==============================================================================
 
 # CABECERA
@@ -153,36 +143,38 @@ st.markdown(f"""
     </div>
 """, unsafe_allow_html=True)
 
-# CONTENEDOR CENTRAL (COLUMNA ESTRECHA PARA MENÚ VERTICAL)
-# Usamos columnas [1, 2, 1] para centrar el menú en la pantalla
+# CONTENEDOR CENTRAL (COLUMNA ÚNICA)
+# Usamos columnas [1, 2, 1] para centrar el bloque de botones en la mitad de la pantalla
 izq, centro, der = st.columns([1, 2, 1])
 
 with centro:
-    st.markdown("### SELECCIONE UN MÓDULO")
-    
+    # Botón 1
     if st.button("SECRETARIO/A"):
-        st.toast("Cargando Secretaría...", icon="📝")
+        st.toast("Cargando...", icon="📝")
         # st.session_state.active_module = 'secretario'
         # st.rerun()
 
+    # Botón 2
     if st.button("TALENTO HUMANO"):
-        st.toast("Cargando TH...", icon="👤")
+        st.toast("Cargando...", icon="👤")
         # st.session_state.active_module = 'th'
         # st.rerun()
 
+    # Botón 3
     if st.button("GENERADOR DOCUMENTAL"):
-        st.toast("Cargando IA...", icon="🤖")
+        st.toast("Cargando...", icon="🤖")
         # st.session_state.active_module = 'ia'
         # st.rerun()
 
+    # Botón 4
     if st.button("ADMINISTRACIÓN"):
-        st.toast("Solicitando Acceso...", icon="🛡️")
+        st.toast("Cargando...", icon="🛡️")
         # st.session_state.active_module = 'admin'
         # st.rerun()
 
 # FOOTER
 st.markdown("""
     <div class="footer">
-        SIGD DINIC v12.0 | Desarrollado por: <b>JSCN</b> | cnjstalin@gmail.com | Soporte: 0996652042
+        SIGD DINIC v13.0 | DESARROLLADO POR: <b>JSCN</b> | cnjstalin@gmail.com | SOPORTE: 0996652042
     </div>
 """, unsafe_allow_html=True)
