@@ -13,7 +13,7 @@ st.set_page_config(
 )
 
 # ==============================================================================
-# 2. LOGICA DEL ESCUDO (INFALIBLE)
+# 2. ESCUDO (HTML PURO PARA QUE SE VEA SIEMPRE)
 # ==============================================================================
 def get_escudo_html():
     # Intento 1: Local
@@ -29,15 +29,15 @@ def get_escudo_html():
 escudo_render = get_escudo_html()
 
 # ==============================================================================
-# 3. ESTILOS CSS (GEOMETRÍA PERFECTA)
+# 3. ESTILOS CSS (GEOMETRÍA PERFECTA Y CENTRADO)
 # ==============================================================================
 st.markdown("""
     <style>
-    @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@500;700&display=swap');
 
-    /* FONDO GENERAL */
+    /* FONDO BLANCO */
     .stApp {
-        background-color: #f8f9fa;
+        background-color: #ffffff;
         color: #212529;
     }
     
@@ -47,84 +47,90 @@ st.markdown("""
     /* CABECERA */
     .header-box {
         text-align: center;
-        padding: 40px;
-        background: white;
-        border-bottom: 4px solid #0E2F44; 
-        margin-bottom: 40px;
+        padding-top: 20px;
+        padding-bottom: 20px;
+        margin-bottom: 30px;
     }
     
     .escudo-img {
         width: 140px;
         height: auto;
-        margin-bottom: 20px;
+        margin-bottom: 15px;
+        display: block;
+        margin-left: auto;
+        margin-right: auto;
     }
 
     .main-title {
         font-family: 'Roboto', sans-serif;
         font-size: 3rem;
         font-weight: 800;
-        color: #0E2F44;
+        color: #0E2F44; /* Azul Policial */
         margin: 0;
         line-height: 1.2;
+        text-transform: uppercase;
     }
     
     .sub-title {
-        font-size: 1.2rem;
-        color: #D4AF37;
+        font-size: 1.1rem;
+        color: #D4AF37; /* Dorado */
         font-weight: 700;
         letter-spacing: 2px;
-        margin-top: 10px;
+        margin-top: 5px;
+        text-transform: uppercase;
     }
 
-    /* --- BOTONES PERFECTOS --- */
+    /* --- BOTONES: UNIFORMIDAD TOTAL --- */
     div.stButton > button {
-        /* ESTILO VISUAL */
+        /* APARIENCIA */
         background: white !important;
-        border: 2px solid #e0e0e0 !important;
+        border: 2px solid #0E2F44 !important; /* Borde Azul */
         color: #0E2F44 !important;
-        border-radius: 10px !important;
+        border-radius: 12px !important;
         
-        /* GEOMETRÍA FIJA (AQUÍ ESTÁ EL TRUCO) */
+        /* TAMAÑO EXACTO PARA TODOS (FORZADO) */
         width: 100% !important;
-        height: 100px !important;      /* Altura exacta para todos */
-        min-height: 100px !important;  /* No encoger */
-        max-height: 100px !important;  /* No crecer */
-        margin-bottom: 15px !important; /* Espacio entre botones */
+        height: 100px !important;      /* Altura fija igual para todos */
+        min-height: 100px !important;
+        max-height: 100px !important;
+        margin-bottom: 15px !important;
         
         /* ALINEACIÓN DE TEXTO */
         display: flex !important;
-        justify-content: center !important; /* Centrado Horizontal */
-        align-items: center !important;     /* Centrado Vertical */
+        flex-direction: column !important;
+        justify-content: center !important; /* Centrado Vertical */
+        align-items: center !important;     /* Centrado Horizontal */
         text-align: center !important;
         
         /* TIPOGRAFÍA */
         font-family: 'Roboto', sans-serif !important;
-        font-size: 1.3rem !important;
+        font-size: 1.2rem !important;
         font-weight: 700 !important;
         text-transform: uppercase !important;
         letter-spacing: 1px !important;
+        white-space: pre-wrap !important; /* Permite que el texto baje si es largo */
         
         transition: all 0.2s ease !important;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.05) !important;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1) !important;
     }
 
-    /* HOVER (EFECTO AL PASAR MOUSE) */
+    /* HOVER (MOUSE ENCIMA) */
     div.stButton > button:hover {
         background: #0E2F44 !important;
         color: white !important;
         border-color: #D4AF37 !important;
         transform: scale(1.02);
-        box-shadow: 0 8px 15px rgba(0,0,0,0.1) !important;
+        box-shadow: 0 8px 15px rgba(0,0,0,0.2) !important;
     }
 
-    /* ELIMINAR CUALQUIER ICONO O ROMBO */
-    div.stButton > button::before { content: none !important; }
-    div.stButton > button::after { content: none !important; }
+    /* ELIMINAR CUALQUIER ELEMENTO EXTRAÑO (ROMBOS) */
+    div.stButton > button::before { content: none !important; display: none !important; }
+    div.stButton > button::after { content: none !important; display: none !important; }
 
     /* FOOTER */
     .footer {
         position: fixed; bottom: 0; left: 0; width: 100%; text-align: center;
-        background: #fff; border-top: 1px solid #ddd; padding: 15px;
+        background: #f8f9fa; border-top: 1px solid #ddd; padding: 15px;
         font-size: 12px; color: #666; font-family: monospace;
     }
     </style>
@@ -143,38 +149,34 @@ st.markdown(f"""
     </div>
 """, unsafe_allow_html=True)
 
-# CONTENEDOR CENTRAL (COLUMNA ÚNICA)
-# Usamos columnas [1, 2, 1] para centrar el bloque de botones en la mitad de la pantalla
+# --- COLUMNA CENTRAL PARA ALINEACIÓN PERFECTA ---
+# Usamos [1, 2, 1] para que los botones queden en el medio (ocupando el 50% del ancho)
 izq, centro, der = st.columns([1, 2, 1])
 
 with centro:
     # Botón 1
     if st.button("SECRETARIO/A"):
         st.toast("Cargando...", icon="📝")
-        # st.session_state.active_module = 'secretario'
-        # st.rerun()
+        # st.session_state.active_module = 'secretario'; st.rerun()
 
     # Botón 2
     if st.button("TALENTO HUMANO"):
         st.toast("Cargando...", icon="👤")
-        # st.session_state.active_module = 'th'
-        # st.rerun()
+        # st.session_state.active_module = 'th'; st.rerun()
 
-    # Botón 3
+    # Botón 3 (El que definía el tamaño, ahora todos son iguales a este)
     if st.button("GENERADOR DOCUMENTAL"):
         st.toast("Cargando...", icon="🤖")
-        # st.session_state.active_module = 'ia'
-        # st.rerun()
+        # st.session_state.active_module = 'ia'; st.rerun()
 
     # Botón 4
     if st.button("ADMINISTRACIÓN"):
         st.toast("Cargando...", icon="🛡️")
-        # st.session_state.active_module = 'admin'
-        # st.rerun()
+        # st.session_state.active_module = 'admin'; st.rerun()
 
 # FOOTER
 st.markdown("""
     <div class="footer">
-        SIGD DINIC v13.0 | DESARROLLADO POR: <b>JSCN</b> | cnjstalin@gmail.com | SOPORTE: 0996652042
+        SIGD DINIC v14.0 | Desarrollado por: <b>JSCN</b> | cnjstalin@gmail.com | Soporte: 0996652042
     </div>
 """, unsafe_allow_html=True)
