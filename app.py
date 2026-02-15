@@ -7,7 +7,7 @@ st.set_page_config(
     page_title="SIGD DINIC | Centro de Mando",
     layout="wide",
     page_icon="🛡️",
-    initial_sidebar_state="collapsed" # Ocultamos barra lateral para look de "Sistema"
+    initial_sidebar_state="collapsed"
 )
 
 # CONSTANTES INMUTABLES
@@ -15,227 +15,187 @@ NOMBRE_SISTEMA = "SISTEMA INTEGRAL DE GESTION DOCUMENTAL DINIC"
 URL_ESCUDO = "https://upload.wikimedia.org/wikipedia/commons/2/25/Escudo_Policia_Nacional_del_Ecuador.png"
 
 # ==============================================================================
-# 2. INYECCIÓN DE CSS (EL DISEÑO VISUAL PROFESIONAL)
+# 2. INYECCIÓN DE CSS (DISEÑO TÁCTICO HORIZONTAL)
 # ==============================================================================
 st.markdown("""
     <style>
-    /* IMPORTAR FUENTES TÉCNICAS (ROBOTO Y RAJDHANI PARA TÍTULOS) */
-    @import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;700&family=Roboto:wght@300;400;700&display=swap');
+    /* IMPORTAR FUENTES TÉCNICAS */
+    @import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;700&family=Roboto:wght@300;400;500&display=swap');
 
-    /* --- 2.1 ESTRUCTURA GENERAL (FONDO Y LIMPIEZA) --- */
+    /* --- 2.1 ESTRUCTURA GENERAL --- */
     .stApp {
-        /* Fondo degradado oscuro profesional con una sutil textura de red */
         background-color: #0a1018;
         background-image: 
-            radial-gradient(circle at 50% 0%, #1a2a3a 0%, #0a1018 70%),
-            linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
-        background-size: 100% 100%, 30px 30px, 30px 30px;
+            radial-gradient(circle at 50% 30%, #1a2a3a 0%, #0a1018 70%),
+            linear-gradient(rgba(255, 255, 255, 0.01) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(255, 255, 255, 0.01) 1px, transparent 1px);
+        background-size: 100% 100%, 40px 40px, 40px 40px;
         color: #e0e0e0;
         font-family: 'Roboto', sans-serif;
     }
     
-    /* Ocultar elementos nativos de Streamlit que ensucian la interfaz */
     #MainMenu, footer, header {visibility: hidden;}
     [data-testid="collapsedControl"] {display: none;}
-    .block-container { padding-top: 2rem !important; padding-bottom: 5rem !important; }
-    hr { border-color: rgba(212, 175, 55, 0.3) !important; margin: 40px 0 !important; } /* Separadores dorados sutiles */
+    .block-container { padding-top: 3rem !important; padding-bottom: 5rem !important; max-width: 1400px !important; }
+    hr { border-color: rgba(212, 175, 55, 0.2) !important; margin: 50px 0 !important; }
 
 
-    /* --- 2.2 CABECERA INSTITUCIONAL (HEADER) --- */
+    /* --- 2.2 CABECERA INSTITUCIONAL CENTRADA --- */
     .header-container {
         display: flex;
+        flex-direction: column; /* Apilado verticalmente para centrar mejor */
         align-items: center;
         justify-content: center;
-        margin-bottom: 40px;
-        padding-bottom: 30px;
-        border-bottom: 3px solid #D4AF37; /* Línea dorada policial */
-        background: rgba(13, 22, 33, 0.8);
-        backdrop-filter: blur(10px);
-        border-radius: 15px;
+        margin-bottom: 50px;
         padding: 30px;
-        box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        background: rgba(13, 22, 33, 0.6);
+        backdrop-filter: blur(10px);
+        border-radius: 20px;
+        border: 1px solid rgba(212, 175, 55, 0.1);
+        text-align: center; /* Asegura que el texto interno esté centrado */
     }
 
     .logo-box img {
-        width: 110px;
-        filter: drop-shadow(0 0 15px rgba(212, 175, 55, 0.6)); /* Resplandor dorado al escudo */
-        margin-right: 30px;
+        width: 130px; /* Un poco más grande */
+        filter: drop-shadow(0 0 20px rgba(212, 175, 55, 0.4));
+        margin-bottom: 20px;
     }
 
     .title-box h1 {
         font-family: 'Rajdhani', sans-serif;
         color: #ffffff;
-        font-size: 3.2rem;
+        font-size: 3rem;
         font-weight: 800;
         margin: 0;
-        letter-spacing: 3px;
+        letter-spacing: 2px;
         text-transform: uppercase;
-        text-shadow: 0 2px 10px rgba(0, 0, 0, 0.8);
-        background: -webkit-linear-gradient(white, #b0bec5);
+        text-shadow: 0 4px 10px rgba(0, 0, 0, 0.8);
+        background: -webkit-linear-gradient(#fff, #cfd8dc);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
     }
 
     .title-box h3 {
         font-family: 'Roboto', sans-serif;
-        color: #D4AF37; /* Color Dorado */
-        font-size: 1.3rem;
-        font-weight: 400;
-        margin: 10px 0 0 0;
-        letter-spacing: 5px;
+        color: #D4AF37;
+        font-size: 1.2rem;
+        font-weight: 500;
+        margin: 15px 0 0 0;
+        letter-spacing: 4px;
         text-transform: uppercase;
+        opacity: 0.9;
     }
 
 
-    /* --- 2.3 TARJETAS DE MÓDULOS (ESTILIZACIÓN AVANZADA DE BOTONES) --- */
-    /* Transformamos los botones estándar de Streamlit en tarjetas interactivas */
+    /* --- 2.3 TARJETAS HORIZONTALES (NUEVO DISEÑO) --- */
     div.stButton > button {
-        background: linear-gradient(145deg, rgba(20, 30, 45, 0.9), rgba(10, 20, 30, 0.9)) !important;
-        border: 1px solid rgba(212, 175, 55, 0.2) !important; /* Borde sutil dorado */
-        border-radius: 16px !important;
+        background: linear-gradient(90deg, rgba(20, 30, 45, 0.95), rgba(15, 25, 35, 0.95)) !important;
+        border: 1px solid rgba(212, 175, 55, 0.15) !important;
+        border-radius: 12px !important;
         color: #e0e0e0 !important;
         
-        /* Tamaño y disposición */
+        /* GEOMETRÍA HORIZONTAL */
         width: 100% !important;
-        height: 280px !important;
+        height: 140px !important; /* Más bajo */
         display: flex !important;
-        flex-direction: column !important;
-        justify-content: center !important;
+        flex-direction: row !important; /* Elementos lado a lado */
+        justify-content: flex-start !important; /* Alineado a la izquierda */
         align-items: center !important;
-        padding: 20px !important;
+        padding: 0 30px !important; /* Relleno horizontal */
+        gap: 25px; /* Espacio entre icono y texto */
 
-        /* Tipografía */
+        /* TIPOGRAFÍA */
         font-family: 'Rajdhani', sans-serif !important;
-        font-size: 1.6rem !important;
+        font-size: 1.5rem !important;
         font-weight: 700 !important;
         text-transform: uppercase !important;
         letter-spacing: 1px !important;
+        text-align: left !important;
         
-        transition: all 0.4s cubic-bezier(0.23, 1, 0.32, 1) !important;
-        box-shadow: 0 10px 20px rgba(0,0,0,0.3), inset 0 0 0 1px rgba(255,255,255,0.05) !important;
+        transition: all 0.3s ease !important;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.2) !important;
         position: relative !important;
         overflow: hidden !important;
     }
 
-    /* Iconos (Emojis) grandes dentro de los botones */
+    /* Iconos (Emojis) a la izquierda */
     div.stButton > button::before {
-        font-size: 70px;
-        margin-bottom: 25px;
-        filter: grayscale(90%) opacity(0.8); /* Apagados por defecto */
-        transition: all 0.4s ease;
-    }
-
-    /* Subtítulos (Descripciones) dentro de los botones */
-    div.stButton > button::after {
-        content: attr(data-desc); /* Texto descriptivo */
-        font-family: 'Roboto', sans-serif;
-        font-size: 0.85rem;
-        font-weight: 400;
-        color: #90a4ae;
-        text-transform: none;
-        letter-spacing: 0.5px;
-        margin-top: 10px;
-        opacity: 0.7;
-        transition: all 0.4s ease;
+        font-size: 55px;
+        margin-bottom: 0; /* Sin margen inferior en modo horizontal */
+        filter: grayscale(100%) opacity(0.7);
+        transition: all 0.3s ease;
+        flex-shrink: 0; /* Evita que el icono se aplaste */
     }
     
-    /* --- EFECTOS HOVER (AL PASAR EL MOUSE) --- */
+    /* EFECTOS HOVER */
     div.stButton > button:hover {
-        transform: translateY(-8px) !important; /* Levantar */
-        background: linear-gradient(145deg, rgba(25, 40, 60, 1), rgba(15, 25, 35, 1)) !important;
-        border-color: #D4AF37 !important; /* Borde dorado brillante */
-        box-shadow: 0 15px 35px rgba(0,0,0,0.5), 0 0 20px rgba(212, 175, 55, 0.2) !important; /* Resplandor dorado */
+        transform: translateX(5px) !important; /* Pequeño desplazamiento lateral */
+        background: linear-gradient(90deg, rgba(30, 45, 70, 1), rgba(20, 30, 45, 1)) !important;
+        border-color: #D4AF37 !important;
+        box-shadow: 0 15px 40px rgba(0,0,0,0.4), inset 0 0 20px rgba(212, 175, 55, 0.1) !important;
         color: #ffffff !important;
     }
 
     div.stButton > button:hover::before {
-        filter: grayscale(0%) opacity(1) drop-shadow(0 0 15px rgba(255,255,255,0.4)); /* Activar color icono */
-        transform: scale(1.1);
+        filter: grayscale(0%) opacity(1) drop-shadow(0 0 10px rgba(255,255,255,0.3));
     }
     
-    div.stButton > button:hover::after {
-        color: #D4AF37; /* Descripción dorada */
-        opacity: 1;
-    }
-    
-    /* Asignación de Iconos y Descripciones específicas por posición */
-    /* Tarjeta 1: Secretaría */
+    /* Asignación de Iconos Específicos */
     div.row-widget.stButton:nth-of-type(1) button::before { content: "📝"; }
-    div.row-widget.stButton:nth-of-type(1) button { --desc: "Gestión, Recepción y Trámite Documental V44"; }
-    /* Tarjeta 2: Asesor IA */
-    div.row-widget.stButton:nth-of-type(2) button::before { content: "🧠"; }
-    div.row-widget.stButton:nth-of-type(2) button { --desc: "Análisis Inteligente con Gemini Pro"; }
-    /* Tarjeta 3: Talento Humano */
-    div.row-widget.stButton:nth-of-type(3) button::before { content: "👤"; }
-    div.row-widget.stButton:nth-of-type(3) button { --desc: "Control de Personal, Partes y Sanciones"; }
-    /* Tarjeta 4: Admin */
-    div.row-widget.stButton:nth-of-type(4) button::before { content: "🛡️"; }
-    div.row-widget.stButton:nth-of-type(4) button { --desc: "Auditoría, Usuarios y Configuración Global"; }
-
-    /* Truco para inyectar la descripción en el pseudo-elemento ::after */
-    div.stButton > button::after { content: var(--desc); }
+    div.row-widget.stButton:nth-of-type(2) button::before { content: "👤"; }
+    div.row-widget.stButton:nth-of-type(3) button::before { content: "🤖"; }
 
     /* FOOTER SIMPLE */
     .footer-status {
         position: fixed; bottom: 0; left: 0; width: 100%; text-align: center; padding: 10px;
-        background: rgba(0,0,0,0.8); color: #546e7a; font-size: 11px; border-top: 1px solid #263238;
-        font-family: 'Roboto Mono', monospace;
+        background: rgba(10, 16, 24, 0.9); color: #546e7a; font-size: 10px; border-top: 1px solid rgba(255,255,255,0.05);
+        font-family: 'Roboto Mono', monospace; letter-spacing: 1px;
     }
     </style>
 """, unsafe_allow_html=True)
 
 # ==============================================================================
-# 3. ESTRUCTURA DEL LAYOUT (HTML/PYTHON)
+# 3. ESTRUCTURA DEL LAYOUT
 # ==============================================================================
 
-# --- 3.1 CABECERA (HEADER) ---
-# Usamos columnas para alinear el escudo y el título de forma precisa
-col_logo, col_titulo = st.columns([1, 6])
-
-with col_logo:
-    # Contenedor para el escudo con la clase CSS aplicada
-    st.markdown(f"""<div class="logo-box"><img src="{URL_ESCUDO}"></div>""", unsafe_allow_html=True)
-
-with col_titulo:
-    # Contenedor para los títulos con las clases CSS aplicadas
-    st.markdown(f"""
+# --- 3.1 CABECERA CENTRADA ---
+st.markdown(f"""
+    <div class="header-container">
+        <div class="logo-box"><img src="{URL_ESCUDO}"></div>
         <div class="title-box">
             <h1>{NOMBRE_SISTEMA}</h1>
             <h3>CENTRO DE MANDO OPERATIVO | NIVEL CENTRAL</h3>
         </div>
-    """, unsafe_allow_html=True)
+    </div>
+""", unsafe_allow_html=True)
 
-st.markdown("---") # Separador visual sutil
+st.markdown("---")
 
-# --- 3.2 GRID DE ACCESO A MÓDULOS (TARJETAS) ---
-# Creamos 4 columnas para los 4 módulos principales
-m1, m2, m3, m4 = st.columns(4, gap="large")
+# --- 3.2 GRID HORIZONTAL DE MÓDULOS (3 COLUMNAS) ---
+# Usamos 3 columnas para que los botones sean anchos y horizontales
+m1, m2, m3 = st.columns(3, gap="large")
 
 with m1:
-    # El texto del botón se renderizará con la fuente Rajdhani y mayúsculas por CSS
-    if st.button("SECRETARÍA"):
-        st.toast("Iniciando Módulo de Secretaría...", icon="📝")
-        # AQUÍ IRÁ LA LÓGICA PARA CAMBIAR DE PÁGINA LUEGO
+    # El icono 📝 se añade por CSS
+    if st.button("SECRETARIO/A"):
+        st.toast("Accediendo a Gestión Documental...", icon="📝")
+        # Lógica de navegación aquí
 
 with m2:
-    if st.button("ASESOR IA"):
-        st.toast("Conectando con Motor Neuronal...", icon="🧠")
-        # AQUÍ IRÁ LA LÓGICA PARA CAMBIAR DE PÁGINA LUEGO
+    # El icono 👤 se añade por CSS
+    if st.button("TALENTO HUMANO"):
+        st.toast("Validando credenciales TH...", icon="👤")
+        # Lógica de navegación aquí
 
 with m3:
-    if st.button("TALENTO HUMANO"):
-        st.toast("Validando Credenciales de TH...", icon="👤")
-        # AQUÍ IRÁ LA LÓGICA PARA CAMBIAR DE PÁGINA LUEGO
+    # El icono 🤖 se añade por CSS
+    if st.button("GENERADOR DOCUMENTAL"):
+        st.toast("Iniciando motor de IA...", icon="🤖")
+        # Lógica de navegación aquí
 
-with m4:
-    if st.button("ADMINISTRACIÓN"):
-        st.toast("Acceso de Nivel Superior Requerido.", icon="🛡️")
-        # AQUÍ IRÁ LA LÓGICA PARA CAMBIAR DE PÁGINA LUEGO
-
-# --- 3.3 PIE DE PÁGINA (ESTADO DEL SISTEMA) ---
+# --- 3.3 PIE DE PÁGINA ---
 st.markdown("""
     <div class="footer-status">
-        ESTADO DEL SISTEMA: OPERATIVO | VERSIÓN: 1.0 ALPHA | CONEXIÓN SEGURA SSL
+        SISTEMA OPERATIVO | CONEXIÓN CIFRADA | DINIC 2026
     </div>
 """, unsafe_allow_html=True)
