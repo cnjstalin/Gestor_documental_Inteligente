@@ -1,25 +1,13 @@
 import streamlit as st
-import google.generativeai as genai
-import tempfile
-import os
-import json
-import re
-import time
-import io
-import random
-import base64
-import pandas as pd
 import streamlit.components.v1 as components
-from copy import copy
-from openpyxl import load_workbook
-from openpyxl.styles import PatternFill, Border, Side, Alignment
+import json
+import os
+import pandas as pd
 from datetime import datetime, timedelta, timezone
 
-# --- 1. CONFIGURACIÓN E INICIO ---
-VER_SISTEMA = "v60.0 (Auto-Scan + Lectura Garantizada)"
-ADMIN_USER = "1723623011"
-ADMIN_PASS_MASTER = "9994915010022"
-
+# ==============================================================================
+# 1. CONFIGURACIÓN DEL SISTEMA
+# ==============================================================================
 st.set_page_config(
     page_title="SIGD DINIC",
     layout="wide",
@@ -27,295 +15,780 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- 2. ESTILOS VISUALES (PREMIUM) ---
+# Credenciales Maestras
+ADMIN_USER = "1723623011"
+ADMIN_PASS_MASTER = "9994915010022"
+
+# Estilos CSS para Streamlit
 st.markdown("""
     <style>
     .main-header { background-color: #0E2F44; padding: 20px; border-radius: 10px; color: white; text-align: center; margin-bottom: 20px; border-bottom: 4px solid #D4AF37; }
-    .main-header h1 { margin: 0; font-size: 2.2rem; font-weight: 800; }
-    .metric-card { background-color: #f8f9fa !important; border-radius: 10px; padding: 15px; text-align: center; border: 1px solid #dee2e6; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-    .metric-card h3 { color: #0E2F44 !important; font-size: 2rem; margin: 0; font-weight: 800; }
-    .metric-card p { color: #555 !important; font-size: 0.9rem; margin: 0; font-weight: 600; }
     .login-container { max-width: 400px; margin: auto; padding: 40px; background-color: #ffffff; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); text-align: center; border-top: 5px solid #0E2F44; }
     div.stButton > button { width: 100%; border-radius: 5px; font-weight: bold; }
     </style>
 """, unsafe_allow_html=True)
 
-# --- 3. FUNCIONES UTILITARIAS (AL INICIO) ---
+# ==============================================================================
+# 2. CÓDIGO HTML INCRUSTADO (TU MOTOR V44)
+# ==============================================================================
+# Pegamos aquí tu código HTML tal cual, dentro de una variable de texto.
+HTML_SECRETARIO_V44 = """
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GESTOR DOCUMENTAL DINIC - V44 MATRIX FIX</title>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; background: #eceff1; padding: 20px; color: #333; padding-top: 20px; padding-bottom: 60px; }
+        .container { max-width: 100%; margin: 0 auto; background: white; padding: 25px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        
+        /* HEADER - Ajustado para iframe */
+        .top-header { position: sticky; top: 0; left: 0; width: 100%; background: #263238; color: white; z-index: 1000; box-shadow: 0 2px 10px rgba(0,0,0,0.3); border-radius: 8px 8px 0 0; margin-bottom: 20px;}
+        .bar-main { display: flex; justify-content: space-between; align-items: center; padding: 10px 20px; border-bottom: 1px solid #455a64; }
+        .bar-tools { background: #37474f; padding: 8px 20px; display: flex; gap: 10px; align-items: center; justify-content: flex-end; flex-wrap: wrap;}
+
+        /* LED */
+        .led-box { font-size: 11px; display: flex; align-items: center; gap: 5px; background: rgba(0,0,0,0.3); padding: 4px 8px; border-radius: 4px; }
+        .led { width: 8px; height: 8px; border-radius: 50%; background: #f44336; box-shadow: 0 0 5px #f44336; }
+        .led.on { background: #00e676; box-shadow: 0 0 5px #00e676; }
+
+        /* BOTONES TOP */
+        .btn-top { border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 11px; text-transform: uppercase; transition: 0.2s; }
+        .btn-cfg { background: #5e35b1; color: white; }
+        .btn-save { background: #00acc1; color: white; }
+        .btn-rest { background: #ffca28; color: #333; }
+        .btn-new { background: #4caf50; color: white; }
+        .btn-wipe { background: #b71c1c; color: white; margin-left: 10px; border: 1px solid #ff8a80; }
+        .btn-top:hover { filter: brightness(1.2); transform: translateY(-1px); }
+
+        /* BARRA DE MODOS */
+        .mode-bar { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px; }
+        .mode-btn { padding: 10px; border-radius: 6px; cursor: pointer; text-align: center; font-weight: bold; border: 2px solid transparent; transition: 0.3s; opacity: 0.7; }
+        .mode-btn:hover { opacity: 1; transform: translateY(-2px); }
+        .mode-copy { background: #fff3e0; color: #e65100; border-color: #ffe0b2; }
+        .mode-copy.active { background: #ffe0b2; border-color: #e65100; opacity: 1; box-shadow: 0 0 8px rgba(230, 81, 0, 0.4); }
+        .mode-gen { background: #e0f7fa; color: #006064; border-color: #b2ebf2; }
+        .mode-gen.active { background: #b2ebf2; border-color: #006064; opacity: 1; box-shadow: 0 0 8px rgba(0, 96, 100, 0.4); }
+
+        /* SECCIONES */
+        .seccion { background: #fafafa; border: 1px solid #cfd8dc; padding: 15px; border-radius: 6px; margin-bottom: 15px; }
+        .seccion h3 { margin: 0 0 10px 0; font-size: 14px; color: #455a64; border-left: 4px solid #607d8b; padding-left: 8px; }
+        
+        /* GRID */
+        .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+        .full { grid-column: 1 / -1; }
+
+        /* INPUTS */
+        label { display: block; font-weight: bold; font-size: 11px; color: #546e7a; margin-bottom: 3px; text-transform: uppercase; }
+        input, select, textarea { width: 100%; padding: 8px; border: 1px solid #b0bec5; border-radius: 4px; font-size: 12px; box-sizing: border-box; }
+        input[readonly] { background: #e0e0e0; color: #555; cursor: not-allowed; }
+        input:disabled, select:disabled, textarea:disabled { background: #cfd8dc; color: #78909c; cursor: not-allowed; border-color: #cfd8dc; }
+
+        /* AUTOCOMPLETE */
+        .ac-wrap { position: relative; }
+        .ac-box { position: absolute; top: 100%; left: 0; width: 100%; background: white; border: 1px solid #90a4ae; z-index: 999; max-height: 200px; overflow-y: auto; display: none; box-shadow: 0 4px 8px rgba(0,0,0,0.2); }
+        .ac-item { padding: 8px; font-size: 12px; cursor: pointer; border-bottom: 1px solid #eee; }
+        .ac-item:hover { background: #e3f2fd; color: #0d47a1; font-weight: bold; }
+
+        /* ARCHIVOS */
+        .drop-area { border: 2px dashed #90a4ae; padding: 15px; text-align: center; border-radius: 6px; cursor: pointer; background: white; transition: 0.2s; margin-bottom: 5px; position: relative; }
+        .drop-area.dragover { border-color: #00e676; background: #e8f5e9; transform: scale(1.02); }
+        .drop-area.disabled { background: #eceff1; border-color: #cfd8dc; cursor: not-allowed; opacity: 0.6; pointer-events: none; }
+        .drop-txt { font-weight: bold; color: #0277bd; font-size: 11px; pointer-events: none; }
+        
+        .file-list-box { max-height: 120px; overflow-y: auto; border: 1px solid #b0bec5; padding: 5px; background: #fff; border-radius: 4px; }
+        .file-item { display: flex; justify-content: space-between; align-items: center; font-size: 10px; margin-bottom: 2px; background: #f1f8e9; padding: 4px; border-radius: 3px; border-bottom: 1px solid #eee; }
+        .btn-del-file { background: #ff5252; color: white; border: none; border-radius: 3px; width: 20px; height: 20px; font-size: 10px; cursor: pointer; margin-left: 5px; font-weight:bold; }
+        .btn-del-file:hover { background: #d32f2f; }
+
+        /* BOTONES ACCIÓN */
+        .btn-main { display: block; width: 100%; padding: 12px; font-size: 15px; font-weight: bold; color: white; border: none; border-radius: 6px; cursor: pointer; margin: 20px 0; transition: background 0.3s; }
+        .btn-add { background: #2e7d32; }
+        .btn-update { background: #f57f17; color: white; box-shadow: 0 4px 10px rgba(245, 127, 23, 0.4); }
+        .btn-down { background: #01579b; }
+
+        /* TABLA */
+        table { width: 100%; border-collapse: collapse; font-size: 11px; margin-top: 10px; }
+        thead { background: #455a64; color: white; }
+        th, td { padding: 6px 10px; border: 1px solid #cfd8dc; text-align: left; }
+        .row-copia { background: #fff3e0; color: #e65100; font-weight: bold; }
+        .row-pend { background: #ffebee; color: #b71c1c; }
+        .row-ok { background: #e8f5e9; color: #1b5e20; }
+        .act-btn { border: none; padding: 3px 8px; border-radius: 3px; cursor: pointer; font-weight: bold; font-size: 10px; margin-right: 4px; }
+        .act-edit { background: #ffeb3b; color: #333; }
+        .act-del { background: #ef5350; color: white; }
+
+        #loader { display: none; position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(255,255,255,0.9); z-index: 2000; text-align: center; padding-top: 20%; }
+        .footer { text-align: center; margin-top: 30px; font-size: 12px; color: #78909c; border-top: 1px solid #ddd; padding-top: 10px; }
+    </style>
+</head>
+<body>
+
+    <div id="loader">
+        <div style="font-size:40px;">⏳</div>
+        <h3 id="loadText" style="color:#37474f;">Procesando...</h3>
+    </div>
+
+    <div class="top-header">
+        <div class="bar-main">
+            <div style="font-size:16px; font-weight:bold;">🛡️ GESTOR DOCUMENTAL DINIC</div>
+            <div class="led-box">
+                <span id="led" class="led"></span>
+                <span id="ledTxt">Verificando plantilla...</span>
+            </div>
+        </div>
+        <div class="bar-tools">
+            <button class="btn-top btn-cfg" onclick="triggerUpload()">📂 SUBIR PLANTILLA</button>
+            <input type="file" id="inPlantilla" accept=".xlsx" style="display:none" onchange="guardarPlantillaDB(this)">
+            
+            <button class="btn-top btn-save" onclick="guardarRespaldo()">⬇️ RESPALDAR</button>
+            <button class="btn-top btn-rest" onclick="document.getElementById('inRestore').click()">⬆️ RESTAURAR</button>
+            <input type="file" id="inRestore" accept=".dinic" style="display:none" onchange="restaurarRespaldo(this)">
+            
+            <span style="border-left:1px solid #aaa; height:20px; margin:0 5px;"></span>
+            
+            <button class="btn-top btn-new" onclick="nuevoTurno()">✨ NUEVO TURNO</button>
+            <button class="btn-top btn-wipe" onclick="borrarTodo()">🗑️ REINICIAR</button>
+        </div>
+    </div>
+
+    <div class="container">
+        
+        <div class="mode-bar">
+            <div id="btnModeCopia" class="mode-btn mode-copy" onclick="toggleMode('COPIA')">
+                ⚠️ ¿EL DOCUMENTO ES UNA COPIA?
+                <br><span style="font-size:10px;">(Click para activar)</span>
+            </div>
+            <div id="btnModeGen" class="mode-btn mode-gen" onclick="toggleMode('GENERADO')">
+                ⚙️ ¿GENERADO DESDE DESPACHO?
+                <br><span style="font-size:10px;">(Click para activar)</span>
+            </div>
+        </div>
+
+        <div id="secCopia" style="display:none; background:#fff3e0; padding:15px; border-radius:6px; margin-bottom:15px; border:1px solid #ffb74d;">
+            <div class="grid-3">
+                <div class="full"><label>N° Documento Copia:</label><input type="text" id="cNum" oninput="cleanPNSync(this)"></div>
+                <div class="full">
+                    <label>📂 ANEXOS COPIA (Arrastre o Click):</label>
+                    <div class="drop-area" id="drop_copy" onclick="document.getElementById('cFile').click()">
+                        <div class="drop-txt">Arrastra archivos aquí o haz click</div>
+                        <input type="file" id="cFile" multiple style="display:none" onchange="handleFiles(this.files, 'copy')">
+                    </div>
+                    <div id="list_copy" class="file-list-box"></div>
+                </div>
+            </div>
+        </div>
+
+        <div id="secTramite">
+            <div class="seccion">
+                <h3>2. DOCUMENTO RECEPTADO</h3>
+                <div class="grid-3">
+                    <div><label>Fecha Doc:</label><input type="date" id="rFd"></div>
+                    <div><label>Remitente:</label><input type="text" id="rRem" list="l_rem" autocomplete="off"><datalist id="l_rem"></datalist></div>
+                    <div><label>Cargo:</label><input type="text" id="rCar" list="l_car" autocomplete="off"><datalist id="l_car"></datalist></div>
+                    <div><label>Unidad Origen:</label><input type="text" id="rUni" list="l_uor" autocomplete="off"><datalist id="l_uor"></datalist></div>
+                    
+                    <div><label>N° Documento:</label><input type="text" id="rNum" oninput="cleanPNSync(this)" style="background:#e3f2fd; font-weight:bold;"></div>
+                    
+                    <div><label>Fecha Recepción:</label><input type="date" id="rFr"></div>
+                    <div class="full"><label>Asunto:</label><input type="text" id="rAsu"></div>
+                    <div class="full"><label>Descripción:</label><textarea id="rDes" rows="2"></textarea></div>
+                    <div><label>S. Policial Turno:</label><input type="text" id="rRec" list="l_tur" autocomplete="off"><datalist id="l_tur"></datalist></div>
+                    <div>
+                        <label style="color:#d32f2f;">Observación:</label>
+                        <select id="rObs" onchange="logicObs()">
+                            <option value="NINGUNA">NINGUNA</option>
+                            <option value="REASIGNADO">REASIGNADO</option>
+                            <option value="GENERADO DESDE DESPACHO">GENERADO DESDE DESPACHO</option>
+                            <option value="CONOCIMIENTO PARA MI CORONEL">CONOCIMIENTO PARA MI CORONEL</option>
+                            <option value="OTRO">OTRO/A</option>
+                        </select>
+                        <input type="text" id="rObsO" style="display:none; margin-top:2px;" placeholder="Especifique">
+                    </div>
+                    
+                    <div class="full" style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; border-top:1px solid #ddd; padding-top:10px;">
+                        <div>
+                            <label style="color:#1565c0;">📄 DOCUMENTO PRINCIPAL (Solo 1):</label>
+                            <div class="drop-area" id="drop_main" onclick="document.getElementById('rFileMain').click()" style="background:#e3f2fd;">
+                                <div class="drop-txt">Arrastra Principal aquí o Click</div>
+                                <input type="file" id="rFileMain" style="display:none" onchange="handleFiles(this.files, 'main')">
+                            </div>
+                            <div id="list_main" class="file-list-box"></div>
+                        </div>
+                        <div>
+                            <label style="color:#2e7d32;">📎 ANEXOS (Acumulativo):</label>
+                            <div class="drop-area" id="drop_anx" onclick="document.getElementById('rFileAnx').click()">
+                                <div class="drop-txt">Arrastra Anexos aquí o Click</div>
+                                <input type="file" id="rFileAnx" multiple style="display:none" onchange="handleFiles(this.files, 'anx')">
+                            </div>
+                            <div id="list_anx" class="file-list-box"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="seccion" id="sec3">
+                <h3>3. GESTIÓN O TRÁMITE</h3>
+                <div class="grid-3">
+                    <div class="full">
+                        <label>Unidad Destino (Comas para varios):</label>
+                        <div class="ac-wrap">
+                            <input type="text" id="gDes" autocomplete="off" oninput="syncDestino()">
+                            <div id="ac_gDes" class="ac-box"></div>
+                        </div>
+                    </div>
+                    <div>
+                        <label>Tipo Doc:</label>
+                        <select id="gTip" onchange="logicTip()">
+                            <option>DOCPOL ELECTRÓNICO</option><option>QUIPUX ELECTRÓNICO</option>
+                            <option>FISICO</option><option>DIGITAL</option><option>OTRO</option>
+                        </select>
+                        <input type="text" id="gTipO" style="display:none; margin-top:2px;">
+                    </div>
+                    <div>
+                        <label>Receptor Respuesta (Comas para varios):</label>
+                        <div class="ac-wrap">
+                            <input type="text" id="gRec" autocomplete="off">
+                            <div id="ac_gRec" class="ac-box"></div>
+                        </div>
+                    </div>
+                    <div><label>Nro Resp:</label><input type="text" id="gNum" oninput="syncRespuesta()"></div>
+                    <div><label>Fecha Emisión:</label><input type="date" id="gFem"></div>
+                    <div>
+                        <label>Estado:</label>
+                        <select id="gEst" style="font-weight:bold; pointer-events:none; background:#eee;">
+                            <option value="PENDIENTE" style="color:red">🔴 PENDIENTE</option>
+                            <option value="FINALIZADO" style="color:green">🟢 FINALIZADO</option>
+                        </select>
+                    </div>
+                    <div class="full">
+                        <label style="color:#c2185b;">DOCUMENTOS DE RESPUESTA (Acumulativo):</label>
+                        <div class="drop-area" id="drop_out" onclick="document.getElementById('gFile').click()">
+                            <div class="drop-txt">Arrastra Respuestas aquí o Click</div>
+                            <input type="file" id="gFile" multiple style="display:none" onchange="handleFiles(this.files, 'out')">
+                        </div>
+                        <div id="list_out" class="file-list-box"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="seccion" id="sec4">
+                <h3>4. SALIDA</h3>
+                <div class="grid-3">
+                    <div><label>Externo?</label><select id="sExt"><option>NO</option><option>SI</option></select></div>
+                    <div class="full"><label>Destino Final:</label><input type="text" id="sDes" readonly></div>
+                    <div><label>NRO DE SALIDA:</label><input type="text" id="sNum" readonly></div>
+                    <div><label>Fecha Salida:</label><input type="date" id="sFs"></div>
+                    <div><label>Fecha Recepción:</label><input type="date" id="sFr"></div>
+                </div>
+            </div>
+        </div>
+
+        <button id="btnMain" class="btn-main btn-add" onclick="agregarRegistro()">➕ AGREGAR TRÁMITE A LA LISTA</button>
+
+        <table>
+            <thead><tr><th width="30">#</th><th>Documento</th><th>Asunto / Obs</th><th>Estado</th><th width="90">Acción</th></tr></thead>
+            <tbody id="tablaBody"></tbody>
+        </table>
+
+        <button class="btn-main btn-down" onclick="generarFinal()">📦 DESCARGAR (ZIP o EXCEL)</button>
+
+        <div class="footer">
+            Soporte Técnico: CARRILLO NARVAEZ JOHN STALIN | CELL 0996652042 | CORREO: cnjstalin@gmail.com
+        </div>
+
+    </div>
+
+    <script>
+        // --- GLOBALS & DB ---
+        let db, registros = [], editIdx = -1;
+        let activeMode = 'TRAMITE'; 
+        let poolFiles = { main: null, anx: [], out: [], copy: [] };
+        const MEM_KEYS = { remitente: 'd_m_rem', cargo: 'd_m_car', u_origen: 'd_m_uor', rec_turno: 'd_m_rtu', u_destinos: 'd_m_ude', rec_respuestas: 'd_m_rre' };
+
+        window.onload = () => {
+            let r = indexedDB.open("DINIC_V44_MATRIX", 1);
+            r.onupgradeneeded = e => { let d = e.target.result; if(!d.objectStoreNames.contains('files')) d.createObjectStore('files'); };
+            r.onsuccess = e => { db = e.target.result; checkPlantilla(); };
+            
+            setToday(); loadMemories();
+            setupAuto('gDes', 'mem_u_destinos'); setupAuto('gRec', 'mem_rec_respuestas');
+            setupDnD(); 
+            
+            document.getElementById('rFd').addEventListener('input', function(){ 
+                let v = this.value; if(v) ['rFr','gFem','sFs','sFr'].forEach(id => document.getElementById(id).value = v); 
+            });
+        };
+
+        // --- MANEJO DE MODOS ---
+        function toggleMode(mode) {
+            if (activeMode === mode) activeMode = 'TRAMITE'; else activeMode = mode;
+            applyModeUI();
+        }
+
+        function applyModeUI() {
+            document.getElementById('btnModeCopia').className = "mode-btn mode-copy";
+            document.getElementById('btnModeGen').className = "mode-btn mode-gen";
+            document.getElementById('secCopia').style.display = 'none';
+            document.getElementById('secTramite').style.display = 'block';
+
+            // Reset habilitaciones
+            document.querySelectorAll('#secTramite input, #secTramite select, #secTramite textarea').forEach(e => e.disabled = false);
+            document.getElementById('rObs').disabled = false;
+            document.getElementById('drop_out').classList.remove('disabled');
+
+            if (activeMode === 'COPIA') {
+                document.getElementById('btnModeCopia').className += " active";
+                document.getElementById('secCopia').style.display = 'block';
+                document.getElementById('secTramite').style.display = 'none';
+            
+            } else if (activeMode === 'GENERADO') {
+                document.getElementById('btnModeGen').className += " active";
+                
+                // Bloquear Remitente, Cargo, Unidad
+                document.getElementById('rRem').disabled = true;
+                document.getElementById('rCar').disabled = true;
+                document.getElementById('rUni').disabled = true;
+                
+                // Fijar Obs
+                document.getElementById('rObs').value = "GENERADO DESDE DESPACHO";
+                
+                // Bloquear subida seccion 3
+                document.getElementById('drop_out').classList.add('disabled');
+                
+                logicObs();
+            } else {
+                document.getElementById('rObs').value = "NINGUNA";
+                logicObs();
+            }
+        }
+
+        // --- DRAG & DROP & FILES ---
+        function setupDnD() {
+            ['drop_copy', 'drop_main', 'drop_anx', 'drop_out'].forEach(id => {
+                let zone = document.getElementById(id);
+                if(!zone) return;
+                
+                zone.addEventListener('dragover', (e) => { e.preventDefault(); e.stopPropagation(); zone.classList.add('dragover'); });
+                zone.addEventListener('dragleave', (e) => { e.preventDefault(); e.stopPropagation(); zone.classList.remove('dragover'); });
+                zone.addEventListener('drop', (e) => {
+                    e.preventDefault(); e.stopPropagation(); zone.classList.remove('dragover');
+                    if(zone.classList.contains('disabled')) return;
+                    let type = id.replace('drop_', ''); 
+                    handleFiles(e.dataTransfer.files, type);
+                });
+            });
+        }
+
+        function handleFiles(files, type) {
+            let arr = Array.from(files);
+            if(type === 'main') poolFiles.main = arr[0];
+            else poolFiles[type] = poolFiles[type].concat(arr);
+            renderFiles();
+        }
+
+        function removeFile(type, index) {
+            if(confirm("¿Quitar este archivo?")) {
+                if(type === 'main') poolFiles.main = null;
+                else poolFiles[type].splice(index, 1);
+                renderFiles();
+            }
+        }
+
+        function renderFiles() {
+            let divM = document.getElementById('list_main'); divM.innerHTML = "";
+            if(poolFiles.main) {
+                divM.innerHTML = `<div class="file-item"><span>📄 PRINCIPAL: ${poolFiles.main.name}</span> <button class="btn-del-file" onclick="removeFile('main',0)">✖</button></div>`;
+            }
+            const renderList = (type, divId, prefix) => {
+                let div = document.getElementById(divId); div.innerHTML = "";
+                poolFiles[type].forEach((f, i) => {
+                    div.innerHTML += `<div class="file-item"><span>${prefix} ${i+1}: ${f.name}</span> <button class="btn-del-file" onclick="removeFile('${type}',${i})">✖</button></div>`;
+                });
+            };
+            renderList('anx', 'list_anx', '📎 ANEXO');
+            renderList('out', 'list_out', '📤 SALIDA');
+            renderList('copy', 'list_copy', '📂 COPIA');
+        }
+
+        // --- CORE: AGREGAR / EDITAR ---
+        function agregarRegistro() {
+            try {
+                let datos = capturarDatos(); 
+                if (!datos) return; 
+
+                if(activeMode !== 'COPIA') saveMemories(datos);
+
+                if (editIdx > -1) { 
+                    registros[editIdx] = datos; 
+                    alert("✅ Registro ACTUALIZADO correctamente"); 
+                } else { 
+                    registros.push(datos); 
+                }
+                resetForm(); renderTable(); 
+            } catch (e) {
+                alert("Error: " + e.message); console.error(e);
+            }
+        }
+
+        function capturarDatos() {
+            if (activeMode === 'COPIA') {
+                let num = getVal('cNum'); if (!num) { alert("Falta N° Copia"); return null; }
+                return { tipo: 'COPIA', num: num, fCopy: [...poolFiles.copy], obs: 'COPIA' };
+            } else {
+                let obs = getVal('rObs');
+                if (obs !== 'GENERADO DESDE DESPACHO' && !getVal('rNum')) { alert("Falta N° Documento de Entrada"); return null; }
+
+                let obsVal = obs === 'OTRO' ? getVal('rObsO') : obs;
+                let tVal = getVal('gTip') === 'OTRO' ? getVal('gTipO') : getVal('gTip');
+                let est = getVal('gEst');
+
+                // En modo generado, drop_out esta desactivado, asegurarse de limpiar fOut
+                let filesOut = (activeMode === 'GENERADO') ? [] : [...poolFiles.out];
+
+                return {
+                    tipo: 'TRAMITE',
+                    rFd: getVal('rFd'), rRem: getVal('rRem'), rCar: getVal('rCar'), rUni: getVal('rUni'),
+                    rNum: getVal('rNum'), rFr: getVal('rFr'), rAsu: getVal('rAsu'),
+                    rDes: getVal('rDes'), rRec: getVal('rRec'), rObs: obsVal, 
+                    fMain: poolFiles.main, fAnx: [...poolFiles.anx], fOut: filesOut,
+                    gDes: getVal('gDes'), gTip: tVal, gRec: getVal('gRec'), gNum: getVal('gNum'),
+                    gFem: getVal('gFem'), gEst: est, 
+                    sExt: getVal('sExt'), sDes: getVal('sDes'), sNum: getVal('sNum'), sFs: getVal('sFs'), sFr: getVal('sFr')
+                };
+            }
+        }
+
+        function editar(i) {
+            editIdx = i; let r = registros[i];
+            let btn = document.getElementById('btnMain'); 
+            btn.innerHTML = "💾 ACTUALIZAR REGISTRO"; btn.className = "btn-main btn-update";
+            
+            poolFiles = { main: r.fMain || null, anx: r.fAnx ? [...r.fAnx] : [], out: r.fOut ? [...r.fOut] : [], copy: r.fCopy ? [...r.fCopy] : [] };
+            
+            if (r.tipo === 'COPIA') {
+                activeMode = 'COPIA'; setVal('cNum', r.num);
+            } else {
+                if (r.rObs === 'GENERADO DESDE DESPACHO') activeMode = 'GENERADO';
+                else activeMode = 'TRAMITE';
+
+                setVal('rFd', r.rFd); setVal('rRem', r.rRem); setVal('rCar', r.rCar); setVal('rUni', r.rUni);
+                setVal('rNum', r.rNum); setVal('rFr', r.rFr); setVal('rAsu', r.rAsu); setVal('rDes', r.rDes); setVal('rRec', r.rRec);
+                
+                let baseObs = ['REASIGNADO','GENERADO DESDE DESPACHO','CONOCIMIENTO PARA MI CORONEL','NINGUNA'].includes(r.rObs) ? r.rObs : 'OTRO';
+                setVal('rObs', baseObs); 
+                if(baseObs==='OTRO') { document.getElementById('rObsO').style.display='block'; setVal('rObsO', r.rObs); }
+                
+                setVal('gDes', r.gDes); 
+                let baseTip = ['DOCPOL ELECTRÓNICO','QUIPUX ELECTRÓNICO','FISICO','DIGITAL'].includes(r.gTip) ? r.gTip : 'OTRO';
+                setVal('gTip', baseTip); if(baseTip==='OTRO') { document.getElementById('gTipO').style.display='block'; setVal('gTipO', r.gTip); }
+                setVal('gRec', r.gRec); setVal('gNum', r.gNum); setVal('gFem', r.gFem); setVal('gEst', r.gEst);
+                setVal('sExt', r.sExt); setVal('sDes', r.sDes); setVal('sNum', r.sNum); setVal('sFs', r.sFs); setVal('sFr', r.sFr);
+            }
+            applyModeUI(); renderFiles(); window.scrollTo(0,0);
+        }
+
+        function borrar(i) { if(confirm("¿Eliminar?")) { registros.splice(i, 1); renderTable(); } }
+
+        function renderTable() {
+            let tbody = document.getElementById('tablaBody'); tbody.innerHTML = "";
+            registros.forEach((r, i) => {
+                let tr = document.createElement('tr');
+                let css="row-grey", desc=r.tipo==='COPIA'?'COPIA':r.rAsu, num, st=r.gEst;
+                
+                if(r.tipo==='COPIA'){ 
+                    css="row-copia"; st="COPIA"; num=r.num; 
+                } else {
+                    num = (r.rObs === 'GENERADO DESDE DESPACHO') ? (r.gNum ? r.gNum : '(SIN NÚMERO)') : r.rNum;
+                    if(st==='PENDIENTE'){ css="row-pend"; } else { css="row-ok"; }
+                }
+
+                tr.className = css;
+                tr.innerHTML = `<td>${i+1}</td><td><b>${num}</b></td><td>${desc}</td><td><span class="badge">${st}</span></td><td><button class="act-btn act-edit" onclick="editar(${i})">✏️</button><button class="act-btn act-del" onclick="borrar(${i})">X</button></td>`;
+                tbody.appendChild(tr);
+            });
+        }
+
+        // --- EXCEL & ZIP LOGIC ---
+        function generarFinal() {
+            if(registros.length===0) return alert("Vacio."); overlay(true,"Generando...");
+            let hasFiles = registros.some(r => r.fMain || (r.fAnx && r.fAnx.length) || (r.fOut && r.fOut.length) || (r.fCopy && r.fCopy.length));
+            let tx = db.transaction(['files'], 'readonly');
+            tx.objectStore('files').get('plantilla').onsuccess = e => {
+                if(e.target.result) {
+                    if (hasFiles) procesarZip(e.target.result); else procesarSoloExcel(e.target.result);
+                } else { overlay(false); alert("Falta Plantilla."); }
+            };
+        }
+
+        async function procesarSoloExcel(blob) {
+            try {
+                const workbook = new ExcelJS.Workbook(); await workbook.xlsx.load(await blob.arrayBuffer());
+                fillSheet(workbook);
+                saveAs(new Blob([await workbook.xlsx.writeBuffer()]), `${getNaming()}.xlsx`); overlay(false);
+            } catch(e) { overlay(false); alert("Error Excel: "+e); }
+        }
+
+        async function procesarZip(blob) {
+            try {
+                const zip = new JSZip(); const workbook = new ExcelJS.Workbook();
+                await workbook.xlsx.load(await blob.arrayBuffer());
+                fillSheet(workbook);
+
+                let nameRef = getNaming();
+                let root = zip.folder(nameRef);
+                let fTram = root.folder("DOCUMENTACION RECIBIDA");
+                let fCop = registros.some(r=>r.tipo==='COPIA') ? root.folder("COPIAS") : null;
+                let ct=0, cc=0;
+
+                registros.forEach((r, idx) => {
+                    if(r.tipo === 'COPIA') {
+                        cc++; 
+                        if(fCop && r.fCopy && r.fCopy.length) {
+                            let tg = fCop.folder(`${cc}. ${safe(r.num)}`); 
+                            r.fCopy.forEach(f => tg.file(f.name, f)); 
+                        }
+                    } else {
+                        ct++;
+                        if (r.fMain || (r.fAnx && r.fAnx.length) || (r.fOut && r.fOut.length)) {
+                            let suffix = "";
+                            if(['REASIGNADO','CONOCIMIENTO PARA MI CORONEL','GENERADO DESDE DESPACHO'].includes(r.rObs)) suffix = " " + r.rObs;
+                            let docName = (r.rObs === 'GENERADO DESDE DESPACHO') ? safe(r.gNum) : safe(r.rNum);
+                            let folderName = `${ct}. ${docName}${suffix}`;
+                            
+                            let tg = fTram.folder(folderName);
+                            if(r.fMain) tg.file(`${docName} PRINCIPAL.${ext(r.fMain.name)}`, r.fMain);
+                            if(r.fAnx) r.fAnx.forEach((f,k)=>tg.file(`${docName} ANEXO ${k+1} ${f.name}`, f));
+                            if(r.fOut) r.fOut.forEach((f,k)=>tg.file(`${r.gNum?safe(r.gNum):'RESP'} RESPUESTA ${k+1} ${f.name}`, f));
+                        }
+                    }
+                });
+
+                const buf = await workbook.xlsx.writeBuffer();
+                root.file(`${nameRef}.xlsx`, buf); 
+                const cnt = await zip.generateAsync({type:"blob"}); 
+                saveAs(cnt, `${nameRef}.zip`); overlay(false);
+
+            } catch(e){ overlay(false); alert("Error ZIP: "+e); }
+        }
+
+        function fillSheet(workbook) {
+            let sheet = workbook.getWorksheet("CONTROL DE GESTIÓN") || workbook.getWorksheet(1);
+            
+            // LISTA DE OBS QUE PINTAN TODA LA FILA
+            const obsGray = ['REASIGNADO', 'GENERADO DESDE DESPACHO', 'CONOCIMIENTO PARA MI CORONEL'];
+
+            // VARIABLES PARA CONTROLAR LA ESCRITURA EN EXCEL (SIN COPIAS)
+            let excelRow = 7;
+            let order = 1;
+
+            registros.forEach((r) => {
+                
+                // SI ES COPIA, NO ESCRIBIMOS NADA EN EL EXCEL (PERO SI EN EL ZIP)
+                if(r.tipo === 'COPIA') return;
+
+                let row = sheet.getRow(excelRow);
+                row.getCell(1).value = order; // Columna A Correlativa
+
+                let obs = r.rObs==='NINGUNA'?"":r.rObs;
+                let fd=fmtD(r.rFd), fr=fmtD(r.rFr), fe=fmtD(r.gFem), fs=fmtD(r.sFs), frs=fmtD(r.sFr);
+
+                if(r.rObs === 'GENERADO DESDE DESPACHO') { row.getCell(11).value=r.rRec; row.getCell(12).value=obs; }
+                else {
+                    row.getCell(3).value=fd; row.getCell(4).value=r.rRem; row.getCell(5).value=r.rCar; row.getCell(6).value=r.rUni;
+                    row.getCell(7).value=r.rNum; row.getCell(8).value=fr; row.getCell(9).value=r.rAsu; row.getCell(10).value=r.rDes;
+                    row.getCell(11).value=r.rRec; row.getCell(12).value=obs;
+                }
+                
+                if(r.rObs !== 'CONOCIMIENTO PARA MI CORONEL') {
+                    row.getCell(13).value=r.gDes; row.getCell(14).value=r.gTip; row.getCell(15).value=r.gRec; row.getCell(16).value=r.gNum;
+                    row.getCell(17).value=fe; row.getCell(19).value=r.gEst; row.getCell(20).value=r.sExt; row.getCell(21).value=r.sDes;
+                    row.getCell(22).value=r.sNum; row.getCell(23).value=fs; row.getCell(24).value=frs;
+                } else { row.getCell(19).value="FINALIZADO"; }
+                
+                // PINTADO CONDICIONAL DE LA FILA
+                if(obsGray.includes(r.rObs)) {
+                        row.eachCell(c => c.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFCFD8DC'}});
+                } else {
+                        // SOLO SEMÁFORO
+                        let color = r.gEst === 'PENDIENTE' ? 'FFEF9A9A' : 'FFA5D6A7';
+                        row.getCell(19).fill={type:'pattern',pattern:'solid',fgColor:{argb: color}};
+                }
+                
+                row.commit();
+                
+                // AVANZAMOS EL CONTADOR SOLO SI SE ESCRIBIÓ
+                excelRow++;
+                order++;
+            });
+        }
+
+        // --- LOGIC UI & STATUS ---
+        function logicObs(){ 
+            let o=getVal('rObs');
+            document.getElementById('sDes').readOnly=true; 
+            document.getElementById('rObsO').style.display='none'; 
+
+            if(o==='REASIGNADO' || o==='CONOCIMIENTO PARA MI CORONEL'){ 
+                document.getElementById('gEst').value = "FINALIZADO";
+                if(o==='REASIGNADO'){
+                    document.getElementById('gNum').disabled=true; document.getElementById('gNum').value=""; 
+                    document.getElementById('sNum').disabled=true; document.getElementById('sNum').value=""; 
+                } else {
+                     document.querySelectorAll('#sec3 input, #sec3 select, #sec4 input, #sec4 select').forEach(e=>e.disabled=true);
+                }
+            } else if(o==='GENERADO DESDE DESPACHO'){ 
+                syncRespuesta();
+            } else if(o==='OTRO'){ 
+                document.getElementById('rObsO').style.display='block'; 
+                syncRespuesta();
+            } else {
+                syncRespuesta();
+            }
+        }
+
+        function syncRespuesta() { 
+            let o = getVal('rObs');
+            if(o === 'REASIGNADO' || o === 'CONOCIMIENTO PARA MI CORONEL') return;
+            let inp = document.getElementById('gNum'); cleanPNSync(inp); let val = inp.value.trim(); 
+            document.getElementById('sNum').value = val; 
+            document.getElementById('gEst').value = val.length > 0 ? "FINALIZADO" : "PENDIENTE";
+        }
+
+        // --- BACKUP ---
+        async function guardarRespaldo() {
+            if(registros.length===0) return alert("Vacio"); overlay(true,"Guardando...");
+            const zip = new JSZip();
+            let meta = registros.map(r=>{ 
+                let c={...r}; 
+                c.nMain = r.fMain ? r.fMain.name : null;
+                c.nAnx = r.fAnx ? r.fAnx.map(f=>f.name) : [];
+                c.nOut = r.fOut ? r.fOut.map(f=>f.name) : [];
+                c.nCopy = r.fCopy ? r.fCopy.map(f=>f.name) : [];
+                delete c.fMain; delete c.fAnx; delete c.fOut; delete c.fCopy;
+                return c; 
+            });
+            zip.file("data.json", JSON.stringify(meta));
+            let ast = zip.folder("assets");
+            registros.forEach((r,i)=>{ 
+                if(r.fMain) ast.file(`${i}_main`, r.fMain);
+                if(r.fAnx) r.fAnx.forEach((f,k)=>ast.file(`${i}_anx_${k}`,f));
+                if(r.fOut) r.fOut.forEach((f,k)=>ast.file(`${i}_out_${k}`, f));
+                if(r.fCopy) r.fCopy.forEach((f,k)=>ast.file(`${i}_copy_${k}`, f));
+            });
+            let blob = await zip.generateAsync({type:"blob"});
+            saveAs(blob, `RESPALDO ${getNaming()}.dinic`); overlay(false);
+        }
+
+        async function restaurarRespaldo(inp) {
+            if(!inp.files[0]) return; overlay(true,"Cargando...");
+            try {
+                let zip = await JSZip.loadAsync(inp.files[0]);
+                let meta = JSON.parse(await zip.file("data.json").async("string"));
+                registros = [];
+                for(let i=0; i<meta.length; i++){
+                    let r = meta[i]; 
+                    r.fMain = null; r.fAnx = []; r.fOut = []; r.fCopy = [];
+                    if(r.nMain) { let b=await zip.file(`assets/${i}_main`).async("blob"); r.fMain=new File([b], r.nMain); }
+                    if(r.nAnx) for(let k=0; k<r.nAnx.length; k++) { let b=await zip.file(`assets/${i}_anx_${k}`).async("blob"); r.fAnx.push(new File([b], r.nAnx[k])); }
+                    if(r.nOut) for(let k=0; k<r.nOut.length; k++) { let b=await zip.file(`assets/${i}_out_${k}`).async("blob"); r.fOut.push(new File([b], r.nOut[k])); }
+                    if(r.nCopy) for(let k=0; k<r.nCopy.length; k++) { let b=await zip.file(`assets/${i}_copy_${k}`).async("blob"); r.fCopy.push(new File([b], r.nCopy[k])); }
+                    registros.push(r);
+                }
+                renderTable(); overlay(false); alert("✅ Restaurado");
+            } catch(e){ overlay(false); alert("Error restauración: " + e); console.log(e); } inp.value="";
+        }
+
+        // --- UTILS ---
+        function triggerUpload(){ document.getElementById('inPlantilla').click(); }
+        function guardarPlantillaDB(inp){ if(!inp.files[0])return; overlay(true); let r=new FileReader(); r.onload=e=>{ let b=new Blob([e.target.result],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}); let t=db.transaction(['files'],'readwrite'); t.objectStore('files').put(b,'plantilla'); t.oncomplete=()=>{overlay(false); checkPlantilla(); alert("Plantilla Guardada");}; }; r.readAsArrayBuffer(inp.files[0]); }
+        function checkPlantilla(){ if(!db)return; db.transaction(['files'],'readonly').objectStore('files').get('plantilla').onsuccess=e=>{ document.getElementById('led').className=e.target.result?"led on":"led"; document.getElementById('ledTxt').innerText=e.target.result?"Plantilla Lista":"Falta Plantilla"; }; }
+        function nuevoTurno(){ if(confirm("¿Nuevo turno? Se limpia la lista.")){ registros=[]; renderTable(); resetForm(); } }
+        function borrarTodo(){ if(confirm("¿Seguro? Borrará todo.")){ localStorage.clear(); location.reload(); } }
+        
+        function resetForm(){ 
+            editIdx=-1; 
+            activeMode='TRAMITE';
+            poolFiles={main:null,anx:[],out:[],copy:[]}; 
+            document.getElementById('btnMain').innerText="➕ AGREGAR TRÁMITE A LA LISTA"; 
+            document.getElementById('btnMain').className="btn-main btn-add"; 
+            document.querySelectorAll('input:not([type=file]), textarea').forEach(i=>i.value=""); 
+            setToday(); 
+            applyModeUI(); 
+            document.querySelectorAll('.file-list-box').forEach(d=>d.innerHTML="");
+            document.querySelectorAll('.ac-box').forEach(s=>s.style.display='none'); 
+        }
+
+        function getNaming(){ let p=registros.find(r=>r.tipo==='TRAMITE'); return p?`TURNO ${p.rFd} ${p.rRec}`:"TURNO DINIC"; }
+        function getVal(id){ return document.getElementById(id).value; }
+        function setVal(id,v){ document.getElementById(id).value=v; }
+        function cleanPNSync(input) { let val = input.value; if(val.toUpperCase().includes("PN-")) { let match = val.match(/PN-.*/i); if(match) input.value = match[0].toUpperCase(); } }
+        function syncDestino() { document.getElementById('sDes').value = document.getElementById('gDes').value; }
+        function logicTip(){ document.getElementById('gTipO').style.display=getVal('gTip')==='OTRO'?'block':'none'; }
+        function setToday(){ const d=new Date().toISOString().split('T')[0]; ['rFd','rFr','gFem','sFs','sFr'].forEach(id=>document.getElementById(id).value=d); }
+        function fmtD(i){ if(!i)return""; const[y,m,d]=i.split('-'); return `${d}/${m}/${y}`; }
+        function safe(s){ return s?s.replace(/[\/\\]/g,'-'):'SN'; }
+        function ext(n){ return n.split('.').pop(); }
+        function overlay(s,t){ document.getElementById('loader').style.display=s?'block':'none'; if(t)document.getElementById('loadText').innerText=t; }
+        
+        // --- MEMORY ---
+        function saveMemories(d) { saveS('mem_remitente', d.rRem); saveS('mem_cargo', d.rCar); saveS('mem_u_origen', d.rUni); saveS('mem_rec_turno', d.rRec); saveM('mem_u_destinos', d.gDes); saveM('mem_rec_respuestas', d.gRec); }
+        function saveS(k, v) { if(!v) return; let l = safeParse(localStorage.getItem(MEM_KEYS[k.replace('mem_','')])); if(!l.includes(v)){ l.push(v); localStorage.setItem(MEM_KEYS[k.replace('mem_','')], JSON.stringify(l)); loadMemories(); } }
+        function saveM(k, v) { if(!v) return; let p = v.split(',').map(s=>s.trim()).filter(s=>s); let l = safeParse(localStorage.getItem(MEM_KEYS[k.replace('mem_','')])); p.forEach(x=>{ if(!l.includes(x)) l.push(x); }); localStorage.setItem(MEM_KEYS[k.replace('mem_','')], JSON.stringify(l)); }
+        function loadMemories() { ['mem_remitente','mem_cargo','mem_u_origen','mem_rec_turno'].forEach(id=>{ let l = safeParse(localStorage.getItem(MEM_KEYS[id.replace('mem_','')])); let el = document.getElementById(id==='mem_remitente'?'l_rem': id==='mem_cargo'?'l_car': id==='mem_u_origen'?'l_uor': 'l_tur'); if(el) el.innerHTML = l.map(x=>`<option value="${x}">`).join(''); }); }
+        function setupAuto(id, memKey) { const inp = document.getElementById(id); const box = document.getElementById('ac_' + id); const key = MEM_KEYS[memKey.replace('mem_','')]; function showSuggestions() { let val = inp.value, parts = val.split(','), term = parts[parts.length - 1].trim().toLowerCase(); let list = safeParse(localStorage.getItem(key)); let matches = term === '' ? list : list.filter(item => item.toLowerCase().includes(term)); if (matches.length > 0) { box.innerHTML = matches.map(item => `<div class="ac-item">${item}</div>`).join(''); box.style.display = 'block'; box.querySelectorAll('.ac-item').forEach(div => { div.onclick = function() { parts[parts.length - 1] = " " + this.innerText; inp.value = parts.join(',') + ", "; box.style.display = 'none'; inp.focus(); inp.dispatchEvent(new Event('input')); }; }); } else box.style.display = 'none'; } inp.addEventListener('input', showSuggestions); inp.addEventListener('focus', showSuggestions); document.addEventListener('click', function(e) { if (e.target !== inp && e.target !== box && !box.contains(e.target)) box.style.display = 'none'; }); }
+        function safeParse(str) { try { return JSON.parse(str) || []; } catch(e) { return []; } }
+    </script>
+</body>
+</html>
+"""
+
+# ==============================================================================
+# 3. FUNCIONES AUXILIARES DE PYTHON (Gestión de Usuarios)
+# ==============================================================================
 def get_hora_ecuador(): 
     return datetime.now(timezone(timedelta(hours=-5)))
 
-def preservar_bordes(cell, fill_obj):
-    if cell.border and (cell.border.left.style or cell.border.top.style): new_border = copy(cell.border)
-    else:
-        thin = Side(border_style="thin", color="000000")
-        new_border = Border(top=thin, left=thin, right=thin, bottom=thin)
-    cell.border = new_border; cell.fill = fill_obj
-    cell.alignment = Alignment(horizontal='center', vertical='center', wrap_text=False)
-
-def extract_json_safe(text):
-    """Extrae JSON incluso si la IA devuelve texto adicional"""
-    try: return json.loads(text)
-    except:
-        match = re.search(r"(\{.*\}|\[.*\])", text, re.DOTALL)
-        if match:
-            try: 
-                data = json.loads(match.group(1))
-                if isinstance(data, list) and len(data) > 0: return data[0]
-                elif isinstance(data, dict): return data
-            except: return {}
-        return {}
-
-def limpiar_codigo_prioridad(texto):
-    """Regla G7: PN-DIGIN-QX... sin 'Oficio Nro'"""
-    if not texto: return ""
-    match = re.search(r"(PN-[\w\-\.]+)", str(texto).upper())
-    if match: return match.group(1).strip()
-    return str(texto).strip()
-
-def extraer_unidad_f7(texto_codigo):
-    """Regla F7: Lo que está entre PN- y -QX"""
-    if not texto_codigo: return "DINIC"
-    match = re.search(r"PN-[\(]?([A-Z0-9]+)[\)]?-QX", str(texto_codigo).upper())
-    if match: return match.group(1).strip()
-    return "DINIC"
-
-def determinar_sale_no_sale(destinos_str):
-    unidades_externas = ["UCAP", "UNDECOF", "UDAR", "DIGIN", "DNATH", "COMANDO GENERAL", "OTRAS DIRECCIONES"]
-    destinos_upper = destinos_str.upper()
-    for u in unidades_externas:
-        if u in destinos_upper: return "SI"
-    return "NO"
-
-def get_img_as_base64(file_path):
-    try:
-        with open(file_path, "rb") as f: return base64.b64encode(f.read()).decode()
-    except: return ""
-
 def get_logo_html(width="120px"):
-    img_path = "Captura.JPG"
-    b64 = get_img_as_base64(img_path)
-    if b64: return f'<img src="data:image/jpeg;base64,{b64}" style="width:{width}; margin-bottom:15px;">'
     return f'<img src="https://upload.wikimedia.org/wikipedia/commons/2/25/Escudo_Policia_Nacional_del_Ecuador.png" style="width:{width}; margin-bottom:15px;">'
 
-def frases_curiosas():
-    return random.choice(["Analizando...", "Extrayendo datos...", "Verificando códigos...", "Conectando con IA..."])
-
-def generar_html_contrato(datos_usuario, img_b64):
-    fecha_hora = get_hora_ecuador().strftime("%Y-%m-%d %H:%M:%S")
-    return f"""<div style='font-family:Arial; padding:20px; border:1px solid black;'><h2>ACTA</h2><p>Usuario: {datos_usuario.get('grado')} {datos_usuario.get('nombre')}</p><p>Fecha: {fecha_hora}</p><img src='data:image/png;base64,{img_b64}' width='150'></div>"""
-
-def get_generador_policial_html():
-    return """<!DOCTYPE html><html><body><h3>Generador Policial</h3><button>Descargar PDF</button></body></html>"""
-
-# --- 4. GESTIÓN DE MODELOS (AUTO-ESCANEO PARA ARREGLAR 404) ---
-def obtener_modelo_disponible():
-    """Pregunta a Google qué modelos hay y devuelve el mejor disponible"""
-    try:
-        listado = genai.list_models()
-        modelos_validos = []
-        for m in listado:
-            if 'generateContent' in m.supported_generation_methods:
-                modelos_validos.append(m.name)
-        
-        # Prioridad: Flash -> Pro 1.5 -> Pro 1.0 -> Cualquiera
-        if not modelos_validos: return "models/gemini-1.5-flash" # Fallback por si acaso
-        
-        # Buscar Flash
-        flash = next((m for m in modelos_validos if "flash" in m), None)
-        if flash: return flash
-        
-        # Buscar 1.5 Pro
-        pro15 = next((m for m in modelos_validos if "1.5-pro" in m), None)
-        if pro15: return pro15
-        
-        # Devolver el primero que encuentre
-        return modelos_validos[0]
-    except:
-        return "models/gemini-1.5-flash" # Fallback si falla el listado
-
-def invocar_ia_segura(content):
-    if 'genai_model' not in st.session_state:
-        raise Exception("IA no inicializada")
-    
-    max_retries = 3
-    for i in range(max_retries):
-        try:
-            return st.session_state.genai_model.generate_content(content)
-        except Exception as e:
-            if "429" in str(e): # Saturación
-                time.sleep(2)
-                continue
-            # Si es otro error, reintentar una vez más tras pausa
-            time.sleep(1)
-            
-    # Último intento
-    return st.session_state.genai_model.generate_content(content)
-
-# --- 5. LOGICA MATRIZ (ESTRICTA) ---
-def generar_fila_matriz(tipo, ia_data, manual_data, usuario_turno, paths_files):
-    # Extracción
-    raw_code_in = ia_data.get("recibido_codigo", "")
-    cod_in = limpiar_codigo_prioridad(raw_code_in)
-    unidad_f7 = extraer_unidad_f7(raw_code_in)
-    
-    fecha_in = ia_data.get("recibido_fecha", "")
-    remitente_nom = ia_data.get("recibido_remitente_nombre", "")
-    remitente_car = ia_data.get("recibido_remitente_cargo", "")
-    asunto_in = ia_data.get("recibido_asunto", "")
-    resumen_in = ia_data.get("recibido_resumen", "")
-    
-    dest_out = ia_data.get("respuesta_destinatarios", "")
-    raw_code_out = ia_data.get("respuesta_codigo", "")
-    cod_out = limpiar_codigo_prioridad(raw_code_out)
-    fecha_out = ia_data.get("respuesta_fecha", "")
-
-    # Estados
-    estado_s7 = "PENDIENTE"
-    has_in = True if (paths_files.get("in") or manual_data.get("G")) else False
-    has_out = True if (paths_files.get("out") or manual_data.get("P")) else False
-    
-    if tipo in ["CONOCIMIENTO", "REASIGNADO", "GENERADO DESDE DESPACHO"]: estado_s7 = "FINALIZADO"
-    elif has_in and has_out: estado_s7 = "FINALIZADO"
-
-    str_unidades = manual_data.get("unidades_str", "")
-    es_interno = determinar_sale_no_sale(str_unidades)
-    if tipo == "CONOCIMIENTO": es_interno = "NO"
-
-    # Estructura Base
-    row = {
-        "C": fecha_in, "D": remitente_nom, "E": remitente_car, "F": unidad_f7,
-        "G": cod_in, "H": fecha_in, "I": asunto_in, "J": resumen_in, "K": usuario_turno,
-        "L": "", "M": str_unidades, "N": manual_data.get("tipo_doc_salida", ""),
-        "O": "", "P": "", "Q": "", "R": "", "S": estado_s7,
-        "T": es_interno, "U": str_unidades, "V": "", "W": "", "X": "", "Y": "", "Z": ""
-    }
-
-    if tipo == "TRAMITE NORMAL":
-        row["L"] = ""
-        row["O"] = dest_out; row["P"] = cod_out; row["Q"] = fecha_out
-        row["V"] = cod_out; row["W"] = fecha_out; row["X"] = fecha_out
-
-    elif tipo == "REASIGNADO":
-        row["L"] = "REASIGNADO"
-        row["O"] = manual_data.get("reasignado_a", "")
-        row["P"] = ""; row["V"] = ""
-        row["Q"] = fecha_in; row["W"] = fecha_in; row["X"] = fecha_in
-
-    elif tipo == "GENERADO DESDE DESPACHO":
-        row["L"] = "GENERADO DESDE DESPACHO"
-        row["D"] = ""; row["E"] = ""
-        row["C"] = fecha_out; row["H"] = fecha_out; row["Q"] = fecha_out; row["W"] = fecha_out; row["X"] = fecha_out
-        row["G"] = cod_out; row["P"] = cod_out; row["V"] = cod_out
-        row["F"] = extraer_unidad_f7(cod_out)
-        row["O"] = dest_out
-
-    elif tipo == "CONOCIMIENTO":
-        row["L"] = "CONOCIMIENTO"
-        row["M"] = ""; row["O"] = ""; row["P"] = ""; row["U"] = ""; row["V"] = ""
-        row["T"] = "NO"
-        row["Q"] = fecha_in; row["W"] = fecha_in; row["X"] = fecha_in
-
-    if row["S"] == "PENDIENTE":
-        for k in ["O", "P", "Q", "V", "W", "X"]: row[k] = ""
-
-    return row
-
-# --- 6. CARGA DE DATOS ---
+# Simulación de Base de Datos de Usuarios
 USUARIOS_BASE = {
     "0702870460": {"grado": "SGOS", "nombre": "VILLALTA OCHOA XAVIER BISMARK", "activo": True},
     "1715081731": {"grado": "SGOS", "nombre": "MINDA MINDA FRANCISCO GABRIEL", "activo": True},
     "1723623011": {"grado": "CBOS", "nombre": "CARRILLO NARVAEZ JOHN STALIN", "activo": True}
 }
-UNIDADES_DEFAULT = ["DINIC", "SOPORTE OPERATIVO", "APOYO OPERATIVO", "PLANIFICACION", "JURIDICO", "COMUNICACION", "UCAP", "UNDECOF", "UDAR", "DIGIN", "DNATH"]
+DB_FILE = "usuarios_db.json"
 
-DB_FILE = "usuarios_db.json"; CONFIG_FILE = "config_sistema.json"; CONTRATOS_FILE = "contratos_legal.json"; LOGS_FILE = "historial_acciones.json"; LISTAS_FILE = "listas_db.json"
-
-def cargar_json(filepath, default):
-    if os.path.exists(filepath):
+def cargar_usuarios():
+    if os.path.exists(DB_FILE):
         try:
-            with open(filepath, 'r') as f: return json.load(f)
-        except: return default
-    return default
-def guardar_json(filepath, data):
-    try:
-        with open(filepath, 'w') as f: json.dump(data, f)
-    except: pass
+            with open(DB_FILE, 'r') as f: return json.load(f)
+        except: return USUARIOS_BASE
+    return USUARIOS_BASE
 
-db_usuarios = cargar_json(DB_FILE, USUARIOS_BASE)
-for k,v in USUARIOS_BASE.items(): 
-    if k not in db_usuarios: db_usuarios[k] = v
-db_contratos = cargar_json(CONTRATOS_FILE, {})
-db_logs = cargar_json(LOGS_FILE, [])
-if not isinstance(db_logs, list): db_logs = []
-db_listas = cargar_json(LISTAS_FILE, {"unidades": UNIDADES_DEFAULT, "reasignados": []})
-config_sistema = cargar_json(CONFIG_FILE, {"pass_universal": "DINIC2026", "pass_th": "THDINIC123", "base_historica": 1258, "consultas_ia_global": 0})
-
-def registrar_accion(usuario, accion, detalle=""):
-    ahora = get_hora_ecuador().strftime("%Y-%m-%d %H:%M:%S")
-    db_logs.insert(0, {"fecha": ahora, "usuario": usuario, "accion": accion, "detalle": detalle})
-    guardar_json(LOGS_FILE, db_logs)
-
-def guardar_nueva_entrada_lista(tipo, valor):
-    if valor and valor not in db_listas[tipo]:
-        db_listas[tipo].append(valor); guardar_json(LISTAS_FILE, db_listas)
-        if tipo == "unidades": st.session_state.lista_unidades = db_listas["unidades"]
-        if tipo == "reasignados": st.session_state.lista_reasignados = db_listas["reasignados"]
-
-def actualizar_presencia(cedula_usuario):
-    if cedula_usuario in db_usuarios:
-        db_usuarios[cedula_usuario]['ultima_actividad'] = get_hora_ecuador().strftime("%Y-%m-%d %H:%M:%S")
-        guardar_json(DB_FILE, db_usuarios)
-
-def get_estado_usuario(cedula):
-    user_data = db_usuarios.get(cedula, {})
-    last_seen_str = user_data.get('ultima_actividad')
-    if not last_seen_str: return "🔴 DESCONECTADO"
-    try:
-        last_seen = datetime.strptime(last_seen_str, "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone(timedelta(hours=-5)))
-        diferencia = (get_hora_ecuador() - last_seen).total_seconds() / 60
-        if diferencia < 5: return "🟢 EN LÍNEA"
-        else: return "🔴 DESCONECTADO"
-    except: return "🔴 ERROR"
-
-# --- 7. VARIABLES DE SESIÓN ---
-if 'logged_in' not in st.session_state: st.session_state.logged_in = False
-if 'user_role' not in st.session_state: st.session_state.user_role = "" 
-if 'usuario_turno' not in st.session_state: st.session_state.usuario_turno = "" 
-if 'user_id' not in st.session_state: st.session_state.user_id = ""
-if 'registros' not in st.session_state: st.session_state.registros = [] 
-if 'edit_index' not in st.session_state: st.session_state.edit_index = None 
-if 'docs_procesados_hoy' not in st.session_state: st.session_state.docs_procesados_hoy = 0
-if 'consultas_ia' not in st.session_state: st.session_state.consultas_ia = 0
-if 'active_module' not in st.session_state: st.session_state.active_module = 'secretario'
-if 'lista_unidades' not in st.session_state: st.session_state.lista_unidades = db_listas.get("unidades", UNIDADES_DEFAULT)
-if 'lista_reasignados' not in st.session_state: st.session_state.lista_reasignados = db_listas.get("reasignados", [])
-if 'active_model_name' not in st.session_state: st.session_state.active_model_name = "Detectando..."
-
-# Persistencia F5
-token = st.query_params.get("token", None)
-if token and not st.session_state.logged_in and token in db_usuarios:
-    st.session_state.logged_in = True; st.session_state.user_id = token; st.session_state.user_role = "admin" if token == ADMIN_USER else "user"
-    st.session_state.usuario_turno = f"{db_usuarios[token]['grado']} {db_usuarios[token]['nombre']}"
-
-# --- AUTO-SCAN DE IA (CORAZÓN DE LA SOLUCIÓN) ---
-sistema_activo = False
-try:
-    api_key = st.secrets.get("GEMINI_API_KEY")
-    if api_key:
-        genai.configure(api_key=api_key)
-        # Escanear modelos disponibles y elegir el mejor automáticamente
-        if 'genai_model' not in st.session_state:
-            modelo_elegido = obtener_modelo_disponible()
-            st.session_state.genai_model = genai.GenerativeModel(modelo_elegido)
-            st.session_state.active_model_name = modelo_elegido
-        sistema_activo = True
-except: sistema_activo = False
+db_usuarios = cargar_usuarios()
 
 # ==============================================================================
-#  INTERFAZ GRÁFICA PRINCIPAL
+# 4. GESTIÓN DE SESIÓN
+# ==============================================================================
+if 'logged_in' not in st.session_state: st.session_state.logged_in = False
+if 'user_role' not in st.session_state: st.session_state.user_role = ""
+if 'usuario_turno' not in st.session_state: st.session_state.usuario_turno = ""
+if 'active_module' not in st.session_state: st.session_state.active_module = 'secretario'
+
+# ==============================================================================
+# 5. INTERFAZ PRINCIPAL
 # ==============================================================================
 
 if not st.session_state.logged_in:
+    # --- PANTALLA DE LOGIN ---
     c1, c2, c3 = st.columns([1,2,1])
     with c2:
         st.markdown("<br><br>", unsafe_allow_html=True)
@@ -323,291 +796,83 @@ if not st.session_state.logged_in:
         with st.form("login_form"):
             usuario_input = st.text_input("Usuario (Cédula):").strip()
             pass_input = st.text_input("Contraseña:", type="password").strip()
+            
             if st.form_submit_button("INGRESAR AL SISTEMA", type="primary"):
+                # Lógica Admin
                 if usuario_input == ADMIN_USER and pass_input == ADMIN_PASS_MASTER:
-                    st.session_state.logged_in = True; st.session_state.user_role = "admin"; st.session_state.user_id = usuario_input
-                    admin_data = db_usuarios.get(ADMIN_USER, {"grado": "CBOS.", "nombre": "CARRILLO NARVAEZ JOHN STALIN"})
-                    st.session_state.usuario_turno = f"{admin_data['grado']} {admin_data['nombre']}"
-                    registrar_accion(st.session_state.usuario_turno, "INICIO SESIÓN ADMIN")
-                    actualizar_presencia(usuario_input); st.query_params["token"] = usuario_input; st.rerun()
+                    st.session_state.logged_in = True
+                    st.session_state.user_role = "admin"
+                    st.session_state.usuario_turno = "ADMINISTRADOR PRINCIPAL"
+                    st.rerun()
+                # Lógica Usuario Normal
                 elif usuario_input in db_usuarios:
                     user_data = db_usuarios[usuario_input]
-                    if pass_input == config_sistema["pass_universal"]:
-                        if user_data["activo"]:
-                            st.session_state.logged_in = True; st.session_state.user_role = "user"; st.session_state.user_id = usuario_input
-                            st.session_state.usuario_turno = f"{user_data['grado']} {user_data['nombre']}"
-                            registrar_accion(st.session_state.usuario_turno, "INICIO SESIÓN USUARIO")
-                            actualizar_presencia(usuario_input); st.query_params["token"] = usuario_input; st.rerun()
-                        else: st.error("🚫 Usuario inactivo.")
-                    else: st.error("🚫 Contraseña incorrecta.")
-                else: st.error("🚫 Usuario no autorizado.")
+                    # Contraseña genérica para usuarios (ajustar según necesidad)
+                    if pass_input == "DINIC2026": 
+                        st.session_state.logged_in = True
+                        st.session_state.user_role = "user"
+                        st.session_state.usuario_turno = f"{user_data['grado']} {user_data['nombre']}"
+                        st.rerun()
+                    else:
+                        st.error("🚫 Contraseña incorrecta.")
+                else:
+                    st.error("🚫 Usuario no autorizado.")
 
 else:
-    actualizar_presencia(st.session_state.user_id)
+    # --- SISTEMA AUTENTICADO ---
     with st.sidebar:
-        if os.path.exists("Captura.JPG"): st.image("Captura.JPG", use_container_width=True)
-        else: st.image("https://upload.wikimedia.org/wikipedia/commons/2/25/Escudo_Policia_Nacional_del_Ecuador.png", width=100)
+        st.image("https://upload.wikimedia.org/wikipedia/commons/2/25/Escudo_Policia_Nacional_del_Ecuador.png", width=100)
         st.markdown("### 👮‍♂️ CONTROL DE MANDO")
-        if st.session_state.user_role == "admin": st.markdown("""<div class="admin-badge">🛡️ MODO ADMINISTRADOR<br><span style="font-size: 0.8em; font-weight: normal;">CONTROL TOTAL</span></div>""", unsafe_allow_html=True)
-        st.info(f"👤 **{st.session_state.usuario_turno}**")
-        st.caption(f"🤖 IA: {st.session_state.active_model_name}") 
-        fecha_turno = st.date_input("Fecha Operación:", value=get_hora_ecuador().date())
-        st.markdown("---"); st.markdown("### 📂 MÓDULOS")
-        if st.button("📝 SECRETARIO/A", use_container_width=True, type="primary" if st.session_state.active_module == 'secretario' else "secondary"): st.session_state.active_module = 'secretario'; st.rerun()
-        if st.button("🧠 ASESOR INTELIGENTE", use_container_width=True, type="primary" if st.session_state.active_module == 'asesor' else "secondary"): st.session_state.active_module = 'asesor'; st.rerun()
-        if st.button("👤 TALENTO HUMANO", use_container_width=True, type="primary" if st.session_state.active_module == 'th' else "secondary"): st.session_state.active_module = 'th'; st.rerun()
-        if st.button("🛡️ ADMINISTRADOR", use_container_width=True, type="primary" if st.session_state.active_module == 'admin' else "secondary"): st.session_state.active_module = 'admin'; st.rerun()
+        
+        if st.session_state.user_role == "admin":
+            st.info("🛡️ MODO ADMIN ACTIVADO")
+            
+        st.write(f"👤 **{st.session_state.usuario_turno}**")
+        st.caption(f"📅 Fecha: {get_hora_ecuador().strftime('%Y-%m-%d')}")
+        
+        st.markdown("---")
+        st.markdown("### 📂 MÓDULOS")
+        
+        if st.button("📝 SECRETARIO/A", use_container_width=True, type="primary" if st.session_state.active_module == 'secretario' else "secondary"): 
+            st.session_state.active_module = 'secretario'; st.rerun()
+            
+        if st.button("🧠 ASESOR INTELIGENTE", use_container_width=True, type="primary" if st.session_state.active_module == 'asesor' else "secondary"): 
+            st.session_state.active_module = 'asesor'; st.rerun()
+            
+        if st.button("👤 TALENTO HUMANO", use_container_width=True, type="primary" if st.session_state.active_module == 'th' else "secondary"): 
+            st.session_state.active_module = 'th'; st.rerun()
+            
+        if st.session_state.user_role == "admin":
+            if st.button("🛡️ ADMINISTRADOR", use_container_width=True, type="primary" if st.session_state.active_module == 'admin' else "secondary"): 
+                st.session_state.active_module = 'admin'; st.rerun()
+        
         st.markdown("---")
         if st.button("🔒 CERRAR SESIÓN"): 
-            st.session_state.logged_in = False; st.query_params.clear(); st.rerun()
+            st.session_state.logged_in = False
+            st.rerun()
 
-    # --- MÓDULO SECRETARIO ---
+    # --- LÓGICA DE MÓDULOS ---
+
+    # 1. MÓDULO SECRETARIO (MOTOR V44 INCRUSTADO)
     if st.session_state.active_module == 'secretario':
-        st.markdown(f'''<div class="main-header"><h1>SIGD DINIC</h1><h3>Módulo Secretario/a - Gestión Documental</h3></div>''', unsafe_allow_html=True)
-        
-        base_h = config_sistema.get("base_historica", 1258)
-        total_d = base_h + len(st.session_state.registros)
-        total_ia = config_sistema.get("consultas_ia_global", 0) + st.session_state.consultas_ia
-        c1, c2, c3 = st.columns(3)
-        c1.markdown(f"<div class='metric-card'><h3>📥 {st.session_state.docs_procesados_hoy}</h3><p>Docs Turno Actual</p></div>", unsafe_allow_html=True)
-        c2.markdown(f"<div class='metric-card'><h3>📈 {total_d}</h3><p>Total Histórico</p></div>", unsafe_allow_html=True)
-        c3.markdown(f"<div class='metric-card'><h3>🧠 {total_ia}</h3><p>Consultas IA (Global)</p></div>", unsafe_allow_html=True)
-        
-        with st.expander("⚙️ CONFIGURACIÓN Y RESPALDO RÁPIDO"):
-            c_conf1, c_conf2 = st.columns(2)
-            with c_conf1:
-                safe_user = re.sub(r'[^a-zA-Z0-9]', '_', st.session_state.usuario_turno)
-                date_str = get_hora_ecuador().strftime("%Y-%m-%d")
-                bk_name = f"RESPALDO_TURNO_{safe_user}_{date_str}.json"
-                if st.session_state.registros: 
-                    st.download_button("⬇️ RESPALDAR TURNO", json.dumps(st.session_state.registros, default=str), bk_name, "application/json")
-                up_bk = st.file_uploader("⬆️ RESTAURAR TURNO", type=['json'])
-                if up_bk: 
-                    try: 
-                        st.session_state.registros = json.load(up_bk); st.session_state.docs_procesados_hoy = len(st.session_state.registros); st.success("¡Restaurado!"); time.sleep(1); st.rerun()
-                    except: st.error("Error archivo.")
-            with c_conf2:
-                if os.path.exists("matriz_maestra.xlsx"):
-                    st.success("✅ Matriz Cargada")
-                    if st.button("🔄 Cambiar Matriz"): os.remove("matriz_maestra.xlsx"); st.rerun()
-                else:
-                    up_m = st.file_uploader("Cargar Matriz .xlsx", type=['xlsx'])
-                    if up_m: 
-                        with open("matriz_maestra.xlsx", "wb") as f: f.write(up_m.getbuffer())
-                        st.rerun()
-        st.write("")
+        # Renderizamos el HTML/JS puro. 
+        # height=1200 asegura que se vea todo sin doble scroll molesto.
+        components.html(HTML_SECRETARIO_V44, height=1200, scrolling=True)
 
-        if sistema_activo:
-            is_edit = st.session_state.edit_index is not None
-            idx_edit = st.session_state.edit_index
-            reg_edit = st.session_state.registros[idx_edit] if is_edit else None
-            
-            if is_edit: st.warning(f"✏️ EDITANDO REGISTRO #{idx_edit + 1}"); 
-            else: st.info("🆕 NUEVO REGISTRO")
-            
-            col1, col2 = st.columns([1, 2])
-            with col1:
-                v_tipo = reg_edit['L'] if (is_edit and reg_edit['L']) else "TRAMITE NORMAL"
-                if not v_tipo: v_tipo = "TRAMITE NORMAL"
-                tipo_proc = st.selectbox("Tipo Gestión:", ["TRAMITE NORMAL", "REASIGNADO", "GENERADO DESDE DESPACHO", "CONOCIMIENTO"], index=["TRAMITE NORMAL", "REASIGNADO", "GENERADO DESDE DESPACHO", "CONOCIMIENTO"].index(v_tipo))
-                v_sal = reg_edit['N'] if (is_edit and reg_edit['N']) else "QUIPUX ELECTRONICO"
-                tipo_doc = st.selectbox("Formato Salida:", ["QUIPUX ELECTRONICO", "DOCPOL ELECTRONICO", "FISICO", "DIGITAL", "OTRO"], index=["QUIPUX ELECTRONICO", "DOCPOL ELECTRONICO", "FISICO", "DIGITAL", "OTRO"].index(v_sal) if v_sal else 0)
-                
-                st.markdown("---"); st.caption("🏢 DEPENDENCIA/as DE DESTINO")
-                opts_u = sorted(st.session_state.lista_unidades)
-                def_u = [u for u in (reg_edit['M'].split(", ") if is_edit and reg_edit['M'] else []) if u in opts_u]
-                u_sel = st.multiselect("Seleccione:", opts_u, default=def_u)
-                chk_no = st.checkbox("NINGUNA")
-                chk_ot = st.checkbox("✍️ OTRA")
-                in_ot = st.text_input("Nueva:") if chk_ot else ""
-                list_u = u_sel.copy()
-                if in_ot: list_u.append(in_ot.upper())
-                str_u = ", ".join(list_u) if not chk_no else ""
-                
-                dest_reasig = ""
-                if tipo_proc == "REASIGNADO":
-                    st.markdown("---"); st.markdown("👤 **DESTINATARIO REASIGNADO**")
-                    opts_r = ["SELECCIONAR..."] + sorted(st.session_state.lista_reasignados) + ["✍️ NUEVO"]
-                    idx_r = opts_r.index(reg_edit["O"]) if (is_edit and reg_edit.get("O") in opts_r) else 0
-                    sel_r = st.selectbox("Historial:", opts_r, index=idx_r)
-                    in_r_man = st.text_input("Grado y Nombre:", value=reg_edit.get("O","") if is_edit else "")
-                    if sel_r == "✍️ NUEVO" or in_r_man: dest_reasig = in_r_man.upper()
-                    elif sel_r != "SELECCIONAR...": dest_reasig = sel_r
-
-            with col2:
-                d_in = None; d_out = None
-                if tipo_proc == "TRAMITE NORMAL":
-                    c_in, c_out = st.columns(2)
-                    d_in = c_in.file_uploader("1. Doc RECIBIDO (PDF)", ['pdf'])
-                    d_out = c_out.file_uploader("2. Doc RESPUESTA (PDF)", ['pdf'])
-                elif tipo_proc in ["REASIGNADO", "CONOCIMIENTO"]:
-                    d_in = st.file_uploader("1. Doc RECIBIDO (PDF)", ['pdf'])
-                elif tipo_proc == "GENERADO DESDE DESPACHO":
-                    d_out = st.file_uploader("2. Doc GENERADO (PDF)", ['pdf'])
-
-            if st.button("🔄 ACTUALIZAR" if is_edit else "➕ AGREGAR", type="primary"):
-                if not os.path.exists("matriz_maestra.xlsx"): st.error("❌ Falta Matriz.")
-                else:
-                    process = False
-                    if tipo_proc == "TRAMITE NORMAL": process = True if (is_edit or d_in or d_out) else False
-                    elif d_in or d_out: process = True
-                    
-                    if process:
-                        with st.spinner(f"⏳ PROCESANDO... {frases_curiosas()}"):
-                            try:
-                                paths = {"in":None, "out":None}
-                                if d_in:
-                                    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as t: t.write(d_in.getvalue()); paths["in"] = t.name
-                                if d_out:
-                                    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as t: t.write(d_out.getvalue()); paths["out"] = t.name
-                                
-                                files_ia = []
-                                if paths["in"]: files_ia.append(genai.upload_file(paths["in"], display_name="In"))
-                                if paths["out"]: files_ia.append(genai.upload_file(paths["out"], display_name="Out"))
-                                
-                                prompt = """
-                                Actúa como experto en gestión documental policial (DINIC). Analiza y extrae JSON ESTRICTO.
-                                
-                                1. CÓDIGO (CRÍTICO): Busca en la esquina superior DERECHA (encabezado). Formato "Oficio Nro. PN-..." o "Memorando...". Extrae TODO el código tal cual.
-                                
-                                2. DESTINATARIOS (Campo O7):
-                                   - UBICACIÓN CLAVE: Busca la sección "PARA:" en la parte SUPERIOR del documento.
-                                   - INSTRUCCIÓN: Extrae NOMBRES y GRADOS de esa sección.
-                                   - REGLA DE ORO: SI LA LINEA TIENE UN CARGO (Ej: "Jefe de...", "Director...", "Comandante..."), ¡IGNORA ESA LINEA!. SOLO QUIERO EL NOMBRE.
-                                   - ¡PROHIBIDO!: NO mires la parte inferior (firma/atentamente). NO extraigas Cargos.
-                                
-                                3. REMITENTE (Campo D7):
-                                   - Busca "DE:" en la cabecera O la firma al final. Extrae GRADO y NOMBRE (Ej: Sgos. Juan Perez).
-                                   - IMPORTANTE: SIEMPRE incluye el GRADO.
-
-                                JSON:
-                                {
-                                    "recibido_fecha": "DD/MM/AAAA",
-                                    "recibido_remitente_nombre": "Texto (Grado y Nombre)",
-                                    "recibido_remitente_cargo": "Texto",
-                                    "recibido_codigo": "Texto",
-                                    "recibido_asunto": "Texto",
-                                    "recibido_resumen": "Texto",
-                                    "respuesta_destinatarios": "Texto (Solo Nombres/Grados de la sección PARA, separados por coma, SIN CARGOS)",
-                                    "respuesta_codigo": "Texto",
-                                    "respuesta_fecha": "DD/MM/AAAA"
-                                }
-                                """
-                                data_ia = {}
-                                if files_ia:
-                                    res = invocar_ia_segura([prompt, *files_ia])
-                                    txt_clean = res.text.replace("```json", "").replace("```", "")
-                                    data_ia = extract_json_safe(txt_clean)
-                                    
-                                    if not data_ia: st.error("⚠️ La IA no devolvió datos válidos. Revisa el PDF.")
-                                
-                                final_d = reg_edit.copy() if is_edit else {}
-                                man_data = {"unidades_str": str_u, "tipo_doc_salida": tipo_doc, "reasignado_a": dest_reasig, "G": final_d.get("G",""), "P": final_d.get("P","")}
-                                row = generar_fila_matriz(tipo_proc, data_ia, man_data, st.session_state.usuario_turno, paths)
-                                
-                                if in_ot: guardar_nueva_entrada_lista("unidades", in_ot)
-                                if dest_reasig: guardar_nueva_entrada_lista("reasignados", dest_reasig)
-                                
-                                if is_edit: st.session_state.registros[idx_edit] = row; st.session_state.edit_index = None; st.success("✅ Actualizado"); registrar_accion(st.session_state.usuario_turno, f"EDITÓ {row['G']}")
-                                else: st.session_state.registros.append(row); st.session_state.docs_procesados_hoy += 1; st.success("✅ Agregado"); registrar_accion(st.session_state.usuario_turno, f"NUEVO {row['G']}")
-                                
-                                if paths["in"]: os.remove(paths["in"])
-                                if paths["out"]: os.remove(paths["out"])
-                                st.rerun()
-                            except Exception as e: st.error(f"Error Técnico: {e}")
-                    else: st.warning("⚠️ Sube documento.")
-
-            if st.session_state.registros:
-                st.markdown("#### 📋 Cola de Trabajo")
-                if len(st.session_state.registros)>0:
-                    inds = [f"#{i+1} | {r['G']} | {r['L']}" for i,r in enumerate(st.session_state.registros)]
-                    s_idx = st.selectbox("Ver:", range(len(st.session_state.registros)), format_func=lambda x: inds[x], index=len(st.session_state.registros)-1)
-                    st.dataframe(pd.DataFrame([st.session_state.registros[s_idx]]), hide_index=True)
-                
-                for i, r in enumerate(st.session_state.registros):
-                    bg = "#e8f5e9" if r["S"]=="FINALIZADO" else "#ffebee"
-                    with st.container():
-                        st.markdown(f"<div style='background:{bg}; padding:10px; border-left:5px solid {'green' if r['S']=='FINALIZADO' else 'red'}; margin-bottom:5px; border-radius:5px;'><b>#{i+1}</b> | <b>{r['G']}</b> | {r['L']}</div>", unsafe_allow_html=True)
-                        c_e, c_d = st.columns([1,1])
-                        if c_e.button("✏️", key=f"e{i}"): st.session_state.edit_index = i; st.rerun()
-                        if c_d.button("🗑️", key=f"d{i}"): st.session_state.registros.pop(i); st.session_state.docs_procesados_hoy = max(0, st.session_state.docs_procesados_hoy-1); st.rerun()
-                
-                if os.path.exists("matriz_maestra.xlsx"):
-                    try:
-                        wb = load_workbook("matriz_maestra.xlsx"); ws = wb[next((s for s in wb.sheetnames if "CONTROL" in s.upper()), wb.sheetnames[0])]
-                        start_row = 7
-                        while ws.cell(row=start_row, column=1).value is not None: start_row += 1
-                        gf = PatternFill(start_color="92D050", end_color="92D050", fill_type="solid")
-                        rf = PatternFill(start_color="FF0000", end_color="FF0000", fill_type="solid")
-                        for i, r in enumerate(st.session_state.registros):
-                            rw = start_row + i
-                            def w(c,v): ws.cell(row=rw, column=c).value = v
-                            w(1, i+1); w(2, ""); w(3, r["C"]); w(4, r["D"]); w(5, r["E"]); w(6, r["F"]); w(7, r["G"]); w(8, r["H"]); w(9, r["I"]); w(10, r["J"]); w(11, r["K"]); w(12, r["L"]); w(13, r["M"]); w(14, r["N"]); w(15, r["O"]); w(16, r["P"]); w(17, r["Q"]); w(18, "")
-                            cs = ws.cell(row=rw, column=19); cs.value = r["S"]
-                            if r["S"]=="FINALIZADO": preservar_bordes(cs, gf)
-                            else: preservar_bordes(cs, rf)
-                            w(20, r["T"]); w(21, r["U"]); w(22, r["V"]); w(23, r["W"]); w(24, r["X"]); w(25, ""); w(26, "")
-                            for c_idx in range(1, 27): 
-                                cell = ws.cell(row=rw, column=c_idx)
-                                if c_idx != 19: preservar_bordes(cell, PatternFill(fill_type=None))
-                        out = io.BytesIO(); wb.save(out); out.seek(0)
-                        fn = f"TURNO {fecha_turno.strftime('%d-%m-%y')} {st.session_state.usuario_turno.upper()}.xlsx"
-                        st.download_button("📥 DESCARGAR MATRIZ FINAL", out, fn, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", type="primary")
-                    except Exception as e: st.error(f"Error Excel: {e}")
-
-    # --- MÓDULO ASESOR ---
+    # 2. MÓDULO ASESOR (Placeholder para futura re-integración o lógica simple)
     elif st.session_state.active_module == 'asesor':
-        st.markdown("### 🧠 Asesor Inteligente")
-        if st.session_state.user_id not in db_contratos:
-            st.warning("⚠️ Acepte los términos.")
-            with st.expander("📜 TÉRMINOS Y CONDICIONES"):
-                if st.button("✅ ACEPTAR Y FIRMAR"):
-                    db_contratos[st.session_state.user_id] = {"fecha": get_hora_ecuador().strftime("%Y-%m-%d %H:%M:%S"), "foto": "", "usuario": st.session_state.usuario_turno}
-                    guardar_json(CONTRATOS_FILE, db_contratos); st.rerun()
-        else:
-            st.markdown("""<div class="legal-warning">⚠️ AVISO LEGAL: Uso referencial.</div>""", unsafe_allow_html=True)
-            if st.session_state.user_id in db_contratos:
-                st.download_button("📜 Descargar Contrato", generar_html_contrato(db_usuarios.get(st.session_state.user_id,{}),""), "Contrato.html", "text/html")
-            up_as = st.file_uploader("Sube PDF", ['pdf'])
-            if up_as and st.button("ANALIZAR"):
-                with st.spinner("Analizando..."):
-                    try:
-                        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as t: t.write(up_as.getvalue()); p = t.name
-                        f = genai.upload_file(p, display_name="Consulta")
-                        res = invocar_ia_segura(["Actúa como JEFE. Dame Diagnóstico, Criterio y Extracto.", f])
-                        st.markdown(res.text)
-                        st.session_state.consultas_ia += 1; incrementar_contador_ia()
-                        os.remove(p)
-                    except Exception as e: st.error(str(e))
+        st.title("🧠 Asesor Inteligente")
+        st.info("Este módulo está en mantenimiento para optimización de IA.")
+        # Aquí puedes volver a poner tu código de Gemini cuando lo ajustemos
 
-    # --- MÓDULO TH ---
+    # 3. MÓDULO TALENTO HUMANO
     elif st.session_state.active_module == 'th':
-        if not st.session_state.th_unlocked:
-            st.markdown("### 👤 Talento Humano"); pwd = st.text_input("Contraseña:", type="password")
-            if st.button("Ingresar"): 
-                if pwd == config_sistema.get("pass_th", "THDINIC123"): st.session_state.th_unlocked = True; st.rerun()
-                else: st.error("Incorrecto")
-        else:
-            components.html(get_generador_policial_html(), height=800, scrolling=True)
-            if st.button("Cerrar"): st.session_state.th_unlocked = False; st.rerun()
+        st.title("👤 Talento Humano")
+        st.warning("Área restringida. Ingrese credenciales de TH.")
+        # Aquí iría la lógica de TH
 
-    # --- MÓDULO ADMINISTRADOR (RESTAURADO) ---
+    # 4. MÓDULO ADMIN
     elif st.session_state.active_module == 'admin':
-        st.markdown("### 🛡️ ADMINISTRADOR"); pwd = st.text_input("Contraseña Maestra:", type="password")
-        if st.session_state.user_role == "admin" and pwd == ADMIN_PASS_MASTER:
-            t1, t2, t3, t4 = st.tabs(["Monitor", "Contratos", "Historial", "Config"])
-            with t1:
-                data = [{"Usuario": f"{v['grado']} {v['nombre']}", "Estado": get_estado_usuario(k)} for k,v in db_usuarios.items()]
-                st.dataframe(pd.DataFrame(data), use_container_width=True)
-            with t2:
-                if db_contratos:
-                    for k, v in db_contratos.items():
-                        c1, c2, c3 = st.columns([2,1,1])
-                        c1.write(f"{v['usuario']} ({v['fecha']})")
-                        c2.download_button("⬇️", generar_html_contrato(db_usuarios.get(k,{}), v["foto"]), f"C_{k}.html", key=f"dl_{k}")
-                        if c3.button("🗑️", key=f"del_{k}"): del db_contratos[k]; guardar_json(CONTRATOS_FILE, db_contratos); st.rerun()
-                else: st.info("Vacío")
-            with t3: st.dataframe(pd.DataFrame(db_logs), use_container_width=True)
-            with t4:
-                st.caption("Contadores"); val = st.number_input("Consultas IA:", value=config_sistema.get("consultas_ia_global",0))
-                if st.button("Guardar IA"): config_sistema["consultas_ia_global"]=val; guardar_json(CONFIG_FILE, config_sistema); st.success("OK")
+        st.title("🛡️ Panel de Administrador")
+        st.write("Gestión de Usuarios y Logs del Sistema.")
+        st.dataframe(pd.DataFrame.from_dict(db_usuarios, orient='index'))
